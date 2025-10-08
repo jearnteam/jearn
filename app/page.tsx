@@ -1,10 +1,8 @@
-import Image from "next/image";
-
 export default function Home() {
   return (
     
     <>
-    	<div>もしもし!!</div>
+    	<div>もしもし!!もしもし!!もしもし!!もしもしmoshimoshi!!</div>
     </>
   );
 }
