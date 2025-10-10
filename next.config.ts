@@ -1,13 +1,9 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
-
-const path = require("path");
-
-module.exports = {
   outputFileTracingRoot: path.join(__dirname),
+  allowedDevOrigins: ["https://kioh.jearn.site", "https://ssh.jearn.site"],
 };
 
 export default nextConfig;
