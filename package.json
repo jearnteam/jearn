@@ -9,11 +9,18 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tiptap/extension-strike": "^3.6.6",
+    "@tiptap/extension-underline": "^3.6.6",
+    "@tiptap/react": "^3.6.6",
+    "@tiptap/starter-kit": "^3.6.6",
+    "katex": "^0.16.23",
+    "mongodb": "^6.20.0",
     "mongoose": "^8.19.1",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "swr": "^2.3.6"
+    "swr": "^2.3.6",
+    "tippy.js": "^6.3.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -22,7 +29,7 @@
     "@types/react": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.1.14",
     "typescript": "^5"
   }
 }

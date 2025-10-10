@@ -1,5 +1,9 @@
 "use client";
+
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+
+const PostEditor = dynamic(() => import("@/components/PostEditor"), { ssr: false });
 
 interface Post {
   _id: string;
@@ -11,7 +15,7 @@ export default function HomePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(""); // TipTap HTML
   const [submitting, setSubmitting] = useState(false);
 
   async function fetchData() {
@@ -36,7 +40,6 @@ export default function HomePage() {
     setSubmitting(false);
   }
 
-  // 🆕 Edit Post
   async function handleEdit(id: string) {
     const newTitle = prompt("New title:");
     const newContent = prompt("New content:");
@@ -49,7 +52,6 @@ export default function HomePage() {
     });
   }
 
-  // 🗑️ Delete Post
   async function handleDelete(id: string) {
     if (!confirm("Are you sure?")) return;
 
@@ -62,33 +64,18 @@ export default function HomePage() {
 
   useEffect(() => {
     fetchData();
-
     const eventSource = new EventSource("/api/stream");
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log("🔔 SSE:", data);
-
-      // ⚡ Handle different event types
-      if (data.type === "new-post") {
-        setPosts((prev) => [...prev, data.post]);
-      }
-
-      if (data.type === "update-post") {
-        setPosts((prev) =>
-          prev.map((p) => (p._id === data.post._id ? data.post : p))
-        );
-      }
-
-      if (data.type === "delete-post") {
+      if (data.type === "new-post") setPosts((prev) => [...prev, data.post]);
+      if (data.type === "update-post")
+        setPosts((prev) => prev.map((p) => (p._id === data.post._id ? data.post : p)));
+      if (data.type === "delete-post")
         setPosts((prev) => prev.filter((p) => p._id !== data.id));
-      }
     };
 
-    eventSource.onerror = (err) => {
-      console.error("❌ SSE error:", err);
-    };
-
+    eventSource.onerror = (err) => console.error("❌ SSE error:", err);
     return () => eventSource.close();
   }, []);
 
@@ -98,7 +85,7 @@ export default function HomePage() {
     <main className="p-6 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">MongoDB Data (Realtime CRUD)</h1>
 
-      {/* 📝 Add Post Form */}
+      {/* Add Post Form */}
       <form onSubmit={handleSubmit} className="mb-6 space-y-3">
         <input
           type="text"
@@ -107,13 +94,10 @@ export default function HomePage() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        <textarea
-          placeholder="Content"
-          className="w-full border rounded p-2"
-          rows={3}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        ></textarea>
+
+        {/* TipTap editor replaces textarea */}
+        <PostEditor onChange={setContent} />
+
         <button
           type="submit"
           disabled={submitting}
@@ -123,7 +107,7 @@ export default function HomePage() {
         </button>
       </form>
 
-      {/* 🗂️ Post List */}
+      {/* Post List */}
       {posts.length === 0 ? (
         <p>No posts found.</p>
       ) : (
@@ -134,10 +118,10 @@ export default function HomePage() {
               className="border p-3 rounded-md bg-gray-50 flex justify-between items-center"
             >
               <div>
-                <h2 className="font-semibold text-black">
-                  {post.title || "Untitled"}
-                </h2>
-                {post.content && <p className="text-black">{post.content}</p>}
+                <h2 className="font-semibold text-black">{post.title || "Untitled"}</h2>
+                {post.content && (
+                  <div className="text-black" dangerouslySetInnerHTML={{ __html: post.content }} />
+                )}
               </div>
               <div className="space-x-2">
                 <button

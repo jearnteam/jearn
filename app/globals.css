@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,51 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #999;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror {
+  font-family: 'Inter', sans-serif;
+  line-height: 1.6;
+}
+
+.ProseMirror p {
+  margin-bottom: 0.5rem;
+}
+
+.ProseMirror u {
+  text-decoration: underline;
+  text-decoration-color: #f63b3b; /* tailwind blue-500 */
+}
+
+.ProseMirror s {
+  text-decoration: line-through;
+}
+
+.ProseMirror code {
+  color: #29b935;
+  background-color: #f7f7f7;
+  padding: 3px;
+  border-radius: 4px;
+}
+
+code {
+  color: #29b935;
+  background-color: #f7f7f7;
+  padding: 3px;
+  border-radius: 4px;
+}
+
+.math-node {
+  background: #f1f5f9;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.95rem;
 }
