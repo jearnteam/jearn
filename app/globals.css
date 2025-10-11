@@ -21,8 +21,10 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  /*background: var(--background);
+  color: var(--foreground);*/
+  background-color: #493a8b; /* dark mode background */
+  color: #fff;
   font-family: Arial, Helvetica, sans-serif;
 }
 
@@ -37,6 +39,10 @@ body {
 .ProseMirror {
   font-family: 'Inter', sans-serif;
   line-height: 1.6;
+}
+
+.ProseMirror h1 {
+  font-size: xx-large;
 }
 
 .ProseMirror p {
@@ -54,14 +60,12 @@ body {
 
 .ProseMirror code {
   color: #29b935;
-  background-color: #f7f7f7;
   padding: 3px;
   border-radius: 4px;
 }
 
 code {
   color: #29b935;
-  background-color: #f7f7f7;
   padding: 3px;
   border-radius: 4px;
 }
@@ -71,4 +75,22 @@ code {
   padding: 2px 4px;
   border-radius: 4px;
   font-size: 0.95rem;
+  color: #0a0a0a;
+  user-select: none;           /* prevent text highlight from appearing */
+  -webkit-user-select: none;   /* Safari / Chrome */
+  -moz-user-select: none;      /* Firefox */
+  -ms-user-select: none;       /* IE / Edge */
+  cursor: pointer;
 }
+
+.math-node:hover {
+  background-color: #f0fdfa;  /* soft mint */
+}
+
+.ProseMirror h1 { font-size: 1.8rem; font-weight: 700; margin: .6rem 0; }
+.ProseMirror h2 { font-size: 1.5rem; font-weight: 600; margin: .5rem 0; }
+.ProseMirror h3 { font-size: 1.25rem; font-weight: 500; margin: .4rem 0; }
+.ProseMirror blockquote {
+  border-left: 4px solid #9ca3af; padding-left: 1rem; color: #4b5563; font-style: italic;
+}
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem; }

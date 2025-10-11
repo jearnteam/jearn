@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 
 export async function GET() {
   const client = await clientPromise;
-  const db = client.db("test");
+  const db = client.db("jearn");
   const messages = await db.collection("messages").find().sort({ _id: 1 }).toArray();
   return NextResponse.json(messages);
 }
@@ -13,7 +13,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const { name, text } = await req.json();
   const client = await clientPromise;
-  const db = client.db("test");
+  const db = client.db("jearn");
 
   const message = { name, text, createdAt: new Date() };
   const result = await db.collection("messages").insertOne(message);
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   const { id, text } = await req.json();
   const client = await clientPromise;
-  const db = client.db("test");
+  const db = client.db("jearn");
 
   await db.collection("messages").updateOne(
     { _id: new ObjectId(id) },
@@ -41,7 +41,7 @@ export async function PUT(req: Request) {
 export async function DELETE(req: Request) {
   const { id } = await req.json();
   const client = await clientPromise;
-  const db = client.db("test");
+  const db = client.db("jearn");
 
   await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
   broadcastSSE({ type: "delete-message", id });

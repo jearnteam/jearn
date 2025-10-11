@@ -1,24 +1,26 @@
-const connections = new Set<WritableStreamDefaultWriter>();
+import { addSSEConnection, removeSSEConnection } from "@/lib/sse";
 
 export async function GET() {
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
 
-  connections.add(writer);
+  // ➕ Add connection
+  addSSEConnection(writer);
 
-  // keep alive so the browser doesn't close the connection
+  // Keep alive
   const keepAlive = setInterval(() => {
     writer.write(`: keep-alive\n\n`);
   }, 20000);
 
   const close = () => {
     clearInterval(keepAlive);
-    connections.delete(writer);
+    removeSSEConnection(writer);
     writer.close();
   };
 
-  // clean up on client disconnect
-  const signal = new AbortController().signal;
+  // Close when client disconnects
+  const controller = new AbortController();
+  const signal = controller.signal;
   signal.addEventListener("abort", close);
 
   return new Response(stream.readable, {
@@ -28,13 +30,4 @@ export async function GET() {
       "Connection": "keep-alive",
     },
   });
-}
-
-export function broadcastSSE(data: any) {
-  const message = `data: ${JSON.stringify(data)}\n\n`;
-  for (const writer of connections) {
-    writer.write(message).catch(() => {
-      connections.delete(writer);
-    });
-  }
 }
