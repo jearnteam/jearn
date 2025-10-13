@@ -1,33 +1,37 @@
 import { addSSEConnection, removeSSEConnection } from "@/lib/sse";
 
-export async function GET() {
+export async function GET(req: Request) {
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
 
-  // ➕ Add connection
+  // Add the connection
   addSSEConnection(writer);
 
-  // Keep alive
+  // Send initial event (flush headers)
+  writer.write(`: connected\n\n`);
+
+  // Keep alive to prevent timeouts
   const keepAlive = setInterval(() => {
-    writer.write(`: keep-alive\n\n`);
+    writer.write(`: keep-alive\n\n`).catch(() => {
+      clearInterval(keepAlive);
+      removeSSEConnection(writer);
+    });
   }, 20000);
 
-  const close = () => {
+  // Handle client disconnect
+  const signal = req.signal;
+  signal.addEventListener("abort", () => {
     clearInterval(keepAlive);
     removeSSEConnection(writer);
     writer.close();
-  };
-
-  // Close when client disconnects
-  const controller = new AbortController();
-  const signal = controller.signal;
-  signal.addEventListener("abort", close);
+  });
 
   return new Response(stream.readable, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*", // or your domain
     },
   });
 }

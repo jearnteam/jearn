@@ -1,4 +1,3 @@
-// lib/sse.ts
 const connections = new Set<WritableStreamDefaultWriter>();
 
 export function addSSEConnection(writer: WritableStreamDefaultWriter) {
