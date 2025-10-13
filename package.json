@@ -9,18 +9,34 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tiptap/extension-placeholder": "^3.6.6",
+    "@tiptap/extension-strike": "^3.6.6",
+    "@tiptap/extension-underline": "^3.6.6",
+    "@tiptap/react": "^3.6.6",
+    "@tiptap/starter-kit": "^3.6.6",
+    "dayjs": "^1.11.18",
+    "framer-motion": "^12.23.24",
+    "i18next": "^25.6.0",
+    "jose": "^6.1.0",
+    "katex": "^0.16.23",
+    "lucide-react": "^0.545.0",
+    "mongodb": "^6.20.0",
+    "mongoose": "^8.19.1",
+    "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.4"
+    "react-i18next": "^16.0.0",
+    "swr": "^2.3.6",
+    "tippy.js": "^6.3.7"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5"
   }
 }
