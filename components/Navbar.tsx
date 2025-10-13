@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
@@ -31,8 +32,12 @@ export default function Navbar() {
       <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3 text-black">
         <div className="flex items-center gap-3">
           <ThreeBall />
-          <h1 className="text-xl font-" style={{ fontFamily: "'Shadows Into Light', cursive" }}>JEARN</h1>
-          
+          <h1
+            className="text-xl font-semibold"
+            style={{ fontFamily: "'Shadows Into Light', cursive" }}
+          >
+            JEARN
+          </h1>
         </div>
 
         {/* RIGHT SIDE: Language + User Info */}
@@ -42,10 +47,13 @@ export default function Navbar() {
           {user ? (
             <>
               {user.picture && (
-                <img
+                <Image
                   src={user.picture}
                   alt="avatar"
-                  className="w-8 h-8 rounded-full border"
+                  width={32}
+                  height={32}
+                  className="rounded-full border"
+                  priority
                 />
               )}
               <span className="text-black text-sm">

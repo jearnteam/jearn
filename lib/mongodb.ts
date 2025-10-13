@@ -1,4 +1,3 @@
-// lib/mongodb.ts
 import { MongoClient } from "mongodb";
 
 if (!process.env.MONGODB_URI) {
@@ -8,17 +7,19 @@ if (!process.env.MONGODB_URI) {
 const uri = process.env.MONGODB_URI;
 const options = {};
 
-let client;
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
+// ✅ Declare global type so TS knows about _mongoClientPromise
+declare global {
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+}
+
 if (process.env.NODE_ENV === "development") {
-  // @ts-ignore
   if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
-    // @ts-ignore
     global._mongoClientPromise = client.connect();
   }
-  // @ts-ignore
   clientPromise = global._mongoClientPromise;
 } else {
   client = new MongoClient(uri, options);

@@ -1,11 +1,21 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { headers, cookies } from "next/headers";
 import { verifyCfAccess } from "@/lib/verifyCfAccess";
 import { upsertUser } from "@/lib/user";
 
+// 👇 define a type for the claims returned by verifyCfAccess
+interface CfAccessClaims {
+  sub?: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+  email_verified?: boolean;
+  [key: string]: unknown; // for extra fields we don't care about
+}
+
 export async function GET() {
-  const h = await headers();
-  const tokenFromHeader = h.get("cf-access-jwt-assertion");
+  const h = headers();
+  const tokenFromHeader = (await h).get("cf-access-jwt-assertion");
   const tokenFromCookie = (await cookies()).get("CF_Authorization")?.value;
   const token = tokenFromHeader ?? tokenFromCookie;
 
@@ -14,16 +24,16 @@ export async function GET() {
   }
 
   try {
-    const claims = await verifyCfAccess(token);
+    const claims = (await verifyCfAccess(token)) as CfAccessClaims;
 
     const provider_id = String(claims.sub ?? claims.email ?? "");
     if (!provider_id) throw new Error("Missing sub/email in claims");
 
     const user = await upsertUser(provider_id, {
-      email: claims.email as string | undefined,
-      name: claims.name as string | undefined,
-      picture: (claims as any).picture as string | undefined,
-      email_verified: (claims as any).email_verified ?? true,
+      email: claims.email,
+      name: claims.name,
+      picture: claims.picture,
+      email_verified: claims.email_verified ?? true,
     });
 
     return NextResponse.json({
@@ -36,8 +46,11 @@ export async function GET() {
         email_verified: user.email_verified,
       },
     });
-  } catch (err: any) {
-    console.error("CF verify/upsert error:", err?.message || err);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown error during verification";
+    console.error("CF verify/upsert error:", message);
+
     return NextResponse.json({ error: "Invalid token" }, { status: 403 });
   }
 }

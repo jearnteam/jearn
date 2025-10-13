@@ -4,7 +4,7 @@ import { PostForm, PostList } from "@/components/posts";
 import { usePosts } from "@/features/posts/hooks/usePosts";
 
 export default function HomePage() {
-  const { posts, loading, addPost, editPost, deletePost } = usePosts();
+  const { posts, addPost, editPost, deletePost } = usePosts();
 
   return (
     <div className="p-6 max-w-xl mx-auto">

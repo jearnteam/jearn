@@ -8,7 +8,7 @@ export function removeSSEConnection(writer: WritableStreamDefaultWriter) {
   connections.delete(writer);
 }
 
-export function broadcastSSE(data: any) {
+export function broadcastSSE(data: unknown) {
   const message = `data: ${JSON.stringify(data)}\n\n`;
   for (const writer of connections) {
     writer.write(message).catch(() => {

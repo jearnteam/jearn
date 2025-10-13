@@ -59,6 +59,7 @@ export default function PostForm({
       {/* 📝 Title */}
       <input
         type="text"
+        name="title input"
         placeholder={t("title")}
         className="w-full border border-black rounded p-2"
         value={title}
