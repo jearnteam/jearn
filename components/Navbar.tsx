@@ -3,6 +3,7 @@
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
+import ThreeBall from "./3d_spinner";
 
 export default function Navbar() {
   const { user } = useCurrentUser();
@@ -26,12 +27,16 @@ export default function Navbar() {
   };
 
   return (
-    <header className="w-full bg-white border-b shadow-sm">
-      <div className="max-w-5xl text-black mx-auto flex justify-between items-center px-4 py-3">
-        <h1 className="text-xl font-bold">JEARN</h1>
-
+    <header className="fixed top-0 left-0 w-full bg-white border-b shadow-sm z-50">
+      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3 text-black">
         <div className="flex items-center gap-3">
-          {/* 🌐 Language Toggle */}
+          <ThreeBall />
+          <h1 className="text-xl font-" style={{ fontFamily: "'Shadows Into Light', cursive" }}>JEARN</h1>
+          
+        </div>
+
+        {/* RIGHT SIDE: Language + User Info */}
+        <div className="flex items-center gap-3">
           <LangSwitcher />
 
           {user ? (

@@ -1,5 +1,7 @@
 "use client";
 
+import "tippy.js/dist/tippy.css";
+import "katex/dist/katex.min.css";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -9,9 +11,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import { TextSelection } from "@tiptap/pm/state";
 import { useEffect, useRef } from "react";
 import tippy, { type Instance } from "tippy.js";
-import "tippy.js/dist/tippy.css";
 import { MathExtension } from "@/components/math/MathExtension";
-import "katex/dist/katex.min.css";
 import { useTranslation } from "react-i18next";
 
 interface PostEditorProps {

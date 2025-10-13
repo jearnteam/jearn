@@ -3,9 +3,6 @@
 import { useEffect, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
-import Strike from "@tiptap/extension-strike";
-import Gapcursor from "@tiptap/extension-gapcursor";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextSelection } from "@tiptap/pm/state";
 import tippy, { type Instance } from "tippy.js";
@@ -28,10 +25,7 @@ export default function PostEditorInner({ onChange }: PostEditorInnerProps) {
     autofocus: false,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
-      Strike,
       MathExtension,
-      Gapcursor,
       Placeholder.configure({
         placeholder: () => t("placeholder"),
         showOnlyWhenEditable: true,
