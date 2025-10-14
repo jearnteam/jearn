@@ -1,10 +1,11 @@
 "use client";
-
-import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
-import ThreeBall from "./3d_spinner";
+
+// 🚀 dynamically import to disable SSR
+const ThreeBall = dynamic(() => import("./3d_spinner"), { ssr: false });
 
 export default function Navbar() {
   const { user } = useCurrentUser();
@@ -31,29 +32,26 @@ export default function Navbar() {
     <header className="fixed top-0 left-0 w-full bg-white border-b shadow-sm z-50">
       <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3 text-black">
         <div className="flex items-center gap-3">
-          <ThreeBall />
+          <div className="w-12 h-8 flex items-center justify-center">
+            <ThreeBall />
+          </div>
           <h1
-            className="text-xl font-semibold"
+            className="text-xl font-bold"
             style={{ fontFamily: "'Shadows Into Light', cursive" }}
           >
             JEARN
           </h1>
         </div>
 
-        {/* RIGHT SIDE: Language + User Info */}
         <div className="flex items-center gap-3">
           <LangSwitcher />
-
           {user ? (
             <>
               {user.picture && (
-                <Image
+                <img
                   src={user.picture}
                   alt="avatar"
-                  width={32}
-                  height={32}
-                  className="rounded-full border"
-                  priority
+                  className="w-8 h-8 rounded-full border"
                 />
               )}
               <span className="text-black text-sm">
