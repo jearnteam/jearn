@@ -10,7 +10,7 @@ i18n.use(initReactI18next).init({
       translation: {
         jearn: "JEARN",
         logout: "Logout",
-        notLoggedIn: "🔒 Not logged in",
+        login: "Login",
         title: "title",
         placeholder: "Type in what you wanna share with everyone",
         heading1: "H1",
@@ -22,7 +22,7 @@ i18n.use(initReactI18next).init({
       translation: {
         jearn: "JEARN", // or a Japanese name if you want
         logout: "ログアウト",
-        notLoggedIn: "🔒 ログインしていません",
+        login: "ログイン",
         title: "テーマ",
         placeholder: "みんなと共有したいことを入力してください",
         heading1: "見出し1",

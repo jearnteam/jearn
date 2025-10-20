@@ -59,7 +59,7 @@ export default function PostEditorInner({ onChange }: PostEditorInnerProps) {
     editor.view.dispatch(editor.state.tr);
   }, [i18n.language, editor]);
 
-  // Initialize a valid selection at start (prevents first-typed-char reset)
+  // Initialize selection
   useEffect(() => {
     if (!editor) return;
     requestAnimationFrame(() => {
@@ -73,7 +73,7 @@ export default function PostEditorInner({ onChange }: PostEditorInnerProps) {
     });
   }, [editor]);
 
-  // Markdown-ish shortcuts (space-triggered)
+  // Markdown-like shortcuts
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
@@ -281,10 +281,8 @@ export default function PostEditorInner({ onChange }: PostEditorInnerProps) {
         </button>
       </div>
 
-      {/* Editor */}
       <EditorContent editor={e} />
 
-      {/* Counter */}
       <div className="text-right text-sm text-gray-400 mt-1">
         {e.getText().length}/280
       </div>

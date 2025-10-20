@@ -1,31 +1,27 @@
 "use client";
+
 import dynamic from "next/dynamic";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
 
-// 🚀 dynamically import to disable SSR
 const ThreeBall = dynamic(() => import("./3d_spinner"), { ssr: false });
 
 export default function Navbar() {
   const { user } = useCurrentUser();
   const { t } = useTranslation();
 
-  const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+  const handleLogout = () => {
+    // 👇 just redirect to your /logout page
+    window.location.href = "/logout";
+  };
 
-    const teamDomain = "https://jearn.cloudflareaccess.com";
-    const appDomain = "https://kioh.jearn.site";
-
-    const loginUrl = `${teamDomain}/cdn-cgi/access/login/${encodeURIComponent(
-      "kioh.jearn.site"
-    )}?force_reauth=true&return_to=${encodeURIComponent(appDomain)}`;
-
-    const logoutUrl = `${teamDomain}/cdn-cgi/access/logout?return_to=${encodeURIComponent(
-      loginUrl
+  const handleLogin = () => {
+    const returnTo =
+      typeof window !== "undefined" ? window.location.href : "https://www.jearn.site";
+    window.location.href = `https://www.jearn.site/cdn-cgi/access/login?return_to=${encodeURIComponent(
+      returnTo
     )}`;
-
-    window.location.href = logoutUrl;
   };
 
   return (
@@ -54,9 +50,7 @@ export default function Navbar() {
                   className="w-8 h-8 rounded-full border"
                 />
               )}
-              <span className="text-black text-sm">
-                {user.name || user.email}
-              </span>
+              <span className="text-black text-sm">{user.name || user.email}</span>
               <button
                 onClick={handleLogout}
                 className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
@@ -65,9 +59,15 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <span className="text-gray-600 text-sm">
-              {t("notLoggedIn") || "🔒 Not logged in"}
-            </span>
+            <>
+              <span>hello</span>
+              <button
+                onClick={handleLogin}
+                className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                {t("login") || "Login"}
+              </button>
+            </>
           )}
         </div>
       </div>

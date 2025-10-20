@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useTranslation } from "react-i18next";
-import PostEditorWrapper from "./PostEditorWrapper";
+import dynamic from "next/dynamic";
+
+// Use the wrapper to make editor stable with HMR
+const PostEditorWrapper = dynamic(() => import("./PostEditorWrapper"), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4 rounded-lg bg-gray-100 animate-pulse h-36"></div>
+  ),
+});
 
 export default function PostForm({
   onSubmit,
@@ -19,11 +26,10 @@ export default function PostForm({
     setAuthor("Anonymous");
   }, []);
 
-  const { t } = useTranslation();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() && !content.trim()) return;
+
     setSubmitting(true);
     await onSubmit(title, content, author);
     setTitle("");
@@ -46,16 +52,13 @@ export default function PostForm({
       )}
       <input
         type="text"
-        placeholder={t("title")}
+        placeholder="Title"
         className="w-full border border-black rounded p-2"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         disabled={submitting}
       />
-
-      {/* ✅ Editor wrapper handles the dynamic boundary */}
       <PostEditorWrapper onChange={setContent} />
-
       <div className="text-sm text-gray-600">
         Posting as : <span className="font-medium">{author}</span>
       </div>

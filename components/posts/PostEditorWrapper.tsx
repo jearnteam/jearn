@@ -1,20 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect } from "react";
-import PostEditorInner from "./PostEditorInner";
+
+// ✅ Dynamic import here (NOT in PostForm)
+const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
+  ssr: false,
+  loading: () => (
+    <div className="p-4 rounded-lg bg-gray-100 animate-pulse h-36"></div>
+  ),
+});
 
 export default function PostEditorWrapper({
   onChange,
 }: {
-  onChange: (contentHtml: string) => void;
+  onChange: (html: string) => void;
 }) {
   useEffect(() => {
-    // 👇 This ensures the editor doesn't “steal focus” on mount
     requestAnimationFrame(() => {
       const active = document.activeElement as HTMLElement | null;
-      if (active && active.tagName === "BODY") {
-        active.blur();
-      }
+      if (active && active.tagName === "BODY") active.blur();
     });
   }, []);
 
