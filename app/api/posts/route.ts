@@ -17,6 +17,8 @@ export async function POST(req: Request) {
   const client = await clientPromise;
   const db = client.db("jearn");
 
+  /* categorize */
+
   const newPost = {
     title,
     content,
