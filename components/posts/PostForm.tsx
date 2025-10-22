@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper from "./PostEditorWrapper";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export default function PostForm({
   onSubmit,
@@ -12,14 +13,18 @@ export default function PostForm({
 }) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [author, setAuthor] = useState("");
+  const [author, setAuthor] = useState("Anonymous");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    setAuthor("Anonymous");
-  }, []);
-
+  const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
+
+  // ✅ Set author name when user info is loaded
+  useEffect(() => {
+    if (!loading) {
+      setAuthor(user?.name || user?.email || "Anonymous");
+    }
+  }, [user, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +49,7 @@ export default function PostForm({
           <div className="h-6 w-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       )}
+
       <input
         type="text"
         placeholder={t("title")}
@@ -53,15 +59,17 @@ export default function PostForm({
         disabled={submitting}
       />
 
-      {/* ✅ Editor wrapper handles the dynamic boundary */}
-      <PostEditorWrapper onChange={setContent} />
+      <PostEditorWrapper value={content} onChange={setContent} />
 
       <div className="text-sm text-gray-600">
-        Posting as : <span className="font-medium">{author}</span>
+        Posting as :{" "}
+        <span className="font-medium">
+          {loading ? "Loading..." : author}
+        </span>
       </div>
       <button
         type="submit"
-        disabled={submitting}
+        disabled={submitting || loading}
         className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 w-full"
       >
         {submitting ? "Posting..." : "Post"}

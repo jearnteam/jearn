@@ -13,21 +13,24 @@ i18n.use(initReactI18next).init({
         login: "Login",
         title: "title",
         placeholder: "Type in what you wanna share with everyone",
-        heading1: "H1",
-        heading2: "H2",
-        heading3: "H3",
       },
     },
     ja: {
       translation: {
-        jearn: "JEARN", // or a Japanese name if you want
+        jearn: "JEARN",
         logout: "ログアウト",
         login: "ログイン",
         title: "テーマ",
         placeholder: "みんなと共有したいことを入力してください",
-        heading1: "見出し1",
-        heading2: "見出し2",
-        heading3: "見出し3",
+      },
+    },
+    my: {
+      translation: {
+        jearn: "JEARN",
+        logout: "အကောင့်ထွက်ရန်",
+        login: "ログイン",
+        title: "ခေါင်းစဥ်",
+        placeholder: "မျှဝေချင်တဲ့အကြောင်းအရာကိုရေးပါ",
       },
     },
   },
