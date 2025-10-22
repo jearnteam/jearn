@@ -12,7 +12,7 @@ import "katex/dist/katex.min.css";
 import { useTranslation } from "react-i18next";
 
 interface PostEditorInnerProps {
-  value: string;                    // ✅ added value prop
+  value: string;
   onChange: (contentHtml: string) => void;
 }
 
@@ -25,7 +25,9 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
   const editor = useEditor({
     autofocus: false,
     extensions: [
-      StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+      StarterKit.configure({
+        heading: { levels: [1, 2, 3] },
+      }),
       MathExtension,
       Placeholder.configure({
         placeholder: () => t("placeholder"),
@@ -33,7 +35,7 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
         showOnlyCurrent: false,
       }),
     ],
-    content: "",
+    content: value,
     immediatelyRender: false,
     editorProps: {
       attributes: {
@@ -54,10 +56,10 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   });
 
-  // 🧽 Reset content when parent `value` becomes empty
+  // 🈳 When `value` becomes empty, clear the editor content
   useEffect(() => {
     if (editor && value === "") {
-      editor.commands.clearContent();
+      editor.commands.setContent("");
     }
   }, [value, editor]);
 
@@ -85,7 +87,6 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
-
     const onKeyDown = (ev: KeyboardEvent) => {
       if (ev.key !== " ") return;
       const { state } = editor;
@@ -117,18 +118,15 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
         return;
       }
     };
-
     dom.addEventListener("keydown", onKeyDown);
     return () => dom.removeEventListener("keydown", onKeyDown);
   }, [editor]);
 
-  // Floating menu logic stays the same ⬇️
+  // Floating menu
   useEffect(() => {
     if (!editor || !menuRef.current) return;
-
     const reference = document.createElement("div");
     document.body.appendChild(reference);
-
     const instance = tippy(reference, {
       getReferenceClientRect: null,
       content: menuRef.current!,
@@ -138,7 +136,6 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
       hideOnClick: false,
       appendTo: document.body,
     });
-
     instance.hide();
     reference.style.pointerEvents = "none";
     tippyRef.current = instance;
@@ -150,7 +147,6 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
         instance.hide();
         return;
       }
-
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return;
       const rect = sel.getRangeAt(0).getBoundingClientRect();
@@ -177,6 +173,7 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
   if (!editor) return null;
   const e = editor;
 
+  // Restore selection for formatting buttons
   const withRestoredSelection = (
     chainOp: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
   ) => {
@@ -197,19 +194,74 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
         ref={menuRef}
         className="flex gap-2 bg-white border border-black rounded-md shadow-md p-1 text-black"
       >
-        {/* same toolbar buttons... */}
         <button
           onMouseDown={preventMouseDown}
-          onClick={() =>
-            withRestoredSelection((c) => c.toggleHeading({ level: 1 }))
-          }
-          className={`px-2 py-1 rounded ${
-            e.isActive("heading", { level: 1 }) ? "bg-gray-200 font-bold" : ""
-          }`}
+          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 1 }))}
+          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 1 }) ? "bg-gray-200 font-bold" : ""}`}
         >
           H1
         </button>
-        {/* ... rest of buttons unchanged */}
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 2 }))}
+          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 2 }) ? "bg-gray-200 font-bold" : ""}`}
+        >
+          H2
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 3 }))}
+          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 3 }) ? "bg-gray-200 font-bold" : ""}`}
+        >
+          H3
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleBold())}
+          className={`px-2 py-1 rounded ${e.isActive("bold") ? "bg-gray-200 font-bold" : ""}`}
+        >
+          B
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleItalic())}
+          className={`px-2 py-1 rounded ${e.isActive("italic") ? "bg-gray-200 italic" : ""}`}
+        >
+          I
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleUnderline())}
+          className={`px-2 py-1 rounded ${e.isActive("underline") ? "bg-gray-200 underline" : ""}`}
+        >
+          U
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleStrike())}
+          className={`px-2 py-1 rounded ${e.isActive("strike") ? "bg-gray-200 line-through" : ""}`}
+        >
+          S
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => withRestoredSelection((c) => c.toggleCode())}
+          className={`px-2 py-1 rounded ${e.isActive("code") ? "bg-gray-200" : ""}`}
+        >
+          {"</>"}
+        </button>
+        <button
+          onMouseDown={preventMouseDown}
+          onClick={() => {
+            const selection = window.getSelection()?.toString();
+            if (selection && selection.trim() !== "") {
+              withRestoredSelection((c) => c.insertMath(selection.trim()));
+            }
+          }}
+          className="px-2 py-1 rounded hover:bg-gray-200"
+        >
+          ∑
+        </button>
       </div>
 
       <EditorContent editor={e} />

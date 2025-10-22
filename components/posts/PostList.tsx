@@ -1,16 +1,21 @@
-"use client";
-
 import { Post } from "@/features/posts/hooks/usePosts";
 import PostItem from "./PostItem";
 import { motion } from "framer-motion";
+
+interface UpvoteResponse {
+  ok: boolean;
+  error?: string;
+  action?: "added" | "removed";
+}
 
 interface Props {
   posts: Post[];
   onEdit: (id: string, title?: string, content?: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onUpvote: (id: string, userId: string) => Promise<UpvoteResponse>; // ✅ updated
 }
 
-export default function PostList({ posts, onEdit, onDelete }: Props) {
+export default function PostList({ posts, onEdit, onDelete, onUpvote }: Props) {
   if (posts.length === 0) {
     return (
       <motion.div
@@ -40,6 +45,7 @@ export default function PostList({ posts, onEdit, onDelete }: Props) {
           post={post}
           onEdit={onEdit}
           onDelete={onDelete}
+          onUpvote={onUpvote} // ✅ now typed correctly
         />
       ))}
     </motion.ul>

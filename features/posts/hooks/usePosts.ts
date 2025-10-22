@@ -9,6 +9,8 @@ export interface Post {
   content?: string;
   author?: string;
   createdAt?: string;
+  upvoters?: string[];
+  upvoteCount?: number;
 }
 
 export function usePosts() {
@@ -59,6 +61,18 @@ export function usePosts() {
     [fetchData]
   );
 
+  const upvotePost = useCallback(
+    async (id: string, userId: string) => {
+      await fetch(`/api/posts/${id}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      await fetchData(); // 🔁 refresh posts after upvote
+    },
+    [fetchData]
+  );
+
   useEffect(() => {
     fetchData();
     const eventSource = new EventSource("/api/stream");
@@ -79,5 +93,5 @@ export function usePosts() {
     return () => eventSource.close();
   }, [fetchData]);
 
-  return { posts, loading, addPost, editPost, deletePost };
+  return { posts, loading, addPost, editPost, deletePost, upvotePost };
 }

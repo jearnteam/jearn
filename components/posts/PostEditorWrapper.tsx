@@ -1,7 +1,7 @@
 "use client";
 
+import { useState } from "react";
 import dynamic from "next/dynamic";
-import { useEffect } from "react";
 
 const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
   ssr: false,
