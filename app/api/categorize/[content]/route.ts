@@ -6,6 +6,6 @@ export async function GET(
   { params }: { params: { content: string } }
 ) {
   const { content } = params;
-  const result = await categorize(content); // important: await here!
+  const result = await categorize(content);
   return NextResponse.json(result);
 }
