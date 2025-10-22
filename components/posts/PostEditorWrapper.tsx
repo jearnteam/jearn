@@ -3,7 +3,6 @@
 import dynamic from "next/dynamic";
 import { useEffect } from "react";
 
-// ✅ Dynamic import here (NOT in PostForm)
 const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
   ssr: false,
   loading: () => (
@@ -12,16 +11,11 @@ const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
 });
 
 export default function PostEditorWrapper({
+  value,
   onChange,
 }: {
+  value: string;
   onChange: (html: string) => void;
 }) {
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      const active = document.activeElement as HTMLElement | null;
-      if (active && active.tagName === "BODY") active.blur();
-    });
-  }, []);
-
-  return <PostEditorInner onChange={onChange} />;
+  return <PostEditorInner value={value} onChange={onChange} />;
 }

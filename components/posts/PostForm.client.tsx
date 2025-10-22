@@ -58,7 +58,7 @@ export default function PostForm({
         onChange={(e) => setTitle(e.target.value)}
         disabled={submitting}
       />
-      <PostEditorWrapper onChange={setContent} />
+      <PostEditorWrapper value={content} onChange={setContent} />
       <div className="text-sm text-gray-600">
         Posting as : <span className="font-medium">{author}</span>
       </div>

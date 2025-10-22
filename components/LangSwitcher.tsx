@@ -5,16 +5,19 @@ import { useTranslation } from "react-i18next";
 export default function LangSwitcher() {
   const { i18n } = useTranslation();
 
-  const toggleLang = () => {
-    i18n.changeLanguage(i18n.language === "en" ? "ja" : "en");
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    i18n.changeLanguage(e.target.value);
   };
 
   return (
-    <button
-      onClick={toggleLang}
-      className="px-3 py-1 text-sm border rounded hover:bg-gray-100"
+    <select
+      onChange={handleChange}
+      value={i18n.language}
+      className="px-3 py-1 text-sm border rounded cursor-pointer hover:bg-gray-100"
     >
-      {i18n.language === "en" ? "日本語" : "English"}
-    </button>
+      <option value="en">English</option>
+      <option value="ja">日本語</option>
+      <option value="my">မြန်မာ</option>
+    </select>
   );
 }
