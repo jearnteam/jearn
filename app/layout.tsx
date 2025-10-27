@@ -29,7 +29,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <I18nProvider>
           <Navbar /> {/* ✅ directly imported client component */}
-          <main className="max-w-5xl mx-auto p-4 pt-16">{children}</main>
+          <main>{children}</main>
         </I18nProvider>
       </body>
     </html>

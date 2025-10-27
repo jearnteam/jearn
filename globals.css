@@ -24,6 +24,17 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
 .ProseMirror p.is-editor-empty:first-child::before {
   color: #999;
   content: attr(data-placeholder);
@@ -107,4 +118,10 @@ code {
 .ProseMirror ul,
 .ProseMirror ol {
   padding-left: 1.5rem;
+}
+
+.hashtag-tag {
+  color: #2563eb;
+  text-decoration: underline;
+  cursor: pointer;
 }

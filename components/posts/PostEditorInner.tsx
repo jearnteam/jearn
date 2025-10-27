@@ -6,70 +6,112 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextSelection } from "@tiptap/pm/state";
 import tippy, { type Instance } from "tippy.js";
-import { MathExtension } from "@/components/math/MathExtension";
 import "tippy.js/dist/tippy.css";
 import "katex/dist/katex.min.css";
 import { useTranslation } from "react-i18next";
+import { MathExtension } from "@/components/math/MathExtension";
+import { Tag } from "@/features/Tag";
+
+// 🚫 StarterKit without default markdown input rules
+const NoInputRulesStarterKit = StarterKit.extend({
+  addInputRules() {
+    return [];
+  },
+});
 
 interface PostEditorInnerProps {
   value: string;
   onChange: (contentHtml: string) => void;
 }
 
-export default function PostEditorInner({ value, onChange }: PostEditorInnerProps) {
+export default function PostEditorInner({
+  value,
+  onChange,
+}: PostEditorInnerProps) {
   const { t, i18n } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
   const lastSelRef = useRef<{ from: number; to: number } | null>(null);
 
-  const editor = useEditor({
-    autofocus: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-      }),
-      MathExtension,
-      Placeholder.configure({
-        placeholder: () => t("placeholder"),
-        showOnlyWhenEditable: true,
-        showOnlyCurrent: false,
-      }),
-    ],
-    content: value,
-    immediatelyRender: false,
-    editorProps: {
-      attributes: {
-        class:
-          "min-h-[120px] w-full rounded-md border border-black p-3 text-base text-black focus:outline-none focus:ring-2 focus:ring-blue-500",
-      },
-      handleDOMEvents: {
-        pointerdown: (view) => {
-          if (document.activeElement !== view.dom) view.focus();
-          return false;
+  // 📝 Initialize editor
+  const editor = useEditor(
+    {
+      autofocus: false,
+      extensions: [
+        NoInputRulesStarterKit,
+        Tag,
+        MathExtension,
+        Placeholder.configure({
+          placeholder: () => t("placeholder"),
+          showOnlyWhenEditable: true,
+          showOnlyCurrent: false,
+        }),
+      ],
+      content: value,
+      immediatelyRender: false,
+      editorProps: {
+        attributes: {
+          class:
+            "min-h-[250px] w-full rounded-md border border-black p-3 text-base text-black focus:outline-none focus:ring-2 focus:ring-black-200",
+          spellcheck: "false", // 👈 must be lowercase and string
+          autocorrect: "off",
+          autocapitalize: "off",
         },
-        mousedown: (view) => {
-          if (document.activeElement !== view.dom) view.focus();
-          return false;
+        handleDOMEvents: {
+          pointerdown: (view) => {
+            if (document.activeElement !== view.dom) view.focus();
+            return false;
+          },
+          mousedown: (view) => {
+            if (document.activeElement !== view.dom) view.focus();
+            return false;
+          },
         },
       },
-    },
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
-  });
 
-  // 🈳 When `value` becomes empty, clear the editor content
+      onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    },
+    [i18n.language]
+  ); // 👈 language as dependency
+
+  // 🈳 Reset content when `value` becomes empty
   useEffect(() => {
     if (editor && value === "") {
       editor.commands.setContent("");
     }
   }, [value, editor]);
 
-  // Update placeholder when language changes
+  // 🌐 Debug language change
+  useEffect(() => {
+    console.log("[🌐 LANG CHANGED]", i18n.language);
+  }, [i18n.language]);
+
+  // 🌍 Update placeholder on language change
   useEffect(() => {
     if (!editor) return;
-    editor.view.dispatch(editor.state.tr);
-  }, [i18n.language, editor]);
 
-  // Initialize selection
+    // 🔁 Reconfigure the Placeholder extension with the new language
+    editor
+      .chain()
+      .command(({ tr, state }) => {
+        const placeholderExtension = editor.extensionManager.extensions.find(
+          (ext) => ext.name === "placeholder"
+        );
+
+        if (placeholderExtension) {
+          placeholderExtension.options.placeholder = () => t("placeholder");
+        }
+
+        // 🪄 Force transaction to refresh UI
+        editor.view.dispatch(tr);
+        editor.commands.blur();
+        setTimeout(() => editor.commands.focus(), 50);
+        return true;
+      })
+      .run();
+  }, [i18n.language, editor, t]);
+
+  // 🪄 Initialize selection at mount
   useEffect(() => {
     if (!editor) return;
     requestAnimationFrame(() => {
@@ -83,46 +125,25 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
     });
   }, [editor]);
 
-  // Markdown-like shortcuts
+  // 🟦 Tag click handler
   useEffect(() => {
     if (!editor) return;
     const dom = editor.view.dom as HTMLElement;
-    const onKeyDown = (ev: KeyboardEvent) => {
-      if (ev.key !== " ") return;
-      const { state } = editor;
-      const { $from } = state.selection;
-      const from = $from.start();
-      const to = $from.pos;
-      const raw = state.doc.textBetween(from, to, "\n", "\n");
-      const chain = editor.chain().focus();
 
-      if (/^#{1,3}$/.test(raw)) {
-        ev.preventDefault();
-        const level = raw.length as 1 | 2 | 3;
-        chain.deleteRange({ from, to }).toggleHeading({ level }).run();
-        return;
-      }
-      if (raw === "-") {
-        ev.preventDefault();
-        chain.deleteRange({ from, to }).toggleBulletList().run();
-        return;
-      }
-      if (/^\d+\.$/.test(raw)) {
-        ev.preventDefault();
-        chain.deleteRange({ from, to }).toggleOrderedList().run();
-        return;
-      }
-      if (raw === ">") {
-        ev.preventDefault();
-        chain.deleteRange({ from, to }).toggleBlockquote().run();
-        return;
+    const handleClick = (ev: MouseEvent) => {
+      const target = ev.target as HTMLElement;
+      if (target?.dataset?.tag !== undefined) {
+        const tagText = target.dataset.tag;
+        console.log("Clicked tag:", tagText);
+        // 👉 You can route or filter posts here
       }
     };
-    dom.addEventListener("keydown", onKeyDown);
-    return () => dom.removeEventListener("keydown", onKeyDown);
+
+    dom.addEventListener("click", handleClick);
+    return () => dom.removeEventListener("click", handleClick);
   }, [editor]);
 
-  // Floating menu
+  // 🧰 Floating menu setup
   useEffect(() => {
     if (!editor || !menuRef.current) return;
     const reference = document.createElement("div");
@@ -173,7 +194,7 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
   if (!editor) return null;
   const e = editor;
 
-  // Restore selection for formatting buttons
+  // 🪄 Restore selection helper for toolbar
   const withRestoredSelection = (
     chainOp: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
   ) => {
@@ -188,7 +209,7 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
   const preventMouseDown = (ev: React.MouseEvent) => ev.preventDefault();
 
   return (
-    <div className="w-full max-w-xl mx-auto">
+    <div className="w-full mx-auto">
       {/* Floating Toolbar */}
       <div
         ref={menuRef}
@@ -196,57 +217,79 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
       >
         <button
           onMouseDown={preventMouseDown}
-          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 1 }))}
-          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 1 }) ? "bg-gray-200 font-bold" : ""}`}
+          onClick={() =>
+            withRestoredSelection((c) => c.toggleHeading({ level: 1 }))
+          }
+          className={`px-2 py-1 rounded ${
+            e.isActive("heading", { level: 1 }) ? "bg-gray-200 font-bold" : ""
+          }`}
         >
           H1
         </button>
         <button
           onMouseDown={preventMouseDown}
-          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 2 }))}
-          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 2 }) ? "bg-gray-200 font-bold" : ""}`}
+          onClick={() =>
+            withRestoredSelection((c) => c.toggleHeading({ level: 2 }))
+          }
+          className={`px-2 py-1 rounded ${
+            e.isActive("heading", { level: 2 }) ? "bg-gray-200 font-bold" : ""
+          }`}
         >
           H2
         </button>
         <button
           onMouseDown={preventMouseDown}
-          onClick={() => withRestoredSelection((c) => c.toggleHeading({ level: 3 }))}
-          className={`px-2 py-1 rounded ${e.isActive("heading", { level: 3 }) ? "bg-gray-200 font-bold" : ""}`}
+          onClick={() =>
+            withRestoredSelection((c) => c.toggleHeading({ level: 3 }))
+          }
+          className={`px-2 py-1 rounded ${
+            e.isActive("heading", { level: 3 }) ? "bg-gray-200 font-bold" : ""
+          }`}
         >
           H3
         </button>
         <button
           onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleBold())}
-          className={`px-2 py-1 rounded ${e.isActive("bold") ? "bg-gray-200 font-bold" : ""}`}
+          className={`px-2 py-1 rounded ${
+            e.isActive("bold") ? "bg-gray-200 font-bold" : ""
+          }`}
         >
           B
         </button>
         <button
           onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleItalic())}
-          className={`px-2 py-1 rounded ${e.isActive("italic") ? "bg-gray-200 italic" : ""}`}
+          className={`px-2 py-1 rounded ${
+            e.isActive("italic") ? "bg-gray-200 italic" : ""
+          }`}
         >
           I
         </button>
         <button
           onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleUnderline())}
-          className={`px-2 py-1 rounded ${e.isActive("underline") ? "bg-gray-200 underline" : ""}`}
+          className={`px-2 py-1 rounded ${
+            e.isActive("underline") ? "bg-gray-200 underline" : ""
+          }`}
         >
           U
         </button>
         <button
           onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleStrike())}
-          className={`px-2 py-1 rounded ${e.isActive("strike") ? "bg-gray-200 line-through" : ""}`}
+          className={`px-2 py-1 rounded ${
+            e.isActive("strike") ? "bg-gray-200 line-through" : ""
+          }`}
         >
           S
         </button>
         <button
           onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleCode())}
-          className={`px-2 py-1 rounded ${e.isActive("code") ? "bg-gray-200" : ""}`}
+          className={`px-2 py-1 rounded ${
+            e.isActive("code") ? "bg-gray-200" : ""
+          }`}
         >
           {"</>"}
         </button>
@@ -264,7 +307,8 @@ export default function PostEditorInner({ value, onChange }: PostEditorInnerProp
         </button>
       </div>
 
-      <EditorContent editor={e} />
+      {/* ✍️ The Editor */}
+      <EditorContent key={i18n.language} editor={editor} />
 
       <div className="text-right text-sm text-gray-400 mt-1">
         {e.getText().length}/280

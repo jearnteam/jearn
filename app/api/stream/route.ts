@@ -4,23 +4,21 @@ export async function GET(req: Request) {
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
 
-  // Add the connection
+  // add connection
   addSSEConnection(writer);
 
-  // Send initial event (flush headers)
+  // flush initial
   writer.write(`: connected\n\n`);
 
-  // Keep alive to prevent timeouts
+  // keep alive every 20s
   const keepAlive = setInterval(() => {
-    writer.write(`: keep-alive\n\n`).catch(() => {
+    writer.write(`: ping\n\n`).catch(() => {
       clearInterval(keepAlive);
       removeSSEConnection(writer);
     });
   }, 20000);
 
-  // Handle client disconnect
-  const signal = req.signal;
-  signal.addEventListener("abort", () => {
+  req.signal.addEventListener("abort", () => {
     clearInterval(keepAlive);
     removeSSEConnection(writer);
     writer.close();
@@ -31,7 +29,6 @@ export async function GET(req: Request) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       "Connection": "keep-alive",
-      "Access-Control-Allow-Origin": "*", // or your domain
     },
   });
 }

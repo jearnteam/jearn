@@ -1,39 +1,45 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper from "./PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-export default function PostForm({
-  onSubmit,
-}: {
-  onSubmit: (title: string, content: string, author: string) => Promise<void>;
-}) {
+interface PostFormProps {
+  onSubmit: (
+    title: string,
+    content: string,
+    authorId: string | null,
+    authorName: string,
+    authorAvatar: string | null
+  ) => Promise<void>;
+}
+
+export default function PostForm({ onSubmit }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [author, setAuthor] = useState("Anonymous");
   const [submitting, setSubmitting] = useState(false);
 
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
 
-  // ✅ Set author name when user info is loaded
-  useEffect(() => {
-    if (!loading) {
-      setAuthor(user?.name || user?.email || "Anonymous");
-    }
-  }, [user, loading]);
+  const authorId = user?._id || null;
+  const authorName = user?.name || "Anonymous";
+  const authorAvatar = user ? `/api/user/avatar/${user._id}?t=${Date.now()}` : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() && !content.trim()) return;
+
     setSubmitting(true);
-    await onSubmit(title, content, author);
-    setTitle("");
-    setContent("");
-    setSubmitting(false);
+    try {
+      await onSubmit(title, content, authorId, authorName, authorAvatar);
+      setTitle("");
+      setContent("");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -61,12 +67,23 @@ export default function PostForm({
 
       <PostEditorWrapper value={content} onChange={setContent} />
 
-      <div className="text-sm text-gray-600">
-        Posting as :{" "}
-        <span className="font-medium">
-          {loading ? "Loading..." : author}
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        {authorAvatar ? (
+          <img
+            src={authorAvatar}
+            alt={authorName}
+            className="w-6 h-6 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center text-xs">
+            {authorName[0] || "👤"}
+          </div>
+        )}
+        <span>
+          Posting as: <strong>{loading ? "Loading..." : authorName}</strong>
         </span>
       </div>
+
       <button
         type="submit"
         disabled={submitting || loading}

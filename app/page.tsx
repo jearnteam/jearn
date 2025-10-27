@@ -30,15 +30,31 @@ export default function HomePage() {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">📄 Realtime Posts with KaTeX</h1>
-      <PostForm onSubmit={addPost} />
-      <PostList
-        posts={posts}
-        onEdit={editPost}
-        onDelete={deletePost}
-        onUpvote={upvotePost}
-      />
+    <div className="h-screen w-full flex">
+      {/* Left Sidebar */}
+      <div className="pt-15 hidden lg:block w-[20%] bg-black overflow-y-auto p-4">
+        <div className="space-y-4 text-white">
+          <p>Left Content</p>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="pt-15 w-full lg:w-[60%] overflow-y-auto scrollbar-hide">
+        <PostForm onSubmit={addPost} />
+        <PostList
+          posts={posts}
+          onEdit={editPost}
+          onDelete={deletePost}
+          onUpvote={upvotePost}
+        />
+      </div>
+
+      {/* Right Sidebar */}
+      <div className="pt-15 hidden lg:block w-[20%] bg-black overflow-y-auto p-4">
+        <div className="space-y-4 text-white">
+          <p>Right Content</p>
+        </div>
+      </div>
     </div>
   );
 }

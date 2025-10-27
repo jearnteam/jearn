@@ -2,6 +2,8 @@
 
 import "tippy.js/dist/tippy.css";
 import "katex/dist/katex.min.css";
+import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -9,10 +11,8 @@ import Strike from "@tiptap/extension-strike";
 import Gapcursor from "@tiptap/extension-gapcursor";
 import Placeholder from "@tiptap/extension-placeholder";
 import { TextSelection } from "@tiptap/pm/state";
-import { useEffect, useRef } from "react";
 import tippy, { type Instance } from "tippy.js";
 import { MathExtension } from "@/components/math/MathExtension";
-import { useTranslation } from "react-i18next";
 
 interface PostEditorProps {
   onChange: (contentHtml: string) => void;
@@ -305,7 +305,7 @@ export default function PostEditor({ onChange }: PostEditorProps) {
 
       {/* Character Counter */}
       <div className="text-right text-sm text-gFray-400 mt-1">
-        {e.getText().length}/280
+        {e.getText().length}/2000
       </div>
     </div>
   );

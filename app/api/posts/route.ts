@@ -1,43 +1,35 @@
-import clientPromise from "@/lib/mongodb";          // ✅ MongoDB connection
-import { broadcastSSE } from "@/lib/sse";           // ✅ SSE helper
-import { NextResponse } from "next/server";        // ✅ Response helper
-import { ObjectId } from "mongodb";                // ✅ For updating/deleting
+import clientPromise from "@/lib/mongodb";
+import { broadcastSSE } from "@/lib/sse";
+import { NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
 
-// 🟢 GET all posts
 export async function GET() {
   const client = await clientPromise;
   const db = client.db("jearn");
-  const posts = await db.collection("posts").find().toArray();
+  const posts = await db.collection("posts").find().sort({ createdAt: -1 }).toArray();
   return NextResponse.json(posts);
 }
 
-// 🟢 CREATE a post
 export async function POST(req: Request) {
-  const { title, content, author } = await req.json();
+  const { title, content, authorId, authorName, authorAvatar } = await req.json();
   const client = await clientPromise;
   const db = client.db("jearn");
-
-  /* categorize */
 
   const newPost = {
     title,
     content,
-    author: author || "Anonymous",
+    authorId: authorId || null,
+    authorName: authorName || "Anonymous",
+    authorAvatar: authorAvatar || null,
     createdAt: new Date().toISOString(),
   };
 
   const result = await db.collection("posts").insertOne(newPost);
 
-  // 📡 Broadcast to clients using SSE
-  broadcastSSE({
-    type: "new-post",
-    post: { _id: result.insertedId, ...newPost },
-  });
-
+  broadcastSSE({ type: "new-post", post: { _id: result.insertedId, ...newPost } });
   return NextResponse.json({ success: true });
 }
 
-// 🟡 UPDATE a post
 export async function PUT(req: Request) {
   const { id, title, content } = await req.json();
   const client = await clientPromise;
@@ -53,11 +45,9 @@ export async function PUT(req: Request) {
   );
 
   broadcastSSE({ type: "update-post", post: { _id: id, ...updatedFields } });
-
   return NextResponse.json({ success: true });
 }
 
-// 🔴 DELETE a post
 export async function DELETE(req: Request) {
   const { id } = await req.json();
   const client = await clientPromise;
@@ -66,6 +56,5 @@ export async function DELETE(req: Request) {
   await db.collection("posts").deleteOne({ _id: new ObjectId(id) });
 
   broadcastSSE({ type: "delete-post", id });
-
   return NextResponse.json({ success: true });
 }
