@@ -41,17 +41,22 @@ async function enrichPost(post: any, usersColl: any) {
 }
 
 /* ---------- GET: Fetch top-level posts ---------- */
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const category = searchParams.get("category");
+
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");
 
-    const docs = await posts
-      .find({ parentId: null })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const query: any = { parentId: null };
+    if (category) {
+      query.categories = category;
+    }
+
+    const docs = await posts.find(query).sort({ createdAt: -1 }).toArray();
 
     // Count comments
     const commentCounts = await posts
@@ -93,6 +98,7 @@ export async function POST(req: Request) {
       parentId = null,
       replyTo = null,
       txId = null,
+      categories = [],
     }: {
       title?: string;
       content: string;
@@ -100,21 +106,32 @@ export async function POST(req: Request) {
       parentId?: string | null;
       replyTo?: string | null;
       txId?: string | null;
+      categories?: string[];
     } = await req.json();
 
+    // --- Basic validation ---
     if (!authorId)
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
-    // ✅ Require title only for top-level post
-    if (!parentId && !title?.trim()) {
+    // ✅ Require title (and optionally categories) only for top-level post
+    const isTopLevel = !parentId && !replyTo;
+    if (isTopLevel && !title?.trim()) {
       return NextResponse.json(
         { error: "Title required for top-level post" },
         { status: 400 }
       );
     }
 
+    if (isTopLevel && (!Array.isArray(categories) || categories.length === 0)) {
+      return NextResponse.json(
+        { error: "At least one category required" },
+        { status: 400 }
+      );
+    }
+
+    // --- MongoDB setup ---
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");
@@ -142,8 +159,8 @@ export async function POST(req: Request) {
       safeParentId = target.parentId || target._id.toString();
     }
 
-    const doc = {
-      title: !safeParentId ? title : undefined,
+    // --- Construct document ---
+    const doc: any = {
       content,
       authorId,
       parentId: safeParentId,
@@ -153,12 +170,20 @@ export async function POST(req: Request) {
       upvoters: [],
     };
 
+    // ✅ Only top-level posts have title + categories
+    if (isTopLevel) {
+      doc.title = title;
+      doc.categories = categories; // 👈 add categories here
+    }
+
+    // --- Insert + enrich ---
     const result = await posts.insertOne(doc);
     const enriched = await enrichPost(
       { ...doc, _id: result.insertedId },
       users
     );
 
+    // --- SSE broadcasting ---
     const sseType = replyTo
       ? "new-reply"
       : safeParentId
@@ -188,6 +213,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
+
 
 /* ---------- PUT: Edit post/comment/reply ---------- */
 export async function PUT(req: Request) {

@@ -7,7 +7,11 @@ export default function HomePage() {
   const [category, setCategory] = useState("");
 
   const callAPI = async () => {
-    const res = await fetch(`/api/categorize/${encodeURIComponent(content)}`);
+    const res = await fetch(`/api/categorize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: content })
+    });
     const json = await res.json();
     setCategory(JSON.stringify(json, null, 2));
   };

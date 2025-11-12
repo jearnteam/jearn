@@ -117,9 +117,7 @@ export default function PostItem({
     // Optimistic UI update
     setPostState((prev) => ({
       ...prev,
-      upvoteCount: alreadyUpvoted
-        ? prev.upvoteCount - 1
-        : prev.upvoteCount + 1,
+      upvoteCount: alreadyUpvoted ? prev.upvoteCount - 1 : prev.upvoteCount + 1,
       upvoters: alreadyUpvoted
         ? prev.upvoters.filter((id) => id !== userId)
         : [...prev.upvoters, userId],
@@ -231,11 +229,28 @@ export default function PostItem({
           )}
         </div>
 
+        {/* ✅ Title */}
         {!isComment && (
           <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
             {postState.title || "Untitled"}
           </h2>
         )}
+
+        {/* ✅ 🆕 Category Badges */}
+        {Array.isArray(postState.categories) &&
+          postState.categories.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2 mb-1">
+              {postState.categories.map((cat) => (
+                <Link
+                  key={cat}
+                  href={`/category/${encodeURIComponent(cat)}`}
+                  className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-600/50 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
+                >
+                  {cat}
+                </Link>
+              ))}
+            </div>
+          )}
 
         {/* ✅ Content */}
         {postState.content?.trim() ? (

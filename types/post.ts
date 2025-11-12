@@ -5,6 +5,7 @@ export interface Post {
   _id: string;
   title?: string;
   content?: string;
+  categories?: string[];
   createdAt?: string;
   authorId: string; // ✅ required
   authorName: string; // ✅ add this

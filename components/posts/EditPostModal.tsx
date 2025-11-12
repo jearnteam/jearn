@@ -92,7 +92,7 @@ export default function EditPostModal({
                 placeholder="Post title"
               />
 
-              <div className="flex-1 overflow-auto border rounded-md dark:border-gray-700 min-h-[200px]">
+              <div className="flex-1 overflow-auto border rounded-md dark:border-gray-700">
                 {editorMounted && (
                   <PostEditorWrapper
                     key={resetKey}

@@ -63,7 +63,10 @@ const CustomHeading = Heading.extend({
           }
 
           // ✅ Use low-level toggleNode to only affect current block
-          return chain().focus().toggleNode("paragraph", "heading", attrs).run();
+          return chain()
+            .focus()
+            .toggleNode("paragraph", "heading", attrs)
+            .run();
         },
     };
   },
@@ -92,11 +95,19 @@ export default function PostEditorInner({
   /* ✅ Initialize editor */
   const editor = useEditor({
     extensions: [
-      NoRulesStarterKit, // ✅ leave heading enabled here
-      ...BASE_EXTENSIONS,
-      RemoveZeroWidthChars,
+      NoRulesStarterKit.configure({
+        heading: false,
+        strike: false,
+        code: false,
+        hardBreak: false,
+      }),
+      Tag,
+      MathExtension,
+      Strike,
+      Code,
       CustomHeading.configure({ levels: [1, 2, 3] }),
       HardBreak.configure({ keepMarks: true }),
+      RemoveZeroWidthChars,
       Placeholder.configure({
         placeholder,
         showOnlyWhenEditable: true,

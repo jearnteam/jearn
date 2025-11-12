@@ -201,7 +201,7 @@ export default function HomePage() {
             className="
               overflow-y-auto
               pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-              lg:pb-4 px-1
+              lg:pb-4 px-1 mt-2
             "
           >
             {/* Pull-to-refresh indicator */}

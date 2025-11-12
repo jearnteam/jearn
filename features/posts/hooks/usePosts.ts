@@ -1,4 +1,3 @@
-// features/posts/hooks/usePosts.ts
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -57,9 +56,9 @@ export function usePosts() {
             case "delete-post":
               return prev.filter((p) => p._id !== data.id);
 
-            /* 👍 UPVOTE — scoped only */
+            /* 👍 UPVOTE */
             case "upvote":
-              if (isRecentTx(data.txId)) return prev; // skip self
+              if (isRecentTx(data.txId)) return prev;
               return prev.map((p) =>
                 p._id === data.postId
                   ? {
@@ -102,25 +101,40 @@ export function usePosts() {
     };
   }, [fetchPosts]);
 
-  /** ✅ Client-triggered actions */
+  /** ✅ Add Post (now supports categories) */
   const addPost = useCallback(
-    async (title: string, content: string, authorId: string | null) => {
+    async (
+      title: string,
+      content: string,
+      authorId: string | null,
+      categories: string[]
+    ) => {
       if (!authorId) {
         console.warn("Skipping post: no author ID");
         return;
       }
-      await fetch("/api/posts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content, authorId }),
-      }).catch((e) => console.error("❌ addPost:", e));
+
+      try {
+        const res = await fetch("/api/posts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, content, authorId, categories }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("❌ addPost failed:", errData.error || res.statusText);
+        }
+      } catch (err) {
+        console.error("🔥 addPost error:", err);
+      }
     },
     []
   );
 
+  /** ✅ Edit Post */
   const editPost = useCallback(
     async (id: string, title: string, content: string) => {
-      // Optimistic UI
       setPosts((prev) =>
         prev.map((p) => (p._id === id ? { ...p, title, content } : p))
       );
@@ -131,11 +145,12 @@ export function usePosts() {
         body: JSON.stringify({ id, title, content }),
       });
 
-      if (!res.ok) fetchPosts(); // fallback
+      if (!res.ok) fetchPosts(); // fallback refetch
     },
     [fetchPosts]
   );
 
+  /** ✅ Delete Post */
   const deletePost = useCallback(async (id: string) => {
     await fetch("/api/posts", {
       method: "DELETE",
@@ -144,6 +159,7 @@ export function usePosts() {
     }).catch((e) => console.error("❌ deletePost:", e));
   }, []);
 
+  /** ✅ Upvote Post */
   const upvotePost = useCallback(
     async (id: string, userId: string, txId: string) => {
       await fetch(`/api/posts/${id}/upvote`, {
@@ -159,7 +175,7 @@ export function usePosts() {
     posts,
     loading,
     refetch: fetchPosts,
-    addPost,
+    addPost, // now takes (title, content, authorId, categories)
     editPost,
     deletePost,
     upvotePost,
