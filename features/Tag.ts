@@ -1,42 +1,8 @@
-import { Mark, mergeAttributes } from "@tiptap/core";
-import { Plugin, PluginKey } from "prosemirror-state";
-import type { EditorView } from "prosemirror-view";
-
-// 🔹 helper function outside of Mark.create
-function applyTagIfMatch(view: EditorView, triggerText: string): boolean {
-  const { state } = view;
-  const $pos = state.selection.$from;
-  const textBefore = $pos.doc.textBetween(0, $pos.pos, "\n", "\n");
-  const match = textBefore.match(/#([A-Za-z0-9_]+)$/);
-
-  if (match) {
-    const tag = match[1];
-    const start = $pos.pos - tag.length - 1;
-    const end = $pos.pos;
-
-    const tr = state.tr
-      .deleteRange(start, end)
-      .insertText(`#${tag}`)
-      .addMark(
-        start,
-        start + tag.length + 1,
-        state.schema.marks["tag"].create({ tag })
-      );
-
-    if (triggerText === " ") {
-      view.dispatch(tr.insertText(" "));
-      return true;
-    } else if (triggerText === "\n") {
-      view.dispatch(tr);
-      return false; // let enter proceed
-    }
-  }
-  return false;
-}
+import { Mark, mergeAttributes, getMarkRange } from "@tiptap/core";
+import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
 
 export const Tag = Mark.create({
   name: "tag",
-  inclusive: false,
 
   addAttributes() {
     return {
@@ -45,39 +11,140 @@ export const Tag = Mark.create({
   },
 
   parseHTML() {
-    return [{ tag: "span[data-tag]" }];
+    return [
+      {
+        tag: "a[data-tag]",
+        getAttrs: (el) =>
+          el instanceof HTMLElement
+            ? { tag: el.getAttribute("data-tag") }
+            : false,
+      },
+    ];
   },
 
+  // ✅ Let the DOM node control text content, don't repeat #tag in renderHTML
   renderHTML({ HTMLAttributes }) {
     return [
-      "span",
+      "a",
       mergeAttributes(HTMLAttributes, {
-        "data-tag": HTMLAttributes.tag,
-        class: "hashtag-tag",
+        href: `/tags/${HTMLAttributes.tag}`,
+        class:
+          "hashtag-tag text-blue-600 dark:text-blue-400 hover:underline cursor-pointer select-none",
       }),
-      `#${HTMLAttributes.tag}`,
     ];
   },
 
   addProseMirrorPlugins() {
-    const pluginKey = new PluginKey("tag-handler");
+    const type = this.type;
 
     return [
       new Plugin({
-        key: pluginKey,
+        key: new PluginKey("hashtag"),
         props: {
-          handleTextInput: (view, from, to, text) => {
-            if (text === " ") {
-              return applyTagIfMatch(view, " ");
+          handleKeyDown(view, event) {
+            const isSpace = event.key === " ";
+            const isEnter = event.key === "Enter";
+            if (!isSpace && !isEnter) return false;
+
+            const { state, dispatch } = view;
+            const { $from, empty } = state.selection;
+
+            // === Case 1: Cursor is inside an existing tag mark -> split it cleanly ===
+            if (empty) {
+              const insideRange = getMarkRange($from, type);
+              if (insideRange) {
+                const splitPos = $from.pos;
+                const tr = state.tr;
+
+                const node = $from.parent;
+                const nodeStart = $from.start();
+                const offset = $from.parentOffset;
+                const fullText = node.textContent;
+
+                const leftText = fullText.slice(0, offset); // still part of tag
+                const rightText = fullText.slice(offset); // plain text
+
+                // Remove original full text
+                tr.delete(nodeStart, nodeStart + fullText.length);
+
+                // Insert left-side shortened link
+                if (leftText.length > 0) {
+                  const newTag = leftText.slice(1); // remove leading '#'
+                  tr.insert(
+                    nodeStart,
+                    state.schema.text(leftText, [type.create({ tag: newTag })])
+                  );
+                }
+
+                let cursorPos = nodeStart + leftText.length;
+
+                // Insert the right-side plain text
+                if (rightText.length > 0) {
+                  tr.insert(cursorPos, state.schema.text(rightText));
+                }
+
+                // Space or Enter behavior
+                if (isSpace) {
+                  tr.insertText(" ", cursorPos);
+                  cursorPos += 1;
+                } else if (isEnter) {
+                  tr.split(cursorPos);
+                }
+
+                tr.setSelection(TextSelection.create(tr.doc, cursorPos));
+                tr.removeStoredMark(type); // prevent leaking blue marks
+
+                dispatch(tr);
+                event.preventDefault();
+                return true;
+              }
             }
-            return false;
-          },
-          handleKeyDown: (view, event) => {
-            if (event.key === "Enter") {
-              const tagged = applyTagIfMatch(view, "\n");
-              return tagged ? false : false;
+
+            // === Case 2: Create a tag from raw "#word" right before the cursor ===
+            const textBefore = $from.parent.textBetween(
+              0,
+              $from.parentOffset,
+              undefined,
+              "\uFFFC"
+            );
+
+            // Match the last "#word" before cursor
+            const match = textBefore.match(/#([\p{L}\p{N}_]+)$/u);
+            if (!match) return false;
+
+            const [fullHashtag, tagValue] = match;
+            const hashtagStart = $from.pos - fullHashtag.length;
+
+            const tr = state.tr;
+
+            // Remove raw "#tag"
+            tr.delete(hashtagStart, $from.pos);
+
+            // Insert marked text
+            const tagNode = state.schema.text(`#${tagValue}`, [
+              type.create({ tag: tagValue }),
+            ]);
+            tr.insert(hashtagStart, tagNode);
+
+            const afterTagPos = hashtagStart + tagNode.nodeSize;
+
+            if (isSpace) {
+              const nextChar = tr.doc.textBetween(
+                afterTagPos,
+                afterTagPos + 1,
+                undefined,
+                "\uFFFC"
+              );
+              if (nextChar !== " ") tr.insertText(" ", afterTagPos);
+              tr.setSelection(TextSelection.create(tr.doc, afterTagPos + 1));
+            } else if (isEnter) {
+              tr.split(afterTagPos);
             }
-            return false;
+
+            tr.removeStoredMark(type);
+            dispatch(tr);
+            event.preventDefault();
+            return true;
           },
         },
       }),

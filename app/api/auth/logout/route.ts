@@ -13,7 +13,7 @@ export async function POST() {
     secure: true,
     sameSite: "lax",
     maxAge: 0, // 👈 expire immediately
-    domain: "www.jearn.site", // 👈 must match exactly
+    domain: process.env.NEXTAUTH_URL, // 👈 must match exactly
   });
 
   return res;

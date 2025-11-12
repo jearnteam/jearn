@@ -5,93 +5,106 @@ import Link from "next/link";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
+import { signOut } from "next-auth/react";
+import ThemeToggle from "@/components/ThemeToggle";
+import LoadingOwl from "@/components/LoadingOwl";
+import { useState, useEffect } from "react";
 
-const ThreeBall = dynamic(() => import("./3d_spinner"), { ssr: false });
+const ThreeBall = dynamic(() => import("./3d_spinner"), {
+  ssr: false,
+  loading: () => null, // Don't show anything while loading the spinner
+});
 
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
 
+  const [hydrated, setHydrated] = useState(false);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "/";
   const defaultAvatar = "/default-avatar.png";
 
-  const handleLogout = () => {
-    window.location.href = "/logout";
-  };
-
-  const handleLogin = () => {
-    const returnTo =
-      typeof window !== "undefined" ? window.location.href : appUrl;
-    window.location.href = `https://www.jearn.site/cdn-cgi/access/login?return_to=${encodeURIComponent(
-      returnTo
-    )}`;
-  };
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
 
   const handleLogoClick = () => {
-    if (appUrl) {
-      window.location.href = appUrl;
-    }
+    if (appUrl) window.location.href = appUrl;
   };
 
   return (
-    <header className="fixed top-0 left-0 w-full bg-white border-b shadow-sm z-50">
-      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3 text-black">
-        {/* Logo */}
+    <header
+      className="fixed top-0 left-0 w-full z-50 border-b shadow-sm
+        bg-white dark:bg-neutral-900 transition-colors duration-300 ease-in-out"
+    >
+      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3">
+        {/* Logo + 3D Spinner */}
         <div
           className="flex items-center gap-3 cursor-pointer"
           onClick={handleLogoClick}
         >
-          <div className="w-12 h-8 flex items-center justify-center">
-            <ThreeBall />
+          <div className="w-12 h-12 flex items-center justify-center">
+            {hydrated ? (
+              <ThreeBall />
+            ) : (
+              <div className="w-10 h-10">
+                <LoadingOwl />
+              </div>
+            )}
           </div>
+
           <h1
-            className="text-xl font-bold"
-            style={{ fontFamily: "'Shadows Into Light', cursive" }}
+            className="text-4xl font-bold"
+            style={{ fontFamily: "var(--font-shadows-into-light)" }}
           >
             JEARN
           </h1>
         </div>
 
-        {/* Right side */}
+        {/* Right Side */}
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <LangSwitcher />
 
-          {loading ? (
-            <span className="text-sm text-gray-500">Loading...</span>
+          {!hydrated ? (
+            <div className="w-16 h-6">
+              <LoadingOwl />
+            </div>
+          ) : loading ? (
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              Loading...
+            </span>
           ) : user ? (
             <>
               <Link href="/profile" className="shrink-0">
                 <img
-                  src={
-                    user?.picture && !user.picture.startsWith("9j/")
-                      ? user.picture
-                      : user?._id
-                      ? `/api/user/avatar/${user._id}?t=${Date.now()}`
-                      : "/default-avatar.png"
-                  }
-                  onError={(e) => (e.currentTarget.src = "/default-avatar.png")}
+                  src={`/api/user/avatar/${user.uid}`}
                   alt="avatar"
-                  className="w-8 h-8 rounded-full cursor-pointer hover:opacity-80 transition"
+                  onError={(e) => (e.currentTarget.src = defaultAvatar)}
+                  className="w-8 h-8 rounded-full object-cover border
+                    border-gray-300 dark:border-gray-700"
                 />
               </Link>
 
               {user.name && (
-                <span className="text-black text-sm font-medium truncate max-w-[120px]">
+                <span className="text-sm font-medium truncate max-w-[120px]">
                   {user.name}
                 </span>
               )}
 
               <button
-                onClick={handleLogout}
-                className="text-sm px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                onClick={() => signOut({ callbackUrl: "/" })}
+                className="text-sm text-red-500 hover:underline"
               >
                 {t("logout") || "Logout"}
               </button>
             </>
           ) : (
             <button
-              onClick={handleLogin}
-              className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              onClick={() => (window.location.href = "/api/auth/signin")}
+              className="text-sm px-3 py-1 rounded
+                bg-blue-600 text-white hover:bg-blue-700
+                dark:bg-blue-500 dark:hover:bg-blue-600
+                transition-colors duration-300"
             >
               {t("login") || "Login"}
             </button>

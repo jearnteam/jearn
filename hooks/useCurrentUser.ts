@@ -1,119 +1,69 @@
+// hooks/useCurrentUser.ts
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface User {
-  bio: string;
-  _id: string;
-  email: string;
+  uid?: string;
   name?: string | null;
+  email?: string | null;
+  bio?: string | null;
   picture?: string | null;
-  email_verified?: boolean;
+  role?: string;
+  theme?: string | null;
+  language?: string | null;
 }
 
-export function useCurrentUser() {
+export function useCurrentUser(pollInterval = 0) {
+  const { data: session, status } = useSession();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const MAX_RETRIES = 10;
-  const RETRY_DELAY = 1000;
+  const retryRef = useRef(0);
 
-  // 🟢 Fetch user info from /api/auth/cf (CF Access)
-  async function fetchWithRetry(attempt = 1): Promise<void> {
+  // 🧭 Fetch user info
+  const fetchUser = useCallback(async () => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/auth/cf", { credentials: "include" });
-
-      if (res.status === 403) {
-        console.warn("⚠️ CF Access expired. Redirecting to login...");
-        const redirectUrl = encodeURIComponent(window.location.href);
-        // 👇 No .env needed — use domain directly
-        window.location.href = `https://jearn.cloudflareaccess.com/cdn-cgi/access/login/kioh.jearn.site?redirect_url=${redirectUrl}`;
-        return;
-      }
-
-      if (!res.ok) {
-        if (res.status === 503 && attempt < MAX_RETRIES) {
-          setTimeout(() => fetchWithRetry(attempt + 1), RETRY_DELAY);
-          return;
-        }
-        setUser(null);
-        setLoading(false);
-        return;
-      }
+      const res = await fetch("/api/user/current", { credentials: "include" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
 
       const data = await res.json();
-      setUser(data.ok ? data.user : null);
+      setUser(data.user ?? null);
+      retryRef.current = 0;
     } catch (err) {
-      console.error("❌ useCurrentUser fetch error:", err);
-      if (attempt < MAX_RETRIES) {
-        setTimeout(() => fetchWithRetry(attempt + 1), RETRY_DELAY);
-        return;
+      // 🔁 Silent retry with exponential backoff, max 3 retries
+      if (retryRef.current < 3) {
+        const delay = 300 * Math.pow(2, retryRef.current);
+        retryRef.current++;
+        setTimeout(fetchUser, delay);
+      } else {
+        setUser(null);
       }
-      setUser(null);
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    fetchWithRetry();
   }, []);
 
-  // 📡 Subscribe to SSE updates
+  // 🧩 Run on auth state change
   useEffect(() => {
-    if (!user?._id) return;
-
-    const userId = user._id; // ✅ Fix TS18047
-    let lastPing = Date.now();
-
-    const evtSource = new EventSource(
-      `/api/user/subscribe?id=${userId}`,
-      { withCredentials: true }
-    );
-
-    // ⏳ check every 10s if the connection is still alive
-    const pingCheck = setInterval(() => {
-      if (Date.now() - lastPing > 40000) {
-        console.warn("⚠️ SSE idle too long, reconnecting...");
-        evtSource.close();
-        reconnect();
-      }
-    }, 10000);
-
-    evtSource.onmessage = (e) => {
-      if (e.data === '{"status":"connected"}') return;
-      lastPing = Date.now();
-      try {
-        const updatedUser = JSON.parse(e.data);
-        setUser((prev) => ({ ...prev, ...updatedUser }));
-      } catch (err) {
-        console.error("❌ Failed to parse SSE message:", err);
-      }
-    };
-
-    evtSource.onerror = () => {
-      console.warn("⚠️ SSE error, reconnecting...");
-      evtSource.close();
-      reconnect();
-    };
-
-    function reconnect() {
-      clearInterval(pingCheck);
-      setTimeout(() => {
-        const newSource = new EventSource(
-          `/api/user/subscribe?id=${userId}`,
-          { withCredentials: true }
-        );
-
-        newSource.onmessage = evtSource.onmessage;
-      }, 3000);
+    if (status === "authenticated") {
+      fetchUser();
+    } else if (status === "unauthenticated") {
+      setUser(null);
+      setLoading(false);
     }
+  }, [status, fetchUser]);
 
-    return () => {
-      clearInterval(pingCheck);
-      evtSource.close();
-    };
-  }, [user?._id]);
+  // ⏱️ Optional polling
+  useEffect(() => {
+    if (pollInterval > 0 && status === "authenticated") {
+      const id = setInterval(fetchUser, pollInterval);
+      return () => clearInterval(id);
+    }
+  }, [pollInterval, status, fetchUser]);
 
-  return { user, loading };
+  // ✅ Expose refresh function as "update"
+  return { user, loading, update: fetchUser };
 }

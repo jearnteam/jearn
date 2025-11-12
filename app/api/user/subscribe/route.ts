@@ -19,41 +19,40 @@ export async function GET(req: NextRequest) {
   const headers = new Headers({
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
-    "Connection": "keep-alive",
+    Connection: "keep-alive",
   });
 
   const stream = new ReadableStream({
     async start(controller) {
-      // 🟢 Initial connection flush
       controller.enqueue(`: connected\n\n`);
       controller.enqueue(`data: {"status":"connected"}\n\n`);
 
-      // 🟡 MongoDB change stream for user document
-      const pipeline = [{ $match: { "documentKey._id": new ObjectId(userId) } }];
-      const changeStream = users.watch(pipeline, { fullDocument: "updateLookup" });
+      const pipeline = [
+        { $match: { "documentKey._id": new ObjectId(userId) } },
+      ];
+      const changeStream = users.watch(pipeline, {
+        fullDocument: "updateLookup",
+      });
 
-      // 🕒 Keepalive ping every 15 seconds to keep CF happy
+      // ✅ Send keepalive every 15 seconds
       const keepAlive = setInterval(() => {
         controller.enqueue(`: ping\n\n`);
-      }, 15);
+      }, 15_000);
 
-      // 📡 Handle change events
-      changeStream.on("change", (change) => {
-        if (!("fullDocument" in change) || !change.fullDocument) return;
+      // ✅ Send updated profile fields
+      changeStream.on("change", (change: any) => {
         const doc = change.fullDocument;
+        if (!doc) return;
 
         controller.enqueue(
           `data: ${JSON.stringify({
             name: doc.name,
             bio: doc.bio,
-            picture: doc.picture
-              ? `/api/user/avatar/${userId}?t=${Date.now()}`
-              : null,
+            picture: `/api/user/avatar/${userId}?t=${Date.now()}`,
           })}\n\n`
         );
       });
 
-      // 🧹 Cleanup when client disconnects
       req.signal.addEventListener("abort", () => {
         clearInterval(keepAlive);
         changeStream.close();
