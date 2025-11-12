@@ -1,5 +1,10 @@
 import clientPromise from "@/lib/mongodb";
 
+/**
+ * 与えられた文字列をcategoriesコレクションで定義されたカテゴリーでカテゴライズする
+ * @param content カテゴライズ対象の文章
+ * @returns [{"label": string, "score": number}] or {error: string}
+ */
 export async function categorize(content: string) {
   const client = await clientPromise;
   const db = client.db("jearn");
