@@ -14,6 +14,9 @@ if (!i18n.isInitialized) {
           login: "Login",
           title: "title",
           placeholder: "Type in what you wanna share with everyone",
+          //dashboard
+          overview: "Overview",
+          analytics: "Analytics",
         },
       },
       ja: {
@@ -23,6 +26,11 @@ if (!i18n.isInitialized) {
           login: "ログイン",
           title: "テーマ",
           placeholder: "みんなと共有したいことを入力してください",
+          //dashboard
+          overview: "概要",
+          analytics: "分析",
+          database: "データベース",
+          settings: "設定",
         },
       },
       my: {
@@ -32,6 +40,11 @@ if (!i18n.isInitialized) {
           login: "ログイン",
           title: "ခေါင်းစဥ်",
           placeholder: "မျှဝေချင်တဲ့အကြောင်းအရာကိုရေးပါ",
+          //dashboard
+          overview: "ခြုံငုံသုံးသပ်ချက်",
+          analytics: "ခွဲခြမ်းစိတ်ဖြာမှု",
+          database: "ဒေတာဘေ့စ်",
+          settings: "ပြုပြင်ခြင်း",
         },
       },
     },
