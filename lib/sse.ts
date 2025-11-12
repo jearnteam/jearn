@@ -1,18 +1,27 @@
-const connections = new Set<WritableStreamDefaultWriter>();
+// /lib/sse.ts
 
-export function addSSEConnection(writer: WritableStreamDefaultWriter) {
-  connections.add(writer);
+type Client = { write: (msg: string) => void };
+let clients: Client[] = [];
+
+export function addClient(client: Client) {
+  clients.push(client);
 }
 
-export function removeSSEConnection(writer: WritableStreamDefaultWriter) {
-  connections.delete(writer);
+export function removeClient(client: Client) {
+  clients = clients.filter((c) => c !== client);
 }
 
-export function broadcastSSE(data: unknown) {
-  const message = `data: ${JSON.stringify(data)}\n\n`;
-  for (const writer of connections) {
-    writer.write(message).catch(() => {
-      connections.delete(writer);
-    });
+export function broadcastSSE(data: any) {
+  const payload = `data: ${JSON.stringify(data)}\n\n`;
+  for (const c of clients) {
+    try {
+      c.write(payload);
+    } catch (err) {
+      console.warn("⚠️ SSE write failed:", err);
+    }
   }
+}
+
+export function getClientCount() {
+  return clients.length;
 }

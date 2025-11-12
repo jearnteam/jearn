@@ -1,191 +1,186 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
+import { useEffect, useRef, useState } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
-import { TextSelection } from "@tiptap/pm/state";
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
-import "katex/dist/katex.min.css";
-import { useTranslation } from "react-i18next";
+import { Plugin } from "prosemirror-state";
+import { Extension, type CommandProps } from "@tiptap/core";
+import Heading, { type Level } from "@tiptap/extension-heading";
+import Underline from "@tiptap/extension-underline";
+import Strike from "@tiptap/extension-strike";
+import Code from "@tiptap/extension-code";
+import HardBreak from "@tiptap/extension-hard-break";
+
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
+import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 
-// 🚫 StarterKit without default markdown input rules
-const NoInputRulesStarterKit = StarterKit.extend({
-  addInputRules() {
-    return [];
+/* ---------- Base Extensions ---------- */
+const BASE_EXTENSIONS = [Tag, MathExtension, Underline, Strike, Code];
+
+/* ✅ Utility: Remove zero-width chars on paste */
+export const RemoveZeroWidthChars = Extension.create({
+  name: "removeZeroWidthChars",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handlePaste(view, event) {
+            const text = event.clipboardData?.getData("text/plain") ?? "";
+            const clean = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
+            view.dispatch(view.state.tr.insertText(clean));
+            return true;
+          },
+          transformPastedHTML(html) {
+            return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
+          },
+        },
+      }),
+    ];
   },
 });
 
+/* ✅ Custom Heading (safe + toggles only current line) */
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    headingNoNewline: {
+      toggleHeadingNoNewline: (attrs: { level: Level }) => ReturnType;
+    };
+  }
+}
+
+const CustomHeading = Heading.extend({
+  addCommands() {
+    return {
+      toggleHeadingNoNewline:
+        (attrs: { level: Level }) =>
+        ({ chain, editor }: CommandProps) => {
+          // If it's already this heading → revert to paragraph
+          if (editor.isActive("heading", attrs)) {
+            return chain().focus().setParagraph().run();
+          }
+
+          // ✅ Use low-level toggleNode to only affect current block
+          return chain().focus().toggleNode("paragraph", "heading", attrs).run();
+        },
+    };
+  },
+});
+
+/* ---------- Component ---------- */
 interface PostEditorInnerProps {
   value: string;
-  onChange: (contentHtml: string) => void;
+  placeholder?: string;
+  compact?: boolean;
+  onReady?: (editor: Editor) => void;
 }
 
 export default function PostEditorInner({
   value,
-  onChange,
+  placeholder = "Start typing...",
+  compact = false,
+  onReady,
 }: PostEditorInnerProps) {
-  const { t, i18n } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
   const lastSelRef = useRef<{ from: number; to: number } | null>(null);
+  const [menuRefreshToggle, setMenuRefreshToggle] = useState(false);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
 
-  // 📝 Initialize editor
-  const editor = useEditor(
-    {
-      autofocus: false,
-      extensions: [
-        NoInputRulesStarterKit,
-        Tag,
-        MathExtension,
-        Placeholder.configure({
-          placeholder: () => t("placeholder"),
-          showOnlyWhenEditable: true,
-          showOnlyCurrent: false,
-        }),
-      ],
-      content: value,
-      immediatelyRender: false,
-      editorProps: {
-        attributes: {
-          class:
-            "min-h-[250px] w-full rounded-md border border-black p-3 text-base text-black focus:outline-none focus:ring-2 focus:ring-black-200",
-          spellcheck: "false", // 👈 must be lowercase and string
-          autocorrect: "off",
-          autocapitalize: "off",
-        },
-        handleDOMEvents: {
-          pointerdown: (view) => {
-            if (document.activeElement !== view.dom) view.focus();
-            return false;
-          },
-          mousedown: (view) => {
-            if (document.activeElement !== view.dom) view.focus();
-            return false;
-          },
-        },
+  /* ✅ Initialize editor */
+  const editor = useEditor({
+    extensions: [
+      NoRulesStarterKit, // ✅ leave heading enabled here
+      ...BASE_EXTENSIONS,
+      RemoveZeroWidthChars,
+      CustomHeading.configure({ levels: [1, 2, 3] }),
+      HardBreak.configure({ keepMarks: true }),
+      Placeholder.configure({
+        placeholder,
+        showOnlyWhenEditable: true,
+      }),
+    ],
+    content: value?.trim() || "<p></p>",
+    editorProps: {
+      attributes: {
+        class:
+          "tiptap ProseMirror w-full h-full text-base text-gray-800 dark:text-gray-200 overflow-y-auto p-2",
       },
-
-      onUpdate: ({ editor }) => onChange(editor.getHTML()),
     },
-    [i18n.language]
-  ); // 👈 language as dependency
+    immediatelyRender: false,
+  });
 
-  // 🈳 Reset content when `value` becomes empty
+  /* 🔌 Pass editor instance to parent */
   useEffect(() => {
-    if (editor && value === "") {
-      editor.commands.setContent("");
-    }
-  }, [value, editor]);
+    if (editor && onReady) onReady(editor);
+  }, [editor, onReady]);
 
-  // 🌐 Debug language change
-  useEffect(() => {
-    console.log("[🌐 LANG CHANGED]", i18n.language);
-  }, [i18n.language]);
-
-  // 🌍 Update placeholder on language change
+  /* ✅ Focus tracking */
   useEffect(() => {
     if (!editor) return;
-
-    // 🔁 Reconfigure the Placeholder extension with the new language
-    editor
-      .chain()
-      .command(({ tr, state }) => {
-        const placeholderExtension = editor.extensionManager.extensions.find(
-          (ext) => ext.name === "placeholder"
-        );
-
-        if (placeholderExtension) {
-          placeholderExtension.options.placeholder = () => t("placeholder");
-        }
-
-        // 🪄 Force transaction to refresh UI
-        editor.view.dispatch(tr);
-        editor.commands.blur();
-        setTimeout(() => editor.commands.focus(), 50);
-        return true;
-      })
-      .run();
-  }, [i18n.language, editor, t]);
-
-  // 🪄 Initialize selection at mount
-  useEffect(() => {
-    if (!editor) return;
-    requestAnimationFrame(() => {
-      const { view } = editor;
-      const tr = view.state.tr.setSelection(
-        TextSelection.near(view.state.doc.resolve(0))
-      );
-      view.dispatch(tr);
-      editor.commands.blur();
-      view.dom.blur();
-    });
-  }, [editor]);
-
-  // 🟦 Tag click handler
-  useEffect(() => {
-    if (!editor) return;
-    const dom = editor.view.dom as HTMLElement;
-
-    const handleClick = (ev: MouseEvent) => {
-      const target = ev.target as HTMLElement;
-      if (target?.dataset?.tag !== undefined) {
-        const tagText = target.dataset.tag;
-        console.log("Clicked tag:", tagText);
-        // 👉 You can route or filter posts here
-      }
+    const handleFocus = () => setIsEditorFocused(true);
+    const handleBlur = () => setIsEditorFocused(false);
+    editor.on("focus", handleFocus);
+    editor.on("blur", handleBlur);
+    return () => {
+      editor.off("focus", handleFocus);
+      editor.off("blur", handleBlur);
     };
-
-    dom.addEventListener("click", handleClick);
-    return () => dom.removeEventListener("click", handleClick);
   }, [editor]);
 
-  // 🧰 Floating menu setup
+  /* 🎯 Floating Menu Logic */
   useEffect(() => {
     if (!editor || !menuRef.current) return;
+    let rafId: number;
     const reference = document.createElement("div");
     document.body.appendChild(reference);
+
     const instance = tippy(reference, {
       getReferenceClientRect: null,
-      content: menuRef.current!,
+      content: menuRef.current,
       trigger: "manual",
       placement: "top",
       interactive: true,
       hideOnClick: false,
       appendTo: document.body,
+      zIndex: 10050,
     });
-    instance.hide();
-    reference.style.pointerEvents = "none";
-    tippyRef.current = instance;
 
-    const handleSelectionUpdate = () => {
-      const { from, to } = editor.state.selection;
-      lastSelRef.current = { from, to };
-      if (from === to) {
+    const updateToolbarPosition = () => {
+      if (!editor?.view?.dom) return;
+      const sel = window.getSelection();
+      const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+      if (!sel || !range) return;
+      const editorEl = editor.view.dom;
+      const isInEditor = editorEl.contains(sel.anchorNode);
+      if (!isInEditor || range.collapsed) {
         instance.hide();
         return;
       }
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
-      const rect = sel.getRangeAt(0).getBoundingClientRect();
+      const rect = range.getBoundingClientRect();
       instance.setProps({ getReferenceClientRect: () => rect });
       instance.show();
+      setMenuRefreshToggle((prev) => !prev);
     };
 
-    const handleTransaction = () => {
-      const { from, to } = editor.state.selection;
-      if (from === to) instance.hide();
+    const debouncedUpdate = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateToolbarPosition);
     };
 
-    editor.on("selectionUpdate", handleSelectionUpdate);
-    editor.on("transaction", handleTransaction);
+    editor.on("selectionUpdate", debouncedUpdate);
+    editor.on("transaction", debouncedUpdate);
+    document.addEventListener("selectionchange", debouncedUpdate);
+
+    tippyRef.current = instance;
 
     return () => {
-      editor.off("selectionUpdate", handleSelectionUpdate);
-      editor.off("transaction", handleTransaction);
+      cancelAnimationFrame(rafId);
+      editor.off("selectionUpdate", debouncedUpdate);
+      editor.off("transaction", debouncedUpdate);
+      document.removeEventListener("selectionchange", debouncedUpdate);
       instance.destroy();
       document.body.removeChild(reference);
     };
@@ -194,124 +189,124 @@ export default function PostEditorInner({
   if (!editor) return null;
   const e = editor;
 
-  // 🪄 Restore selection helper for toolbar
   const withRestoredSelection = (
     chainOp: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
   ) => {
     const sel = lastSelRef.current;
     let chain = e.chain().focus();
-    if (sel && sel.from !== sel.to) {
-      chain = chain.setTextSelection(sel);
-    }
+    if (sel && sel.from !== sel.to) chain = chain.setTextSelection(sel);
     chainOp(chain).run();
   };
 
-  const preventMouseDown = (ev: React.MouseEvent) => ev.preventDefault();
+  const headingLevels: Level[] = [1, 2, 3];
 
   return (
     <div className="w-full mx-auto">
       {/* Floating Toolbar */}
       <div
         ref={menuRef}
-        className="flex gap-2 bg-white border border-black rounded-md shadow-md p-1 text-black"
+        className="flex gap-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md p-1 text-black dark:text-white"
       >
+        {headingLevels.map((level) => (
+          <button
+            key={level}
+            onClick={() =>
+              withRestoredSelection((c) => c.toggleHeadingNoNewline({ level }))
+            }
+            className={`px-2 py-1 rounded ${
+              e.isActive("heading", { level })
+                ? "bg-gray-200 dark:bg-gray-700"
+                : "hover:bg-gray-100 dark:hover:bg-gray-700"
+            }`}
+          >
+            H{level}
+          </button>
+        ))}
+
         <button
-          onMouseDown={preventMouseDown}
-          onClick={() =>
-            withRestoredSelection((c) => c.toggleHeading({ level: 1 }))
-          }
-          className={`px-2 py-1 rounded ${
-            e.isActive("heading", { level: 1 }) ? "bg-gray-200 font-bold" : ""
-          }`}
-        >
-          H1
-        </button>
-        <button
-          onMouseDown={preventMouseDown}
-          onClick={() =>
-            withRestoredSelection((c) => c.toggleHeading({ level: 2 }))
-          }
-          className={`px-2 py-1 rounded ${
-            e.isActive("heading", { level: 2 }) ? "bg-gray-200 font-bold" : ""
-          }`}
-        >
-          H2
-        </button>
-        <button
-          onMouseDown={preventMouseDown}
-          onClick={() =>
-            withRestoredSelection((c) => c.toggleHeading({ level: 3 }))
-          }
-          className={`px-2 py-1 rounded ${
-            e.isActive("heading", { level: 3 }) ? "bg-gray-200 font-bold" : ""
-          }`}
-        >
-          H3
-        </button>
-        <button
-          onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleBold())}
           className={`px-2 py-1 rounded ${
-            e.isActive("bold") ? "bg-gray-200 font-bold" : ""
+            e.isActive("bold")
+              ? "bg-gray-200 dark:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           B
         </button>
+
         <button
-          onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleItalic())}
           className={`px-2 py-1 rounded ${
-            e.isActive("italic") ? "bg-gray-200 italic" : ""
+            e.isActive("italic")
+              ? "bg-gray-200 dark:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           I
         </button>
+
         <button
-          onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleUnderline())}
           className={`px-2 py-1 rounded ${
-            e.isActive("underline") ? "bg-gray-200 underline" : ""
+            e.isActive("underline")
+              ? "bg-gray-200 dark:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           U
         </button>
+
         <button
-          onMouseDown={preventMouseDown}
           onClick={() => withRestoredSelection((c) => c.toggleStrike())}
           className={`px-2 py-1 rounded ${
-            e.isActive("strike") ? "bg-gray-200 line-through" : ""
+            e.isActive("strike")
+              ? "bg-gray-200 dark:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           S
         </button>
+
         <button
-          onMouseDown={preventMouseDown}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => withRestoredSelection((c) => c.toggleCode())}
           className={`px-2 py-1 rounded ${
-            e.isActive("code") ? "bg-gray-200" : ""
+            e.isActive("code") ? "bg-gray-200 dark:bg-gray-700" : ""
           }`}
         >
           {"</>"}
         </button>
+
         <button
-          onMouseDown={preventMouseDown}
           onClick={() => {
             const selection = window.getSelection()?.toString();
-            if (selection && selection.trim() !== "") {
-              withRestoredSelection((c) => c.insertMath(selection.trim()));
-            }
+            if (!selection?.trim()) return;
+            const { from, to } = e.state.selection;
+            withRestoredSelection((c) =>
+              c.deleteRange({ from, to }).insertMath(selection.trim())
+            );
           }}
-          className="px-2 py-1 rounded hover:bg-gray-200"
+          className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
         >
           ∑
         </button>
       </div>
 
-      {/* ✍️ The Editor */}
-      <EditorContent key={i18n.language} editor={editor} />
+      {/* Editor Container */}
+      <div
+        className={`flex flex-col rounded-lg border transition ${
+          isEditorFocused
+            ? "border-black dark:border-white shadow-md"
+            : "border-gray-300 dark:border-gray-500"
+        }`}
+      >
+        <div className="flex-1 relative max-h-[300px] overflow-y-auto overflow-x-hidden">
+          <EditorContent editor={editor} />
+        </div>
 
-      <div className="text-right text-sm text-gray-400 mt-1">
-        {e.getText().length}/280
+        <div className="text-right text-xs text-gray-500 dark:text-gray-400 px-4 py-1 border-t border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm">
+          {e.getText().length} / 280
+        </div>
       </div>
     </div>
   );

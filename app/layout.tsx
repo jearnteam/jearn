@@ -1,17 +1,32 @@
+// app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Shadows_Into_Light } from "next/font/google";
 import "@/globals.css";
 import I18nProvider from "@/components/I18nProvider";
-import Navbar from "@/components/Navbar"; // ✅ no dynamic here
+import Navbar from "@/components/Navbar";
+import ClientLayout from "./ClientLayout";
+import UserThemeSync from "@/components/UserThemeSync";
+import LanguageInitializer from "@/components/LanguageInitializer";
+import SWRegister from "./sw-register";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const shadowsIntoLight = Shadows_Into_Light({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-shadows-into-light",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -25,12 +40,45 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <I18nProvider>
-          <Navbar /> {/* ✅ directly imported client component */}
-          <main>{children}</main>
-        </I18nProvider>
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+        <Script
+          id="theme-preload"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const theme = localStorage.getItem('theme');
+                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch (_) {}
+            `,
+          }}
+        />
+      </head>
+
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${shadowsIntoLight.variable} 
+        antialiased transition-colors duration-300 min-h-dvh`}
+      >
+        <ClientLayout>
+          <SWRegister />
+          <UserThemeSync />
+          <I18nProvider>
+            <LanguageInitializer />
+            <Navbar />
+            <main className="min-h-screen bg-white dark:bg-neutral-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+              {children}
+            </main>
+          </I18nProvider>
+        </ClientLayout>
       </body>
     </html>
   );

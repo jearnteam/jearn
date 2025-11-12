@@ -1,34 +1,42 @@
-import { addSSEConnection, removeSSEConnection } from "@/lib/sse";
+// app/api/stream/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { addClient, removeClient } from "@/lib/sse";
 
-export async function GET(req: Request) {
-  const stream = new TransformStream();
-  const writer = stream.writable.getWriter();
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-  // add connection
-  addSSEConnection(writer);
+export async function GET(req: NextRequest) {
+  const stream = new ReadableStream({
+    start(controller) {
+      const enc = new TextEncoder();
+      const write = (msg: string) => controller.enqueue(enc.encode(msg));
+      const client = { write };
 
-  // flush initial
-  writer.write(`: connected\n\n`);
+      addClient(client);
 
-  // keep alive every 20s
-  const keepAlive = setInterval(() => {
-    writer.write(`: ping\n\n`).catch(() => {
-      clearInterval(keepAlive);
-      removeSSEConnection(writer);
-    });
-  }, 20000);
+      write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
-  req.signal.addEventListener("abort", () => {
-    clearInterval(keepAlive);
-    removeSSEConnection(writer);
-    writer.close();
+      const ping = setInterval(() => {
+        write(
+          `data: ${JSON.stringify({ type: "ping", t: Date.now() })}\n\n`
+        );
+      }, 30_000);
+
+      req.signal.addEventListener("abort", () => {
+        clearInterval(ping);
+        removeClient(client);
+        controller.close();
+      });
+    },
   });
 
-  return new Response(stream.readable, {
+  return new NextResponse(stream, {
+    status: 200,
     headers: {
-      "Content-Type": "text/event-stream",
+      "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }
