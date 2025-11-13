@@ -3,10 +3,19 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Menu, X, Home, BarChart3, Database, Settings } from "lucide-react";
 import DatabasePanel from "./DatabasePanel";
 import AnalyticsPanel from "./AnalyticsPanel";
 import { useTranslation } from "react-i18next";
+import {
+  Menu,
+  X,
+  Home,
+  BarChart3,
+  Database,
+  Settings,
+  Bell,
+  FileBarChart,
+} from "lucide-react";
 
 export default function Dashboard() {
   const { data: session } = useSession();
@@ -18,7 +27,13 @@ export default function Dashboard() {
   const [sidebarFullyOpen, setSidebarFullyOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<
-    "overview" | "analytics" | "database" | "settings" | null
+    | "overview"
+    | "analytics"
+    | "database"
+    | "notification"
+    | "reports"
+    | "settings"
+    | null
   >(null);
 
   const [hydrated, setHydrated] = useState(false);
@@ -91,6 +106,7 @@ export default function Dashboard() {
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("overview")}
           />
+
           <SidebarItem
             icon={<BarChart3 size={18} />}
             label={t("analytics") || "Analytics"}
@@ -98,6 +114,7 @@ export default function Dashboard() {
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("analytics")}
           />
+
           <SidebarItem
             icon={<Database size={18} />}
             label={t("database") || "Database"}
@@ -105,6 +122,23 @@ export default function Dashboard() {
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("database")}
           />
+
+          <SidebarItem
+            icon={<Bell size={18} />}
+            label={t("notification") || "Notification"}
+            active={activeTab === "notification"}
+            sidebarFullyOpen={sidebarFullyOpen}
+            onClick={() => setActiveTab("notification")}
+          />
+
+          <SidebarItem
+            icon={<FileBarChart size={18} />}
+            label={t("reports") || "Reports"}
+            active={activeTab === "reports"}
+            sidebarFullyOpen={sidebarFullyOpen}
+            onClick={() => setActiveTab("reports")}
+          />
+
           <SidebarItem
             icon={<Settings size={18} />}
             label={t("settings") || "Settings"}

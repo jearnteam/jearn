@@ -17,6 +17,8 @@ if (!i18n.isInitialized) {
           //dashboard
           overview: "Overview",
           analytics: "Analytics",
+          notification: "Notification",
+          reports: "Reports",
         },
       },
       ja: {
@@ -31,6 +33,8 @@ if (!i18n.isInitialized) {
           analytics: "分析",
           database: "データベース",
           settings: "設定",
+          notification: "通知",
+          reports: "通報",
         },
       },
       my: {
@@ -45,6 +49,8 @@ if (!i18n.isInitialized) {
           analytics: "ခွဲခြမ်းစိတ်ဖြာမှု",
           database: "ဒေတာဘေ့စ်",
           settings: "ပြုပြင်ခြင်း",
+          notification: "အသိပေးချက်",
+          reports: "တိုင်ကြားစာ",
         },
       },
     },

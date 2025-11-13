@@ -136,9 +136,7 @@ export default function AnalyticsPanel() {
       {/* 🟨 Bar Chart: All categories (including 0) */}
       {stats.categories.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-2">
-            Posts by Category (Including Empty)
-          </h2>
+          <h2 className="text-xl font-semibold mb-2">Categories</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats.categories}>
               <XAxis dataKey="name" stroke="currentColor" />
@@ -147,9 +145,11 @@ export default function AnalyticsPanel() {
                 contentStyle={{
                   background: "rgba(0,0,0,0.75)",
                   border: "none",
-                  color: "#fff",
                 }}
+                labelStyle={{ color: "#fff" }}
+                itemStyle={{ color: "#fff" }}
               />
+
               <Bar dataKey="count" radius={8}>
                 {stats.categories.map((c) => (
                   <Cell key={c.name} fill={colorMap[c.name]} />
@@ -193,7 +193,7 @@ function MetricCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="p-4 rounded-xl bg-gray-100 dark:bg-neutral-800 text-center shadow">
       <div className="text-2xl font-bold text-yellow-500">{value}</div>
-      <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+      <div className="text-sm text-gray-500 dark:text-gray-100">{label}</div>
     </div>
   );
 }
