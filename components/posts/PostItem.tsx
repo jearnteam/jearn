@@ -59,6 +59,8 @@ export default function PostItem({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
 
+  const [alreadyReported, setAlreadyReported] = useState(false);
+
   const defaultAvatar = "/default-avatar.png";
   const realAvatarUrl =
     postState.authorAvatar && postState.authorAvatar.startsWith("http")
@@ -92,6 +94,24 @@ export default function PostItem({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    async function checkReport() {
+      if (!userId) return;
+
+      try {
+        const res = await fetch(
+          `/api/reports/check?postId=${post._id}&userId=${userId}`
+        );
+        const data = await res.json();
+        setAlreadyReported(data.alreadyReported);
+      } catch (err) {
+        console.error("Failed to check report:", err);
+      }
+    }
+
+    checkReport();
+  }, [post._id, userId]);
 
   const handleEdit = async () => {
     setMenuOpen(false);
@@ -150,6 +170,50 @@ export default function PostItem({
     }
   }, [userId, postState._id, postState.upvoters, pending, onUpvote]);
 
+  const handleReport = async () => {
+    if (!userId) {
+      alert("You must be logged in to report.");
+      return;
+    }
+
+    if (alreadyReported) {
+      alert("You already reported this post.");
+      return;
+    }
+
+    const reason = prompt("Why are you reporting this post?");
+    if (!reason || !reason.trim()) return;
+
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: postState._id,
+          reporterId: userId,
+          reason: reason.trim(),
+        }),
+      });
+
+      if (res.status === 409) {
+        alert("You already reported this post.");
+        setAlreadyReported(true);
+        return;
+      }
+
+      if (!res.ok) {
+        alert("Failed to submit report.");
+        return;
+      }
+
+      alert("Report submitted. Thank you.");
+      setAlreadyReported(true);
+    } catch (err) {
+      console.error("Failed to submit report:", err);
+      alert("already submitted report!");
+    }
+  };
+
   const toggleExpand = () => setExpanded((prev) => !prev);
 
   const isComment = !!post.parentId;
@@ -194,49 +258,73 @@ export default function PostItem({
             </div>
           </div>
 
-          {userId === postState.authorId && (
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen((v) => !v)}
-                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
-              >
-                <MoreVertical size={20} />
-              </button>
-              <AnimatePresence>
-                {menuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    className="absolute right-0 mt-2 w-40 z-20 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700"
-                  >
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
+            >
+              <MoreVertical size={20} />
+            </button>
+
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="absolute right-0 mt-2 w-40 z-20 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700"
+                >
+                  {/* Owner actions */}
+                  {userId === postState.authorId && (
+                    <>
+                      <button
+                        onClick={handleEdit}
+                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                      >
+                        ✏️ Edit
+                      </button>
+                      <button
+                        onClick={handleDelete}
+                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700 text-red-600"
+                      >
+                        🗑 Delete
+                      </button>
+                    </>
+                  )}
+
+                  {/* Report option for everyone else */}
+                  {userId !== postState.authorId && (
                     <button
-                      onClick={handleEdit}
-                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                      disabled={alreadyReported}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (!alreadyReported) handleReport();
+                      }}
+                      className={`block w-full text-left px-4 py-2 
+                    ${
+                      alreadyReported
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                    }
+                     text-yellow-600`}
                     >
-                      ✏️ Edit
+                      ⚠️ {alreadyReported ? "Reported" : "Report"}
                     </button>
-                    <button
-                      onClick={handleDelete}
-                      className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700 text-red-600"
-                    >
-                      🗑 Delete
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
-        {/* ✅ Title */}
+        {/* Title */}
         {!isComment && (
           <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
             {postState.title || "Untitled"}
           </h2>
         )}
 
-        {/* ✅ 🆕 Category Badges */}
+        {/* Category Badges */}
         {Array.isArray(postState.categories) &&
           postState.categories.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
@@ -252,7 +340,7 @@ export default function PostItem({
             </div>
           )}
 
-        {/* ✅ Content */}
+        {/* Content */}
         {postState.content?.trim() ? (
           <motion.div
             initial={{ height: 0, opacity: 0 }}

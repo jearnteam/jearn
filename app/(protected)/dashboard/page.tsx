@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import DatabasePanel from "./DatabasePanel";
 import AnalyticsPanel from "./AnalyticsPanel";
+import ReportsPanel from "./ReportsPanel";
 import { useTranslation } from "react-i18next";
 import {
   Menu,
@@ -164,6 +165,7 @@ export default function Dashboard() {
 
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "database" && <DatabasePanel />}
+        {activeTab === "reports" && <ReportsPanel />}
         {activeTab === "settings" && <p>Settings will be added here.</p>}
       </main>
     </div>
