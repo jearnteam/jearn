@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import {
-  Edit3,
-  Trash2,
-  Save,
-  XCircle,
-  Search,
-} from "lucide-react";
+import { Edit3, Trash2, Save, XCircle, Search } from "lucide-react";
 
 export default function DatabasePanel() {
   const [posts, setPosts] = useState<any[]>([]);
@@ -23,6 +17,10 @@ export default function DatabasePanel() {
   const [searchCategory, setSearchCategory] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  // 📄 Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   /* ---------- Fetch Posts ---------- */
   useEffect(() => {
@@ -62,28 +60,28 @@ export default function DatabasePanel() {
       const idMatch =
         !searchPostId ||
         p._id?.toLowerCase().includes(searchPostId.toLowerCase());
+
       const userMatch =
         !searchUser ||
         p.authorName?.toLowerCase().includes(searchUser.toLowerCase());
+
       const userIdMatch =
         !searchUserId ||
         p.authorId?.toLowerCase().includes(searchUserId.toLowerCase());
+
       const catMatch =
         !searchCategory ||
         (Array.isArray(p.categories) &&
           p.categories.some((c: string) =>
             c.toLowerCase().includes(searchCategory.toLowerCase())
           ));
+
       const created = new Date(p.createdAt);
       const fromMatch = !dateFrom || created >= new Date(dateFrom);
       const toMatch = !dateTo || created <= new Date(dateTo);
+
       return (
-        idMatch &&
-        userMatch &&
-        userIdMatch &&
-        catMatch &&
-        fromMatch &&
-        toMatch
+        idMatch && userMatch && userIdMatch && catMatch && fromMatch && toMatch
       );
     });
   }, [
@@ -96,7 +94,27 @@ export default function DatabasePanel() {
     dateTo,
   ]);
 
-  /* ---------- Open JSON editor ---------- */
+  /* 🔄 Reset to page 1 when filters change */
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchPostId,
+    searchUser,
+    searchUserId,
+    searchCategory,
+    dateFrom,
+    dateTo,
+  ]);
+
+  /* ---------- Pagination logic ---------- */
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage]);
+
+  /* ---------- JSON Editor ---------- */
   const openEditor = (post: any) => {
     setEditPost(post);
     setJsonText(JSON.stringify(post, null, 2));
@@ -108,6 +126,7 @@ export default function DatabasePanel() {
     try {
       const parsed = JSON.parse(jsonText);
       if (!parsed._id) throw new Error("Missing _id field");
+
       const res = await fetch("/api/posts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -117,9 +136,12 @@ export default function DatabasePanel() {
           content: parsed.content,
         }),
       });
+
       if (!res.ok) throw new Error("Update failed");
+
       alert("✅ Saved successfully!");
       setEditPost(null);
+
       setPosts((prev) =>
         prev.map((p) => (p._id === parsed._id ? { ...p, ...parsed } : p))
       );
@@ -144,6 +166,7 @@ export default function DatabasePanel() {
             className="border rounded px-2 py-1 text-sm dark:bg-neutral-900 dark:border-gray-700"
           />
         </div>
+
         <input
           type="text"
           placeholder="Username"
@@ -151,6 +174,7 @@ export default function DatabasePanel() {
           onChange={(e) => setSearchUser(e.target.value)}
           className="border rounded px-2 py-1 text-sm dark:bg-neutral-900 dark:border-gray-700"
         />
+
         <input
           type="text"
           placeholder="User ID"
@@ -158,6 +182,7 @@ export default function DatabasePanel() {
           onChange={(e) => setSearchUserId(e.target.value)}
           className="border rounded px-2 py-1 text-sm dark:bg-neutral-900 dark:border-gray-700"
         />
+
         <input
           type="text"
           placeholder="Category"
@@ -165,6 +190,7 @@ export default function DatabasePanel() {
           onChange={(e) => setSearchCategory(e.target.value)}
           className="border rounded px-2 py-1 text-sm dark:bg-neutral-900 dark:border-gray-700"
         />
+
         <div className="flex items-center gap-2">
           <label className="text-sm">From:</label>
           <input
@@ -174,6 +200,7 @@ export default function DatabasePanel() {
             className="border rounded px-2 py-1 text-sm dark:bg-neutral-900 dark:border-gray-700"
           />
         </div>
+
         <div className="flex items-center gap-2">
           <label className="text-sm">To:</label>
           <input
@@ -201,8 +228,9 @@ export default function DatabasePanel() {
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
             </thead>
+
             <tbody>
-              {filtered.map((p) => (
+              {paginated.map((p) => (
                 <tr
                   key={p._id}
                   className="border-t border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-neutral-800"
@@ -234,7 +262,8 @@ export default function DatabasePanel() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
+
+              {paginated.length === 0 && (
                 <tr>
                   <td
                     colSpan={6}
@@ -248,6 +277,37 @@ export default function DatabasePanel() {
           </table>
         </div>
       )}
+
+      {/* 🔀 Pagination */}
+      <div className="flex justify-center items-center gap-4 mt-4 text-sm">
+        <button
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1
+              ? "bg-gray-300 dark:bg-neutral-800 opacity-50 cursor-not-allowed"
+              : "bg-gray-300 dark:bg-neutral-800 hover:bg-gray-400 dark:hover:bg-neutral-700"
+          }`}
+        >
+          ← Prev
+        </button>
+
+        <span className="text-gray-600 dark:text-gray-400">
+          Page {currentPage} of {totalPages || 1}
+        </span>
+
+        <button
+          disabled={currentPage === totalPages || totalPages === 0}
+          onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          className={`px-3 py-1 rounded ${
+            currentPage === totalPages || totalPages === 0
+              ? "bg-gray-300 dark:bg-neutral-800 opacity-50 cursor-not-allowed"
+              : "bg-gray-300 dark:bg-neutral-800 hover:bg-gray-400 dark:hover:bg-neutral-700"
+          }`}
+        >
+          Next →
+        </button>
+      </div>
 
       {/* 🧩 JSON Modal */}
       {editPost && (
@@ -274,6 +334,7 @@ export default function DatabasePanel() {
               >
                 <XCircle size={16} /> Cancel
               </button>
+
               <button
                 onClick={handleSave}
                 className="flex items-center gap-2 px-3 py-1 rounded bg-green-600 text-white hover:bg-green-700"

@@ -12,17 +12,18 @@ export default function Dashboard() {
   const { data: session } = useSession();
   const { t } = useTranslation();
 
-  // ✅ Start with sidebar closed
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ✅ Default tab is undefined until hydration finishes
+  // NEW: Text appears only after expand finishes
+  const [sidebarFullyOpen, setSidebarFullyOpen] = useState(false);
+
   const [activeTab, setActiveTab] = useState<
     "overview" | "analytics" | "database" | "settings" | null
   >(null);
 
   const [hydrated, setHydrated] = useState(false);
 
-  // ✅ Restore last tab on mount
+  // Restore last selected tab
   useEffect(() => {
     const savedTab = localStorage.getItem("dashboard-active-tab");
     if (
@@ -33,17 +34,15 @@ export default function Dashboard() {
     ) {
       setActiveTab(savedTab);
     } else {
-      setActiveTab("overview"); // fallback for first visit
+      setActiveTab("overview");
     }
     setHydrated(true);
   }, []);
 
-  // ✅ Save tab changes
   useEffect(() => {
     if (activeTab) localStorage.setItem("dashboard-active-tab", activeTab);
   }, [activeTab]);
 
-  // 🕒 Avoid showing flash of “database” before hydration
   if (!hydrated || !activeTab)
     return (
       <div className="fixed inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
@@ -55,8 +54,9 @@ export default function Dashboard() {
     <div className="fixed inset-0 pt-[4.3rem] bg-white dark:bg-black flex">
       {/* ---------- Sidebar ---------- */}
       <motion.aside
-        animate={{ width: sidebarOpen ? 240 : 50 }}
+        animate={{ width: sidebarOpen ? 175 : 50 }}
         transition={{ duration: 0.25, ease: "easeInOut" }}
+        onAnimationComplete={() => setSidebarFullyOpen(sidebarOpen)}
         className="
           relative h-full border-r border-gray-300 dark:border-neutral-800
           bg-gray-100 dark:bg-neutral-900 text-gray-900 dark:text-gray-100
@@ -65,12 +65,18 @@ export default function Dashboard() {
       >
         {/* Toggle button */}
         <button
-          onClick={() => setSidebarOpen((v) => !v)}
+          onClick={() => {
+            if (sidebarOpen) {
+              // Immediately hide text on closing
+              setSidebarFullyOpen(false);
+            }
+            setSidebarOpen((v) => !v);
+          }}
           className="
-            absolute top-4 left-2 flex items-center justify-center w-8 h-8
-            rounded-md bg-gray-200 dark:bg-neutral-800
-            hover:bg-gray-300 dark:hover:bg-neutral-700
-            text-gray-800 dark:text-gray-100 transition
+          absolute top-4 left-2 flex items-center justify-center w-8 h-8
+          rounded-md bg-gray-200 dark:bg-neutral-800
+         hover:bg-gray-300 dark:hover:bg-neutral-700
+          text-gray-800 dark:text-gray-100 transition
           "
           aria-label="Toggle Sidebar"
         >
@@ -82,28 +88,28 @@ export default function Dashboard() {
             icon={<Home size={18} />}
             label={t("overview") || "Overview"}
             active={activeTab === "overview"}
-            sidebarOpen={sidebarOpen}
+            sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("overview")}
           />
           <SidebarItem
             icon={<BarChart3 size={18} />}
             label={t("analytics") || "Analytics"}
             active={activeTab === "analytics"}
-            sidebarOpen={sidebarOpen}
+            sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("analytics")}
           />
           <SidebarItem
             icon={<Database size={18} />}
             label={t("database") || "Database"}
             active={activeTab === "database"}
-            sidebarOpen={sidebarOpen}
+            sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("database")}
           />
           <SidebarItem
             icon={<Settings size={18} />}
             label={t("settings") || "Settings"}
             active={activeTab === "settings"}
-            sidebarOpen={sidebarOpen}
+            sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("settings")}
           />
         </div>
@@ -135,19 +141,19 @@ function SidebarItem({
   icon,
   label,
   active,
-  sidebarOpen,
+  sidebarFullyOpen,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
   active: boolean;
-  sidebarOpen: boolean;
+  sidebarFullyOpen: boolean;
   onClick: () => void;
 }) {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-200
+      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-200 h-10
         ${
           active
             ? "bg-yellow-400 dark:bg-yellow-500 text-black"
@@ -155,7 +161,13 @@ function SidebarItem({
         }`}
     >
       {icon}
-      {sidebarOpen && <span className="text-sm">{label}</span>}
+
+      {/* Show label *only after* sidebar animations finish */}
+      {sidebarFullyOpen && (
+        <span className="text-sm opacity-100 transition-opacity duration-150">
+          {label}
+        </span>
+      )}
     </div>
   );
 }
