@@ -1,82 +1,74 @@
-import { NextRequest } from "next/server";
+// app/api/user/avatar/[id]/route.ts
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
-import fs from "fs/promises";
+import { ObjectId, Binary } from "mongodb";
+import { NextResponse } from "next/server";
+import { readFileSync } from "fs";
 import path from "path";
 
 export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// Preload fallback buffer ONCE (fast)
+const FALLBACK_BUFFER = new Uint8Array(
+  readFileSync(path.join(process.cwd(), "public/default-avatar.png"))
+);
+
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
   try {
-    const id = params.id;
+    const userId = params.id;
+
+    if (userId === "system") {
+      return serveDefault();
+    }
+
+    if (!ObjectId.isValid(userId)) {
+      return serveDefault();
+    }
+
     const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "jearn");
-    const users = db.collection("users");
+    const db = client.db("jearn");
 
-    let user = null;
+    const user = await db
+      .collection("users")
+      .findOne({ _id: new ObjectId(userId) }, { projection: { picture: 1 } });
 
-    if (ObjectId.isValid(id)) {
-      user = await users.findOne(
-        { _id: new ObjectId(id) },
-        { projection: { picture: 1, avatarUrl: 1 } }
-      );
-    }
-    if (!user) {
-      user = await users.findOne(
-        { uid: id },
-        { projection: { picture: 1, avatarUrl: 1 } }
-      );
-    }
+    if (!user?.picture) return serveDefault();
 
-    // Remote avatar (external provider URL)
-    if (user?.avatarUrl) {
-      const res = await fetch(user.avatarUrl);
-      if (res.ok) {
-        const blob = await res.arrayBuffer();
-        return new Response(blob, {
-          status: 200,
-          headers: {
-            "Content-Type": "image/png",
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=86400",
-            "Connection": "keep-alive",
-          },
-        });
-      }
+    let buffer: Buffer | null = null;
+    let contentType = user.picture.contentType || "image/png";
+    const pic = user.picture;
+
+    if (pic.data instanceof Binary) {
+      buffer = pic.data.buffer;
+    } else if (Buffer.isBuffer(pic.data)) {
+      buffer = pic.data;
+    } else if (pic._bsontype === "Binary") {
+      buffer = pic.buffer;
+    } else if (pic.data instanceof Uint8Array) {
+      buffer = Buffer.from(pic.data);
     }
 
-    // Avatar stored in DB
-    if (user?.picture) {
-      const buffer = Buffer.isBuffer(user.picture)
-        ? user.picture
-        : Buffer.from(user.picture.buffer);
+    if (!buffer) return serveDefault();
 
-      return new Response(buffer, {
-        status: 200,
-        headers: {
-          "Content-Type": "image/png",
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=86400",
-          "Connection": "keep-alive",
-        },
-      });
-    }
-
-    // Default avatar
-    const filePath = path.join(process.cwd(), "public", "default-avatar.png");
-    const fallback = await fs.readFile(filePath);
-
-    return new Response(fallback, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
-        "Content-Type": "image/png",
-        "Cache-Control": "public, max-age=86400, stale-while-revalidate=86400",
+        "Content-Type": contentType,
+        "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
   } catch (err) {
-    console.warn("⚠️ Avatar route error:", err);
-    return new Response(null, { status: 204 }); // empty but no error
+    console.error("❌ Avatar route error:", err);
+    return serveDefault();
   }
+}
+
+// ⭐ NEVER redirect. Serve fallback bytes immediately.
+function serveDefault() {
+  return new NextResponse(FALLBACK_BUFFER, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "no-store",
+    },
+  });
 }

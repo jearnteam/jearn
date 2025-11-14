@@ -8,11 +8,12 @@ import LangSwitcher from "@/components/LangSwitcher";
 import { signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 import LoadingOwl from "@/components/LoadingOwl";
+import Avatar from "@/components/Avatar";
 import { useState, useEffect } from "react";
 
 const ThreeBall = dynamic(() => import("./3d_spinner"), {
   ssr: false,
-  loading: () => null, // Don't show anything while loading the spinner
+  loading: () => <LoadingOwl />,
 });
 
 export default function Navbar() {
@@ -21,35 +22,26 @@ export default function Navbar() {
 
   const [hydrated, setHydrated] = useState(false);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "/";
-  const defaultAvatar = "/default-avatar.png";
 
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   const handleLogoClick = () => {
-    if (appUrl) window.location.href = appUrl;
+    window.location.href = appUrl;
   };
 
   return (
-    <header
-      className="fixed top-0 left-0 w-full z-50 border-b shadow-sm
-        bg-white dark:bg-neutral-900 transition-colors duration-300 ease-in-out"
-    >
-      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 py-3">
-        {/* Logo + 3D Spinner */}
+    <header className="fixed top-0 left-0 w-full z-50 bg-white dark:bg-neutral-900 border-b shadow-sm">
+      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 h-16">
+
+        {/* LOGO */}
         <div
           className="flex items-center gap-3 cursor-pointer"
           onClick={handleLogoClick}
         >
           <div className="w-12 h-12 flex items-center justify-center">
-            {hydrated ? (
-              <ThreeBall />
-            ) : (
-              <div className="w-10 h-10">
-                <LoadingOwl />
-              </div>
-            )}
+            {hydrated ? <ThreeBall /> : <LoadingOwl />}
           </div>
 
           <h1
@@ -60,37 +52,37 @@ export default function Navbar() {
           </h1>
         </div>
 
-        {/* Right Side */}
+        {/* RIGHT SIDE */}
         <div className="flex items-center gap-3">
+
           <ThemeToggle />
           <LangSwitcher />
 
           {!hydrated ? (
-            <div className="w-16 h-6">
-              <LoadingOwl />
-            </div>
+            <div className="w-8 h-8"><LoadingOwl /></div>
           ) : loading ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">
               Loading...
             </span>
           ) : user ? (
             <>
+              {/* USER AVATAR */}
               <Link href="/profile" className="shrink-0">
-                <img
-                  src={`/api/user/avatar/${user.uid}`}
-                  alt="avatar"
-                  onError={(e) => (e.currentTarget.src = defaultAvatar)}
-                  className="w-8 h-8 rounded-full object-cover border
-                    border-gray-300 dark:border-gray-700"
+                <Avatar
+                  id={user._id}
+                  size={36}
+                  className="border border-gray-300 dark:border-gray-700"
                 />
               </Link>
 
+              {/* USERNAME */}
               {user.name && (
                 <span className="text-sm font-medium truncate max-w-[120px]">
                   {user.name}
                 </span>
               )}
 
+              {/* LOGOUT */}
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
                 className="text-sm text-red-500 hover:underline"
@@ -101,14 +93,16 @@ export default function Navbar() {
           ) : (
             <button
               onClick={() => (window.location.href = "/api/auth/signin")}
-              className="text-sm px-3 py-1 rounded
+              className="
+                text-sm px-3 py-1 rounded
                 bg-blue-600 text-white hover:bg-blue-700
                 dark:bg-blue-500 dark:hover:bg-blue-600
-                transition-colors duration-300"
+              "
             >
               {t("login") || "Login"}
             </button>
           )}
+
         </div>
       </div>
     </header>

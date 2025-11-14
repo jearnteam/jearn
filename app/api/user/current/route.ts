@@ -1,81 +1,40 @@
-// app/api/user/current/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import clientPromise from "@/lib/mongodb";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import type { MongoClient } from "mongodb";
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const session = await safeSession();
+    const session = await getServerSession();
     if (!session?.user?.email) {
-      console.warn("⚠️ No session or email");
-      return ok({ user: null });
+      return NextResponse.json({ ok: false, user: null });
     }
 
-    const user = await safeFetchUser(session.user.email);
-    return ok({ user });
-  } catch (err) {
-    console.error("🔥 /api/user/current crashed hard:", err);
-    // 👇 Explicitly send 200 OK with null user, never 503
-    return NextResponse.json(
-      { ok: false, user: null, error: String(err) },
-      { status: 200 }
-    );
-  }
-}
+    const client = await clientPromise;
+    const db = client.db("jearn");
 
-function ok(data: object) {
-  return NextResponse.json({ ok: true, ...data }, { status: 200 });
-}
-
-async function safeSession() {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) console.warn("⚠️ getServerSession returned null");
-    return session;
-  } catch (err) {
-    console.error("❌ getServerSession failed:", err);
-    return null;
-  }
-}
-
-async function safeFetchUser(email: string) {
-  try {
-    const client = (await Promise.race([
-      clientPromise,
-      timeout(1000), // 🕐 fail fast
-    ])) as MongoClient;
-
-    const db = client.db(process.env.MONGODB_DB || "jearn");
-    const user = await db
-      .collection("users")
-      .findOne({ email }, { projection: { password: 0 } });
+    const user = await db.collection("users").findOne({
+      email: session.user.email,
+    });
 
     if (!user) {
-      console.warn("⚠️ No DB user found for", email);
-      return null;
+      return NextResponse.json({ ok: false, user: null });
     }
 
-    return {
-      uid: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      bio: user.bio,
-      theme: user.theme ?? "system",
-      language: user.language ?? "en",
-      picture: user.picture ? `/api/user/avatar/${user._id}` : null,
-    };
-  } catch (err) {
-    console.error("❌ safeFetchUser DB error:", err);
-    return null;
-  }
-}
+    return NextResponse.json({
+      ok: true,
+      user: {
+        _id: user._id.toString(),          // Mongo user ID
+        uid: user.provider_id || null,     // Google provider ID
+        name: user.name ?? "",
+        bio: user.bio ?? "",
+        theme: user.theme ?? "light",
+        language: user.language ?? "en",
+        hasPicture: !!user.picture,        // For avatar
+      },
+    });
 
-function timeout(ms: number) {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error("DB timeout")), ms)
-  );
+  } catch (err) {
+    console.error("current user error:", err);
+    return NextResponse.json({ ok: false, user: null });
+  }
 }

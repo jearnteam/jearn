@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper, {
@@ -8,7 +8,6 @@ import PostEditorWrapper, {
 } from "@/components/posts/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 
-/* ---------- Props Type (exported for PostFormBox) ---------- */
 export interface PostFormProps {
   onSubmit: (
     title: string,
@@ -23,7 +22,6 @@ interface Category {
   score: number;
 }
 
-/* ---------- Component ---------- */
 export default function PostForm({ onSubmit }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [resetKey, setResetKey] = useState(0);
@@ -31,13 +29,22 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const [checking, setChecking] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const [isTitleFocused, setIsTitleFocused] = useState(false);
-  const titleRef = useRef<HTMLInputElement>(null);
 
-  const authorId = user?.uid || null;
+  /** ❗ FIX: Force re-render when user loads */
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    console.log("POSTFORM USER =", user);
+    if (!loading) setReady(true);
+  }, [loading, user]);
+
+  /** Use MongoDB _id for author identity */
+  const authorId = user?._id || null;
 
   /* ---------- AI Category Check ---------- */
   const handleCheckCategories = async () => {
@@ -73,8 +80,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    if (selected.length === 0)
-      return alert("Please choose at least one category.");
+    if (selected.length === 0) return alert("Choose a category.");
 
     const html = editorRef.current?.getHTML?.() ?? "";
 
@@ -93,14 +99,13 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     }
   };
 
-  /* ---------- UI ---------- */
   return (
     <motion.form
       onSubmit={handleSubmit}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex flex-col h-full min-h-0 space-y-4 bg-white dark:bg-neutral-900 p-4 rounded-lg"
+      className="flex flex-col h-full space-y-4 bg-white dark:bg-neutral-900 p-4 rounded-lg"
     >
       {/* Title Input */}
       <div
@@ -111,7 +116,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
         }`}
       >
         <input
-          ref={titleRef}
           type="text"
           placeholder={t("title") || "Title"}
           value={title}
@@ -119,27 +123,27 @@ export default function PostForm({ onSubmit }: PostFormProps) {
           onBlur={() => setIsTitleFocused(false)}
           onChange={(e) => setTitle(e.target.value)}
           disabled={submitting}
-          className="w-full text-xl font-medium px-4 py-3 bg-transparent focus:outline-none focus:ring-0"
+          className="w-full text-xl px-4 py-3 bg-transparent focus:outline-none"
         />
       </div>
 
       {/* Editor */}
-      <div className="flex-1 overflow-y-auto bg-white dark:bg-neutral-900 rounded-md">
+      <div className="flex-1 overflow-y-auto rounded-md">
         <PostEditorWrapper key={resetKey} ref={editorRef} value={""} />
       </div>
 
       {/* Category Section */}
       {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-300 dark:border-gray-700">
+        <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-gray-700">
           {categories.map((cat) => (
             <button
               key={cat.label}
               type="button"
               onClick={() => handleSelectCategory(cat.label)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+              className={`px-3 py-1 rounded-full text-sm font-medium ${
                 selected.includes(cat.label)
                   ? "bg-blue-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+                  : "bg-gray-200 dark:bg-gray-700"
               }`}
             >
               {cat.label} ({(cat.score * 100).toFixed(1)}%)
@@ -149,24 +153,20 @@ export default function PostForm({ onSubmit }: PostFormProps) {
       )}
 
       {/* Bottom Section */}
-      <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t border-gray-200 dark:border-gray-700 pt-3 pb-4">
+      <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700 pt-3 pb-4">
         <div className="flex justify-between items-center">
           {/* User Info */}
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+          <div className="flex items-center gap-2 text-sm">
             <img
               src={
                 user?.picture
                   ? `${user.picture}?t=${Date.now()}`
                   : "/default-avatar.png"
               }
-              alt="avatar"
               className="w-8 h-8 rounded-full border"
             />
             <span>
-              Posting as{" "}
-              <strong>
-                {loading ? "Loading..." : user?.name ?? "Anonymous"}
-              </strong>
+              Posting as <strong>{user?.name ?? "Anonymous"}</strong>
             </span>
           </div>
 
@@ -175,13 +175,9 @@ export default function PostForm({ onSubmit }: PostFormProps) {
             {categories.length === 0 ? (
               <button
                 type="button"
-                onClick={handleCheckCategories}
                 disabled={checking}
-                className={`px-6 py-2 rounded-lg font-medium ${
-                  checking
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-yellow-500 hover:bg-yellow-600 text-white"
-                }`}
+                onClick={handleCheckCategories}
+                className="px-6 py-2 rounded-lg bg-yellow-500 text-white disabled:bg-gray-400"
               >
                 {checking ? "Checking..." : "Check Categories"}
               </button>
@@ -189,11 +185,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
               <button
                 type="submit"
                 disabled={submitting || loading || selected.length === 0}
-                className={`px-6 py-2 rounded-lg font-medium ${
-                  submitting || loading || selected.length === 0
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                className="px-6 py-2 rounded-lg bg-blue-600 text-white disabled:bg-gray-400"
               >
                 {submitting ? "Submitting..." : "Submit"}
               </button>

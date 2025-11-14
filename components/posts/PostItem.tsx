@@ -40,34 +40,35 @@ export default function PostItem({
   fullView = false,
 }: PostItemProps) {
   const { user } = useCurrentUser();
-  const userId = user?.uid ?? "";
+  const userId = user?._id ?? ""; // <--- FIXED IDENTITY
 
   const [postState, setPostState] = useState(post);
 
-  // ✅ Keep in sync with server/SSE updates
-  useEffect(() => {
-    setPostState(post);
-  }, [post]);
+  useEffect(() => setPostState(post), [post]);
 
   const hasUpvoted = userId && postState.upvoters?.includes(userId);
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const [expanded, setExpanded] = useState(fullView);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [measureDone, setMeasureDone] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
 
+  const [shareOpen, setShareOpen] = useState(false);
   const [alreadyReported, setAlreadyReported] = useState(false);
 
+  /** Avatar logic */
   const defaultAvatar = "/default-avatar.png";
+
   const realAvatarUrl =
     postState.authorAvatar && postState.authorAvatar.startsWith("http")
       ? postState.authorAvatar
       : `/api/user/avatar/${postState.authorId}`;
 
   const [avatarLoaded, setAvatarLoaded] = useState(false);
+
   useEffect(() => {
     const img = new Image();
     img.src = realAvatarUrl;
@@ -76,9 +77,8 @@ export default function PostItem({
   }, [realAvatarUrl]);
 
   useLayoutEffect(() => {
-    const el = contentRef.current;
-    if (el) {
-      setContentHeight(el.scrollHeight);
+    if (contentRef.current) {
+      setContentHeight(contentRef.current.scrollHeight);
       setMeasureDone(true);
     }
   }, [postState.content]);
@@ -87,42 +87,76 @@ export default function PostItem({
     contentHeight && contentHeight > LINE_HEIGHT * LINE_THRESHOLD;
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
+    function handleClick(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node))
         setMenuOpen(false);
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   useEffect(() => {
     async function checkReport() {
       if (!userId) return;
-
       try {
         const res = await fetch(
           `/api/reports/check?postId=${post._id}&userId=${userId}`
         );
         const data = await res.json();
         setAlreadyReported(data.alreadyReported);
-      } catch (err) {
-        console.error("Failed to check report:", err);
-      }
+      } catch {}
     }
-
     checkReport();
   }, [post._id, userId]);
 
+  /** Edit */
   const handleEdit = async () => {
     setMenuOpen(false);
     await onEdit?.(postState);
   };
 
+  /** Delete */
   const handleDelete = async () => {
     setMenuOpen(false);
     if (postState._id) await onDelete?.(postState._id);
   };
 
+  /** Report */
+  const handleReport = async () => {
+    if (!userId) return alert("Login required to report.");
+
+    if (alreadyReported) return alert("Already reported.");
+
+    const reason = prompt("Why report?");
+    if (!reason?.trim()) return;
+
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: postState._id,
+          reporterId: userId,
+          reason: reason.trim(),
+        }),
+      });
+
+      if (res.status === 409) {
+        alert("Already reported.");
+        setAlreadyReported(true);
+        return;
+      }
+
+      if (!res.ok) return alert("Failed to report.");
+
+      alert("Report submitted.");
+      setAlreadyReported(true);
+    } catch {
+      alert("Failed.");
+    }
+  };
+
+  /** Upvote */
   const [pending, setPending] = useState(false);
 
   const handleUpvote = useCallback(async () => {
@@ -130,11 +164,9 @@ export default function PostItem({
     setPending(true);
 
     const alreadyUpvoted = postState.upvoters?.includes(userId);
-    const txId =
-      globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+    const txId = crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
     rememberTx(txId);
 
-    // Optimistic UI update
     setPostState((prev) => ({
       ...prev,
       upvoteCount: alreadyUpvoted ? prev.upvoteCount - 1 : prev.upvoteCount + 1,
@@ -153,9 +185,8 @@ export default function PostItem({
           body: JSON.stringify({ userId, txId }),
         });
       }
-    } catch (err) {
-      console.error("❌ Upvote failed:", err);
-      // Revert on failure
+    } catch {
+      // revert
       setPostState((prev) => ({
         ...prev,
         upvoteCount: alreadyUpvoted
@@ -165,56 +196,10 @@ export default function PostItem({
           ? [...prev.upvoters, userId]
           : prev.upvoters.filter((id) => id !== userId),
       }));
-    } finally {
-      setPending(false);
     }
+
+    setPending(false);
   }, [userId, postState._id, postState.upvoters, pending, onUpvote]);
-
-  const handleReport = async () => {
-    if (!userId) {
-      alert("You must be logged in to report.");
-      return;
-    }
-
-    if (alreadyReported) {
-      alert("You already reported this post.");
-      return;
-    }
-
-    const reason = prompt("Why are you reporting this post?");
-    if (!reason || !reason.trim()) return;
-
-    try {
-      const res = await fetch("/api/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          postId: postState._id,
-          reporterId: userId,
-          reason: reason.trim(),
-        }),
-      });
-
-      if (res.status === 409) {
-        alert("You already reported this post.");
-        setAlreadyReported(true);
-        return;
-      }
-
-      if (!res.ok) {
-        alert("Failed to submit report.");
-        return;
-      }
-
-      alert("Report submitted. Thank you.");
-      setAlreadyReported(true);
-    } catch (err) {
-      console.error("Failed to submit report:", err);
-      alert("already submitted report!");
-    }
-  };
-
-  const toggleExpand = () => setExpanded((prev) => !prev);
 
   const isComment = !!post.parentId;
   const WrapperTag: any = fullView || isComment ? "div" : "li";
@@ -224,107 +209,108 @@ export default function PostItem({
       <WrapperTag
         className={`${
           fullView
-            ? "bg-white dark:bg-neutral-900 border border-gray-300 dark:border-gray-700 rounded-xl p-6 list-none"
-            : "bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-300 list-none"
-        }`}
+            ? "bg-white dark:bg-neutral-900 border border-gray-300 dark:border-gray-700 rounded-xl p-6"
+            : "bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-all"
+        } list-none`}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center mb-3">
+        {/* HEADER */}
+        <div className="flex items-center justify-between mb-3">
+          <Link
+            href={`/profile/${postState.authorId}`}
+            className="flex items-center hover:opacity-80 transition"
+          >
             <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 dark:border-gray-700 mr-3">
               {!avatarLoaded && (
                 <img
                   src={defaultAvatar}
-                  alt="Default avatar"
-                  className="w-8 h-8 object-cover opacity-80"
+                  className="w-full h-full object-cover opacity-70"
+                  alt="avatar"
                 />
               )}
               <img
                 src={realAvatarUrl}
-                alt={postState.authorName || "User avatar"}
-                className={`w-8 h-8 object-cover absolute top-0 left-0 transition-opacity duration-300 
-                  ${avatarLoaded ? "opacity-100" : "opacity-0"}`}
+                className={`absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-300 ${
+                  avatarLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                alt="avatar"
               />
             </div>
+
             <div>
               <p className="font-semibold text-gray-800 dark:text-gray-200">
-                {postState.authorName || "Anonymous"}
+                {postState.authorName || ""}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {postState.createdAt
-                  ? dayjs(postState.createdAt).fromNow()
-                  : "Just now"}
+                {dayjs(postState.createdAt).fromNow()}
               </p>
             </div>
-          </div>
+          </Link>
 
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
-            >
-              <MoreVertical size={20} />
-            </button>
+          {/* MENU */}
+          {userId && (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
+              >
+                <MoreVertical size={20} />
+              </button>
 
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="absolute right-0 mt-2 w-40 z-20 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700"
-                >
-                  {/* Owner actions */}
-                  {userId === postState.authorId && (
-                    <>
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="absolute right-0 mt-2 w-40 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden"
+                  >
+                    {/* Owner */}
+                    {userId === String(postState.authorId) && (
+                      <>
+                        <button
+                          onClick={handleEdit}
+                          className="block w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={handleDelete}
+                          className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        >
+                          🗑 Delete
+                        </button>
+                      </>
+                    )}
+
+                    {/* Not owner */}
+                    {userId !== String(postState.authorId) && (
                       <button
-                        onClick={handleEdit}
-                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        onClick={handleReport}
+                        disabled={alreadyReported}
+                        className={`block w-full px-4 py-2 text-left text-yellow-600 ${
+                          alreadyReported
+                            ? "opacity-50 cursor-not-allowed"
+                            : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        }`}
                       >
-                        ✏️ Edit
+                        ⚠️ {alreadyReported ? "Reported" : "Report"}
                       </button>
-                      <button
-                        onClick={handleDelete}
-                        className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700 text-red-600"
-                      >
-                        🗑 Delete
-                      </button>
-                    </>
-                  )}
-
-                  {/* Report option for everyone else */}
-                  {userId !== postState.authorId && (
-                    <button
-                      disabled={alreadyReported}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        if (!alreadyReported) handleReport();
-                      }}
-                      className={`block w-full text-left px-4 py-2 
-                    ${
-                      alreadyReported
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:bg-gray-100 dark:hover:bg-neutral-700"
-                    }
-                     text-yellow-600`}
-                    >
-                      ⚠️ {alreadyReported ? "Reported" : "Report"}
-                    </button>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
-        {/* Title */}
+        {/* TITLE */}
         {!isComment && (
           <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
-            {postState.title || "Untitled"}
+            {postState.title}
           </h2>
         )}
 
-        {/* Category Badges */}
+        {/* CATEGORIES */}
         {Array.isArray(postState.categories) &&
           postState.categories.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
@@ -340,8 +326,8 @@ export default function PostItem({
             </div>
           )}
 
-        {/* Content */}
-        {postState.content?.trim() ? (
+        {/* CONTENT */}
+        {postState.content?.trim() && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{
@@ -352,56 +338,53 @@ export default function PostItem({
               opacity: 1,
             }}
             transition={{ duration: 0.35 }}
-            className="overflow-hidden mt-2 text-gray-900 dark:text-gray-100 relative"
+            className="mt-2 overflow-hidden text-gray-900 dark:text-gray-100"
             ref={contentRef}
             style={{
               lineHeight: `${LINE_HEIGHT}px`,
               visibility: measureDone ? "visible" : "hidden",
             }}
           >
-            <MathRenderer html={postState.content ?? ""} />
+            <MathRenderer html={postState.content} />
           </motion.div>
-        ) : null}
+        )}
 
         {!fullView && !isComment && shouldTruncate && (
           <button
-            onClick={toggleExpand}
+            onClick={() => setExpanded((x) => !x)}
             className="mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             {expanded ? "Show Less ▲" : "Show More ▼"}
           </button>
         )}
 
-        {/* Footer */}
+        {/* FOOTER */}
         <div className="mt-4 flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
           <button
             onClick={handleUpvote}
             disabled={pending}
-            className={`flex items-center gap-1 transition-colors ${
-              pending
-                ? "opacity-60 cursor-not-allowed"
-                : hasUpvoted
+            className={`flex items-center gap-1 ${
+              hasUpvoted
                 ? "text-blue-600 dark:text-blue-400"
                 : "hover:text-blue-600 dark:hover:text-blue-400"
             }`}
           >
-            <ArrowBigUp size={18} />
-            <span>{postState.upvoteCount ?? 0}</span>
+            <ArrowBigUp size={18} /> {postState.upvoteCount ?? 0}
           </button>
 
           {!fullView && !isComment && (
             <Link
               href={`/posts/${postState._id}#comments`}
-              onClick={() => {
+              onClick={() =>
                 sessionStorage.setItem(
                   "home-scroll-position",
                   window.scrollY.toString()
-                );
-              }}
+                )
+              }
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
             >
               <MessageCircle size={18} />
-              <span>{postState.commentCount ?? 0}</span>
+              {postState.commentCount ?? 0}
             </Link>
           )}
 
@@ -410,13 +393,12 @@ export default function PostItem({
               onClick={() => setShareOpen(true)}
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
             >
-              <Share2 size={18} /> <span>Share</span>
+              <Share2 size={18} /> Share
             </button>
           )}
         </div>
       </WrapperTag>
 
-      {/* Share Modal */}
       <SharePostModal
         open={shareOpen}
         postUrl={`${

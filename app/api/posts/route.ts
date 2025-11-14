@@ -6,10 +6,13 @@ import { broadcastSSE } from "@/lib/sse";
 
 export const runtime = "nodejs";
 
-/* ---------- Helper: Enrich post with user info ---------- */
+/* -----------------------------------------
+   Helper: Enrich post with user info
+----------------------------------------- */
 async function enrichPost(post: any, usersColl: any) {
   let user = null;
 
+  // First try authorId as ObjectId
   if (post.authorId && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
@@ -17,6 +20,7 @@ async function enrichPost(post: any, usersColl: any) {
     );
   }
 
+  // Fallback for provider_id
   if (!user && post.authorId) {
     user = await usersColl.findOne(
       { provider_id: post.authorId },
@@ -24,6 +28,7 @@ async function enrichPost(post: any, usersColl: any) {
     );
   }
 
+  // Final avatarId (user._id OR raw authorId)
   const avatarId = user?._id
     ? String(user._id)
     : ObjectId.isValid(post.authorId)
@@ -33,6 +38,10 @@ async function enrichPost(post: any, usersColl: any) {
   return {
     ...post,
     _id: post._id?.toString?.() ?? post._id,
+
+    // 🔥 IMPORTANT: send clean authorId to FE
+    authorId: avatarId ? avatarId.toString() : null,
+
     authorName: user?.name ?? "Unknown",
     authorAvatar: avatarId
       ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
@@ -40,7 +49,9 @@ async function enrichPost(post: any, usersColl: any) {
   };
 }
 
-/* ---------- GET: Fetch top-level posts ---------- */
+/* -----------------------------------------
+   GET — fetch top-level posts
+----------------------------------------- */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -52,9 +63,7 @@ export async function GET(req: Request) {
     const users = db.collection("users");
 
     const query: any = { parentId: null };
-    if (category) {
-      query.categories = category;
-    }
+    if (category) query.categories = category;
 
     const docs = await posts.find(query).sort({ createdAt: -1 }).toArray();
 
@@ -71,9 +80,11 @@ export async function GET(req: Request) {
       countMap[c._id] = c.count;
     });
 
+    // Enrich posts with user & avatar
     const enriched = await Promise.all(
       docs.map(async (p) => {
         const enrichedPost = await enrichPost(p, users);
+
         return {
           ...enrichedPost,
           commentCount: countMap[p._id.toString()] ?? 0,
@@ -88,7 +99,9 @@ export async function GET(req: Request) {
   }
 }
 
-/* ---------- POST: Create post/comment/reply ---------- */
+/* -----------------------------------------
+   POST — create post / comment / reply
+----------------------------------------- */
 export async function POST(req: Request) {
   try {
     const {
@@ -99,24 +112,16 @@ export async function POST(req: Request) {
       replyTo = null,
       txId = null,
       categories = [],
-    }: {
-      title?: string;
-      content: string;
-      authorId: string;
-      parentId?: string | null;
-      replyTo?: string | null;
-      txId?: string | null;
-      categories?: string[];
     } = await req.json();
 
-    // --- Basic validation ---
     if (!authorId)
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
+
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
-    // ✅ Require title (and optionally categories) only for top-level post
     const isTopLevel = !parentId && !replyTo;
+
     if (isTopLevel && !title?.trim()) {
       return NextResponse.json(
         { error: "Title required for top-level post" },
@@ -131,7 +136,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- MongoDB setup ---
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
 
     let safeParentId = parentId;
 
-    // ✅ If replying to another comment/reply
+    // If replying
     if (replyTo) {
       if (!ObjectId.isValid(replyTo)) {
         return NextResponse.json(
@@ -155,11 +159,9 @@ export async function POST(req: Request) {
           { status: 404 }
         );
 
-      // ✅ Always use the top-level post ID as parentId
       safeParentId = target.parentId || target._id.toString();
     }
 
-    // --- Construct document ---
     const doc: any = {
       content,
       authorId,
@@ -170,20 +172,17 @@ export async function POST(req: Request) {
       upvoters: [],
     };
 
-    // ✅ Only top-level posts have title + categories
     if (isTopLevel) {
       doc.title = title;
-      doc.categories = categories; // 👈 add categories here
+      doc.categories = categories;
     }
 
-    // --- Insert + enrich ---
     const result = await posts.insertOne(doc);
     const enriched = await enrichPost(
       { ...doc, _id: result.insertedId },
       users
     );
 
-    // --- SSE broadcasting ---
     const sseType = replyTo
       ? "new-reply"
       : safeParentId
@@ -214,11 +213,13 @@ export async function POST(req: Request) {
   }
 }
 
-
-/* ---------- PUT: Edit post/comment/reply ---------- */
+/* -----------------------------------------
+   PUT — Edit post / comment / reply
+----------------------------------------- */
 export async function PUT(req: Request) {
   try {
     const { id, title, content, txId = null } = await req.json();
+
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");
@@ -251,10 +252,13 @@ export async function PUT(req: Request) {
   }
 }
 
-/* ---------- DELETE: Cascade delete ---------- */
+/* -----------------------------------------
+   DELETE — delete post + children
+----------------------------------------- */
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
+
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");

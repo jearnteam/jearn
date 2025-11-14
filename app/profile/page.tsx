@@ -1,3 +1,4 @@
+// app/profile/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,167 +10,135 @@ export default function ProfilePage() {
   const { user, loading, update } = useCurrentUser();
   const { status } = useSession();
   const router = useRouter();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "/";
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
-  const [picture, setPicture] = useState<string | null>(null);
+
+  const [preview, setPreview] = useState("/default-avatar.png");
   const [file, setFile] = useState<File | null>(null);
+
   const [uploading, setUploading] = useState(false);
-  const [imgLoading, setImgLoading] = useState(true);
-  const [imgError, setImgError] = useState(false);
 
-  const sessionLoading = status === "loading" || loading;
+  const sessionLoading = loading || status === "loading";
 
-  // 🧭 Redirect if unauthenticated
+  // Redirect if not logged in
   useEffect(() => {
     if (!sessionLoading && status === "unauthenticated") {
-      console.warn("⚠️ No session detected → redirecting home");
-      router.push(appUrl);
+      router.push("/");
     }
-  }, [sessionLoading, status, router, appUrl]);
+  }, [sessionLoading, status]);
 
-  // 🧾 Fill user info when loaded
+  // Load user data
   useEffect(() => {
     if (!loading && user) {
-      // Avoid overwriting user input if the user starts editing before load
-      setName((prev) => (prev === "" ? user.name || "" : prev));
-      setBio((prev) => (prev === "" ? user.bio || "" : prev));
-      setPicture(`/api/user/avatar/${user.uid}?t=${Date.now()}`);
-      setImgLoading(true);
+      setName(user.name || "");
+      setBio(user.bio || "");
+
+      // Always cache bust
+      setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
     }
   }, [user, loading]);
 
-  // 🖼️ Preview selected file immediately
+  // Local preview for uploaded file
   useEffect(() => {
     if (!file) return;
-    const preview = URL.createObjectURL(file);
-    setPicture(preview);
-    setImgLoading(false);
-    return () => URL.revokeObjectURL(preview);
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const handleSave = async () => {
-    if (!user?.uid) return;
+  async function handleSave() {
+    if (!user?._id) {
+      alert("Invalid user session.");
+      return;
+    }
+
     setUploading(true);
 
-    const formData = new FormData();
-    formData.append("userId", user.uid);
-    formData.append("name", name);
-    formData.append("bio", bio);
-    if (file) formData.append("picture", file);
+    const fd = new FormData();
+    fd.append("userId", user._id); // IMPORTANT — use _id, NOT uid
+    fd.append("name", name);
+    fd.append("bio", bio);
+    if (file) fd.append("picture", file);
 
     try {
       const res = await fetch("/api/user/update", {
         method: "POST",
-        body: formData,
+        body: fd,
       });
-      if (!res.ok) throw new Error(await res.text());
+
       const data = await res.json();
-      if (data.ok) {
-        await update(); // refresh hook data
-        setPicture(`/api/user/avatar/${user.uid}?t=${Date.now()}`); // bust cache
-        setImgLoading(true);
-        alert("✅ Profile updated!");
-      } else {
-        alert("❌ " + data.error);
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Update failed");
       }
+
+      // Refresh backend state
+      await update();
+
+      // Refresh avatar preview
+      setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
+
+      alert("Profile updated!");
+
     } catch (err) {
       console.error(err);
-      alert("❌ Upload failed: " + (err as Error).message);
+      alert("Failed to update profile");
     } finally {
       setUploading(false);
     }
-  };
+  }
 
-  // 🌀 Wait for user to load
-  if (sessionLoading || loading)
-    return (
-      <div className="flex flex-col items-center justify-center h-[80vh] text-center gap-4">
-        <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-600">Loading your profile...</p>
-      </div>
-    );
+  if (sessionLoading)
+    return <div className="flex justify-center items-center h-[70vh]">Loading...</div>;
 
-  if (!user) return null;
-
-  const isChanged =
-    name !== (user.name || "") || bio !== (user.bio || "") || !!file;
+  if (!user)
+    return <div className="flex justify-center items-center h-[70vh]">Not logged in</div>;
 
   return (
     <div className="max-w-lg mx-auto mt-24 px-4">
       <h1 className="text-2xl font-bold mb-6">Profile Settings</h1>
 
       <div className="flex flex-col gap-4">
-        {/* 👤 Avatar */}
-        <div className="flex items-center gap-4 relative">
-          <div className="relative">
+
+        {/* Avatar upload */}
+        <div className="flex items-center gap-4">
+          <div
+            className="rounded-full overflow-hidden border flex items-center justify-center"
+            style={{ width: 80, height: 80 }}
+          >
             <img
-              key={picture}
-              src={picture || "/default-avatar.png"}
-              alt="avatar"
-              className="w-20 h-20 rounded-full object-cover border"
-              onLoad={() => {
-                setImgLoading(false);
-                setImgError(false);
-              }}
-              onError={() => {
-                setImgLoading(false); // ✅ Always stop loading
-                setImgError(true);
-
-                if (user?.picture) {
-                  // ✅ Retry only if picture exists in DB
-                  console.warn("⚠️ Avatar failed to load, retrying...");
-                  setTimeout(() => {
-                    setImgLoading(true);
-                    setPicture(`/api/user/avatar/${user.uid}?v=${Date.now()}`);
-                  }, 2000);
-                } else {
-                  // ✅ No picture? Show default avatar
-                  setPicture("/default-avatar.png");
-                }
-              }}
+              src={preview}
+              className="w-full h-full object-cover object-center"
+              alt="avatar preview"
             />
-
-            {/* 🌀 Loader overlay */}
-            {imgLoading && (
-              <div className="absolute top-0 left-0 w-20 h-20 flex items-center justify-center bg-white/50 rounded-full">
-                <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              </div>
-            )}
           </div>
 
           <input
-            id="avatar-upload"
             type="file"
             accept="image/*"
             onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            className="text-sm"
           />
         </div>
 
-        <label className="text-sm font-medium">Name</label>
+        <label>Name</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="border rounded px-2 py-1 w-full"
+          className="border rounded px-2 py-1"
         />
 
-        <label className="text-sm font-medium">Bio</label>
+        <label>Bio</label>
         <textarea
           value={bio}
           onChange={(e) => setBio(e.target.value)}
-          className="border rounded px-2 py-1 w-full min-h-[80px]"
+          className="border rounded px-2 py-1"
         />
 
         <button
           onClick={handleSave}
-          disabled={!isChanged || uploading}
-          className={`px-4 py-2 rounded text-white transition-colors ${
-            isChanged && !uploading
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-gray-400 cursor-not-allowed"
-          }`}
+          disabled={uploading}
+          className="px-4 py-2 rounded bg-blue-600 text-white"
         >
           {uploading ? "Saving..." : "Save Changes"}
         </button>

@@ -10,7 +10,7 @@ export default function DatabasePanel() {
   const [jsonText, setJsonText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // 🔍 Filters
+  // Filters
   const [searchPostId, setSearchPostId] = useState("");
   const [searchUser, setSearchUser] = useState("");
   const [searchUserId, setSearchUserId] = useState("");
@@ -18,37 +18,40 @@ export default function DatabasePanel() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  // 📄 Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  /* ---------- Fetch Posts ---------- */
+  /* ---------- Fetch Posts (admin route) ---------- */
   useEffect(() => {
     async function loadPosts() {
       setLoading(true);
       try {
-        const res = await fetch("/api/posts");
+        const res = await fetch("/api/admin/all-posts");
         const data = await res.json();
         if (Array.isArray(data)) setPosts(data);
+        else console.error("Unexpected data:", data);
       } catch (err) {
         console.error("❌ Failed to fetch posts:", err);
       } finally {
         setLoading(false);
       }
     }
+
     loadPosts();
   }, []);
 
   /* ---------- Delete ---------- */
   async function handleDelete(id: string) {
     if (!confirm("Delete this post?")) return;
+
     try {
-      const res = await fetch("/api/posts", {
+      const res = await fetch(`/api/admin/delete-post/${id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
       });
-      if (res.ok) setPosts((prev) => prev.filter((p) => p._id !== id));
+
+      if (res.ok) {
+        setPosts((prev) => prev.filter((p) => p._id !== id));
+      }
     } catch (err) {
       console.error("🔥 Delete failed:", err);
     }
@@ -94,10 +97,8 @@ export default function DatabasePanel() {
     dateTo,
   ]);
 
-  /* 🔄 Reset to page 1 when filters change */
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [
+  /* Reset pagination on filter change */
+  useEffect(() => setCurrentPage(1), [
     searchPostId,
     searchUser,
     searchUserId,
@@ -106,7 +107,6 @@ export default function DatabasePanel() {
     dateTo,
   ]);
 
-  /* ---------- Pagination logic ---------- */
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
   const paginated = useMemo(() => {
@@ -121,30 +121,30 @@ export default function DatabasePanel() {
     setErrorMsg("");
   };
 
-  /* ---------- Save changes ---------- */
+  /* ---------- Save changes (admin update API) ---------- */
   async function handleSave() {
     try {
       const parsed = JSON.parse(jsonText);
-      if (!parsed._id) throw new Error("Missing _id field");
+      if (!parsed._id) throw new Error("Missing _id field.");
 
-      const res = await fetch("/api/posts", {
+      const res = await fetch(`/api/admin/update-post/${parsed._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: parsed._id,
-          title: parsed.title,
-          content: parsed.content,
-        }),
+        body: jsonText,
       });
 
-      if (!res.ok) throw new Error("Update failed");
+      const data = await res.json();
+      console.log("SAVE RESPONSE:", data);
 
-      alert("✅ Saved successfully!");
-      setEditPost(null);
+      if (!data.ok) throw new Error("Update failed.");
+
+      alert("✅ Saved!");
 
       setPosts((prev) =>
         prev.map((p) => (p._id === parsed._id ? { ...p, ...parsed } : p))
       );
+
+      setEditPost(null);
     } catch (err: any) {
       setErrorMsg(err.message);
     }
@@ -154,7 +154,7 @@ export default function DatabasePanel() {
     <div>
       <h1 className="text-2xl font-bold mb-4">Database Management</h1>
 
-      {/* 🔍 Filter bar */}
+      {/* ---------- Filter Bar ---------- */}
       <div className="flex flex-wrap gap-3 mb-4 items-end">
         <div className="flex items-center gap-2">
           <Search size={16} />
@@ -212,7 +212,7 @@ export default function DatabasePanel() {
         </div>
       </div>
 
-      {/* 📋 Table */}
+      {/* ---------- Posts Table ---------- */}
       {loading ? (
         <p>Loading posts...</p>
       ) : (
@@ -278,7 +278,7 @@ export default function DatabasePanel() {
         </div>
       )}
 
-      {/* 🔀 Pagination */}
+      {/* ---------- Pagination ---------- */}
       <div className="flex justify-center items-center gap-4 mt-4 text-sm">
         <button
           disabled={currentPage === 1}
@@ -309,7 +309,7 @@ export default function DatabasePanel() {
         </button>
       </div>
 
-      {/* 🧩 JSON Modal */}
+      {/* ---------- JSON Modal Editor ---------- */}
       {editPost && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[999999] p-4">
           <div className="bg-white dark:bg-neutral-900 w-full max-w-2xl rounded-lg shadow-xl p-4 relative">
