@@ -52,12 +52,14 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     const text = html.replace(/<[^>]+>/g, "").trim();
     if (!text) return;
 
+    const checkText = `title: ${title}\n${text}`;
+    
     setChecking(true);
     try {
       const res = await fetch("/api/categorize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: checkText }),
       });
 
       if (!res.ok) throw new Error("Categorization failed");
