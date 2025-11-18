@@ -30,7 +30,6 @@ function useShowLoginOnNewTab() {
 export default function HomePage() {
   useShowLoginOnNewTab();
 
-  const router = useRouter();
   const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
 
   const mainRef = useRef<HTMLElement>(null!);
@@ -46,14 +45,30 @@ export default function HomePage() {
 
   const SCROLL_KEY = "homeScrollY";
 
-  // Read if it's a back navigation
+  // DEBUG: detect navigation type
+  useEffect(() => {
+    const nav = performance.getEntriesByType("navigation")[0] as any;
+
+    console.log(
+      "%c[DEBUG] Navigation type: " + nav?.type,
+      "background:#222; color:#0f0; padding:2px"
+    );
+
+    if (nav?.type === "back_forward") {
+      console.log("%c[DEBUG] Detected BACK navigation", "color: cyan");
+    } else {
+      console.log("%c[DEBUG] Normal page entry", "color: gray");
+    }
+  }, []);
+
+  // Detect back navigation
   const isBackNavigation = (): boolean => {
     if (typeof performance === "undefined") return false;
     const nav = performance.getEntriesByType("navigation")[0] as any;
     return nav?.type === "back_forward";
   };
 
-  // Restore scroll on browser back
+  // Generic scroll restore (for normal back/forward navigation)
   useEffect(() => {
     if (isBackNavigation()) {
       const storedY = sessionStorage.getItem(SCROLL_KEY);
@@ -124,6 +139,73 @@ export default function HomePage() {
     }
   }
 
+  // ============================================
+  // PERFECT SCROLL RESTORE (Method 2 — ID anchor)
+  // ============================================
+  useEffect(() => {
+    const targetPostId = sessionStorage.getItem("scrollToPost");
+
+    console.log(
+      "%c[DEBUG] scrollToPost in session = " + targetPostId,
+      "color: orange; font-weight: bold"
+    );
+
+    if (!targetPostId) {
+      console.log("%c[DEBUG] No target, abort restore", "color: orange");
+      return;
+    }
+
+    if (!mainRef.current) {
+      console.log("%c[DEBUG] mainRef missing!", "color: red");
+      return;
+    }
+
+    let tries = 0;
+
+    const tryScroll = () => {
+      const el = document.getElementById(`post-${targetPostId}`);
+      tries++;
+
+      console.log(
+        `%c[DEBUG] Try #${tries}: element = `,
+        "color: lightblue",
+        el
+      );
+
+      if (el) {
+        console.log(
+          "%c[DEBUG] SCROLLING TO POST!",
+          "background:green; color:white; padding:2px"
+        );
+        sessionStorage.removeItem("scrollToPost");
+        el.scrollIntoView({ behavior: "instant", block: "start" });
+        return true;
+      }
+
+      if (tries >= 20) {
+        console.log(
+          "%c[DEBUG] STOPPING after 20 tries — element never appeared",
+          "color:red"
+        );
+        return true;
+      }
+
+      return false;
+    };
+
+    if (tryScroll()) return;
+
+    console.log("%c[DEBUG] Using mutation observer", "color: purple");
+
+    const observer = new MutationObserver(() => {
+      if (tryScroll()) observer.disconnect();
+    });
+
+    observer.observe(mainRef.current, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [posts]);
+
   return (
     <>
       {/* ===== Modals ===== */}
@@ -163,10 +245,7 @@ export default function HomePage() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="
-            fixed inset-0 z-50 flex items-center justify-center 
-            bg-white/90 dark:bg-neutral-900/90
-          "
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/90 dark:bg-neutral-900/90"
         >
           <div className="flex flex-col items-center justify-center text-gray-600 dark:text-gray-300">
             <div className="w-48 h-48 flex items-center justify-center">
@@ -206,12 +285,12 @@ export default function HomePage() {
             )}
 
             <PostList
-  posts={posts}
-  onEdit={(p) => setEditingPost(p)}
-  onDelete={async (id) => requestDelete(id)}
-  onUpvote={upvotePost}
-  scrollContainerRef={mainRef}   // <-- ADD THIS
-/>
+              posts={posts}
+              onEdit={(p) => setEditingPost(p)}
+              onDelete={async (id) => requestDelete(id)}
+              onUpvote={upvotePost}
+              scrollContainerRef={mainRef}
+            />
           </main>
 
           {/* Right Sidebar */}

@@ -15,7 +15,7 @@ export default function HydrationGuard({ children }: { children: React.ReactNode
   if (!hydrated) {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white dark:bg-neutral-900">
-        <div className="w-40 h-40">
+        <div className="w-[200px] h-[200px] flex items-center justify-center">
           <LoadingOwl />
         </div>
       </div>

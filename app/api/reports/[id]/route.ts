@@ -10,10 +10,11 @@ export const runtime = "nodejs";
 --------------------------------------------------------- */
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ FIXED
+
     const { status } = await req.json();
 
     if (!["pending", "reviewed", "ignored"].includes(status)) {
@@ -47,10 +48,10 @@ export async function PUT(
 --------------------------------------------------------- */
 export async function DELETE(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params; // ✅ FIXED
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid id" }, { status: 400 });

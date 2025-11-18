@@ -1,4 +1,5 @@
 import clientPromise from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -18,11 +19,12 @@ export async function GET(req: Request) {
     const db = client.db("jearn");
     const reports = db.collection("reports");
 
-    const existing = await reports.findOne({ postId });
+    const existing = await reports.findOne({
+      postId: new ObjectId(postId),
+    });
 
     // No report for this post yet?
-    if (!existing)
-      return NextResponse.json({ alreadyReported: false });
+    if (!existing) return NextResponse.json({ alreadyReported: false });
 
     const reporters = Array.isArray(existing.reporters)
       ? existing.reporters

@@ -10,6 +10,11 @@ import LanguageInitializer from "@/components/LanguageInitializer";
 import SWRegister from "./sw-register";
 import Script from "next/script";
 
+// ✅ Force dynamic, no cache, so pages (including Home) keep client state better
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

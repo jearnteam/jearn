@@ -31,16 +31,17 @@ export default function LoadingOwl() {
   }, [mounted, resolvedTheme]);
 
   // 🚫 Render placeholder during SSR
+  // 🚫 No h-screen here — let parent control layout
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center h-screen bg-transparent">
+      <div className="flex items-center justify-center bg-transparent">
         <div style={{ width: 200, height: 200 }} />
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-center h-screen bg-transparent">
+    <div className="flex items-center justify-center bg-transparent">
       <div
         ref={container}
         style={{

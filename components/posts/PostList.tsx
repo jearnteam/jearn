@@ -32,6 +32,22 @@ export default function PostList({
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
+  // Restore visibleCount from session (so infinite scroll doesn't reset)
+  useEffect(() => {
+    const saved = sessionStorage.getItem("postListVisibleCount");
+    if (saved) {
+      const n = Number(saved);
+      if (!Number.isNaN(n) && n > 0) {
+        setVisibleCount(n);
+      }
+    }
+  }, []);
+
+  // Persist visibleCount
+  useEffect(() => {
+    sessionStorage.setItem("postListVisibleCount", String(visibleCount));
+  }, [visibleCount]);
+
   /* ----------------------------
       Preload avatar images
   -----------------------------*/
@@ -56,9 +72,7 @@ export default function PostList({
 
     const slice = posts.slice(0, visibleCount);
 
-    const avatarURLs = slice.map(
-      (p) => `/api/user/avatar/${p.authorId}`
-    );
+    const avatarURLs = slice.map((p) => `/api/user/avatar/${p.authorId}`);
 
     setBatchLoading(true);
 
@@ -93,11 +107,9 @@ export default function PostList({
     return () => observer.disconnect();
   }, [posts.length, batchLoading, scrollContainerRef]);
 
-  /* ----------------------------
-      UI rendering
-  -----------------------------*/
   return (
     <motion.div
+      id="post-list-wrapper"
       initial={{ opacity: 0, filter: "blur(6px)" }}
       animate={{ opacity: 1, filter: "blur(0px)" }}
       transition={{ duration: 0.6, ease: "easeOut" }}

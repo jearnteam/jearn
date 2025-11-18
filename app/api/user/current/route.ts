@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
 
 export async function GET() {
   try {
-    const session = await getServerSession();
+    // ✅ MUST pass authOptions
+    const session = await getServerSession(authOptions);
+
     if (!session?.user?.email) {
       return NextResponse.json({ ok: false, user: null });
     }
@@ -23,13 +26,13 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       user: {
-        _id: user._id.toString(),          // Mongo user ID
-        uid: user.provider_id || null,     // Google provider ID
+        _id: user._id.toString(),
+        uid: user.provider_id || null,
         name: user.name ?? "",
         bio: user.bio ?? "",
         theme: user.theme ?? "light",
         language: user.language ?? "en",
-        hasPicture: !!user.picture,        // For avatar
+        hasPicture: !!user.picture,
       },
     });
 

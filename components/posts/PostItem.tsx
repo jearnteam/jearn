@@ -40,7 +40,7 @@ export default function PostItem({
   fullView = false,
 }: PostItemProps) {
   const { user } = useCurrentUser();
-  const userId = user?._id ?? ""; // <--- FIXED IDENTITY
+  const userId = user?._id ?? "";
 
   const [postState, setPostState] = useState(post);
 
@@ -104,7 +104,9 @@ export default function PostItem({
         );
         const data = await res.json();
         setAlreadyReported(data.alreadyReported);
-      } catch {}
+      } catch {
+        // ignore
+      }
     }
     checkReport();
   }, [post._id, userId]);
@@ -207,6 +209,7 @@ export default function PostItem({
   return (
     <>
       <WrapperTag
+        id={`post-${postState._id}`} // 🔑 scroll anchor
         className={`${
           fullView
             ? "bg-white dark:bg-neutral-900 border border-gray-300 dark:border-gray-700 rounded-xl p-6"
@@ -375,12 +378,13 @@ export default function PostItem({
           {!fullView && !isComment && (
             <Link
               href={`/posts/${postState._id}#comments`}
-              onClick={() =>
-                sessionStorage.setItem(
-                  "home-scroll-position",
-                  window.scrollY.toString()
-                )
-              }
+              onClick={() => {
+                console.log(
+                  "%c[DEBUG] Saving scrollToPost = " + postState._id,
+                  "color: yellow; background:black; padding:2px"
+                );
+                sessionStorage.setItem("scrollToPost", postState._id);
+              }}
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
             >
               <MessageCircle size={18} />

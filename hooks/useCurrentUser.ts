@@ -2,86 +2,80 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
-interface User {
-  _id: string;
-  uid: string | null;
-  name?: string | null;
-  bio?: string | null;
-  theme?: string | null;
-  language?: string | null;
-  picture?: string | null;
-  hasPicture?: boolean;
+//
+// -------------------------------------------------------
+//  GLOBAL CACHE — shared across ALL components / hooks
+// -------------------------------------------------------
+let cachedUser: any = null;
+let fetchPromise: Promise<any> | null = null;
+
+async function getUserOnce() {
+  // Already fetched → return cached version instantly
+  if (cachedUser) return cachedUser;
+
+  // If already fetching → return the same promise
+  if (fetchPromise) return fetchPromise;
+
+  // First fetch → create a single promise
+  fetchPromise = fetch("/api/user/current", {
+    cache: "no-store",
+    credentials: "include",
+  })
+    .then(async (res) => {
+      const data = await res.json();
+      cachedUser = data; // Save globally
+      return data;
+    })
+    .catch((err) => {
+      console.error("getUserOnce error:", err);
+      cachedUser = null;
+      return null;
+    });
+
+  return fetchPromise;
 }
 
-export function useCurrentUser(pollInterval = 0) {
-  const [user, setUser] = useState<User | null>(null);
+
+// -------------------------------------------------------
+//  HOOK BEGINS HERE
+// -------------------------------------------------------
+export function useCurrentUser() {
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const mounted = useRef(true);
+  useEffect(() => {
+    let active = true;
 
-  const fetchUser = useCallback(async () => {
-    if (!mounted.current) return;
+    getUserOnce().then((data) => {
+      if (!active) return;
 
-    try {
-      const res = await fetch("/api/user/current", {
-        cache: "no-store",
-        credentials: "include",
-      });
-
-      const type = res.headers.get("content-type") || "";
-      if (!res.ok || !type.includes("application/json")) {
-        console.warn("⚠️ Bad current user response:", res.status);
+      if (!data || !data.user) {
         setUser(null);
-        setLoading(false);
-        return;
+      } else {
+        const { _id, uid, name, bio, theme, language, hasPicture } = data.user;
+
+        const avatar = hasPicture
+          ? `/api/user/avatar/${_id}?v=${Date.now()}`
+          : "/default-avatar.png";
+
+        setUser({
+          _id,
+          uid,
+          name,
+          bio,
+          theme,
+          language,
+          picture: avatar,
+        });
       }
 
-      const data = await res.json();
-      if (!data.user) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      const { _id, uid, name, bio, theme, language, hasPicture } = data.user;
-
-      const avatar = hasPicture
-        ? `/api/user/avatar/${_id}?v=${Date.now()}`
-        : "/default-avatar.png";
-
-      setUser({
-        _id,
-        uid,
-        name,
-        bio,
-        theme,
-        language,
-        picture: avatar,
-      });
-    } catch (err) {
-      console.error("useCurrentUser error:", err);
-      setUser(null);
-    } finally {
       setLoading(false);
-    }
-  }, []);
+    });
 
-  useEffect(() => {
-    fetchUser(); // 🔥 RUN IMMEDIATELY
-  }, []);
-
-  useEffect(() => {
-    if (pollInterval > 0) {
-      const id = setInterval(fetchUser, pollInterval);
-      return () => clearInterval(id);
-    }
-  }, [pollInterval]);
-
-  useEffect(() => {
     return () => {
-      mounted.current = false;
+      active = false;
     };
   }, []);
 
-  return { user, loading, update: fetchUser };
+  return { user, loading };
 }

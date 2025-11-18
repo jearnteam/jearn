@@ -47,7 +47,7 @@ export default function PostPage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 pt-[72px] md:pt-[88px] bg-white dark:bg-neutral-900 flex items-center justify-center z-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-white dark:bg-neutral-900 z-50">
         <div className="flex flex-col items-center text-gray-600 dark:text-gray-300">
           <div className="w-48 h-48 flex items-center justify-center">
             <LoadingOwl />
