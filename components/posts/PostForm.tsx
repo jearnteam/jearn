@@ -64,7 +64,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
       const res = await fetch("/api/categorize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({ content: text }), // ← FIXED HERE
       });
 
       if (!res.ok) throw new Error("Categorization failed");
