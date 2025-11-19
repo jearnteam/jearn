@@ -4,12 +4,16 @@ import path from "path";
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    scrollRestoration: true, // 🚀 Browser-native back button restore
+  },
+
   outputFileTracingRoot: path.join(__dirname),
 
   compiler: isProd
     ? {
         removeConsole: {
-          exclude: ["error"], // keep only console.error, strip log, warn, info, etc.
+          exclude: ["error"],
         },
       }
     : {},

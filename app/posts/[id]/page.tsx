@@ -7,8 +7,6 @@ import CommentClientSection from "@/components/comments/CommentClientSection";
 import LoadingOwl from "@/components/LoadingOwl";
 import type { Post } from "@/types/post";
 
-const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
-
 export default function PostPage() {
   const { id } = useParams() as { id: string };
 
@@ -21,14 +19,14 @@ export default function PostPage() {
 
     async function fetchData() {
       try {
-        const postRes = await fetch(`${baseUrl}/api/posts/${id}`, {
+        const postRes = await fetch(`/api/posts/${id}`, {
           cache: "no-store",
         });
         if (!postRes.ok) return notFound();
         const postData = await postRes.json();
         setPost(postData);
 
-        const commentsRes = await fetch(`${baseUrl}/api/posts/${id}/comments`, {
+        const commentsRes = await fetch(`/api/posts/${id}/comments`, {
           cache: "no-store",
         });
         if (commentsRes.ok) {
@@ -61,14 +59,7 @@ export default function PostPage() {
   if (!post) return notFound();
 
   return (
-    <div
-      className="
-        fixed inset-0
-        pt-[72px] md:pt-[88px]  /* space for navbar */
-        overflow-y-auto
-        bg-white dark:bg-neutral-900
-      "
-    >
+    <div className="pt-[72px] md:pt-[88px] bg-white dark:bg-neutral-900">
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-10">
         <FullPostClient initialPost={post} />
         <CommentClientSection comments={comments} postId={post._id} />

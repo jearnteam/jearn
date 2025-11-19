@@ -9,35 +9,40 @@ import { signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Avatar from "@/components/Avatar";
 import { useState, useEffect } from "react";
-
-// ⛔ Removed LoadingOwl completely
-// ⛔ Removed loading: () => <LoadingOwl />
+import { useRouter } from "next/navigation";
 
 const ThreeBall = dynamic(() => import("./3d_spinner"), {
   ssr: false,
-  loading: () => null, // Cleaner fallback
+  loading: () => null,
 });
 
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
+  const router = useRouter();
 
   const [hydrated, setHydrated] = useState(false);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "/";
 
   useEffect(() => {
     setHydrated(true);
   }, []);
 
   const handleLogoClick = () => {
-    window.location.href = appUrl;
+    router.push("/"); // SPA navigation
+  };
+
+  const handleLogin = () => {
+    router.push("/api/auth/signin");
+  };
+
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
+    router.replace("/");
   };
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white dark:bg-neutral-900 border-b shadow-sm">
       <div className="max-w-5xl mx-auto flex justify-between items-center px-4 h-16">
-        
-        {/* LOGO */}
         <div
           className="flex items-center gap-3 cursor-pointer"
           onClick={handleLogoClick}
@@ -54,12 +59,10 @@ export default function Navbar() {
           </h1>
         </div>
 
-        {/* RIGHT SIDE */}
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <LangSwitcher />
 
-          {/* Removed owl fallback here */}
           {!hydrated ? (
             <div className="w-8 h-8" />
           ) : loading ? (
@@ -83,7 +86,7 @@ export default function Navbar() {
               )}
 
               <button
-                onClick={() => signOut({ callbackUrl: "/" })}
+                onClick={handleLogout}
                 className="text-sm text-red-500 hover:underline"
               >
                 {t("logout") || "Logout"}
@@ -91,12 +94,8 @@ export default function Navbar() {
             </>
           ) : (
             <button
-              onClick={() => (window.location.href = "/api/auth/signin")}
-              className="
-                text-sm px-3 py-1 rounded
-                bg-blue-600 text-white hover:bg-blue-700
-                dark:bg-blue-500 dark:hover:bg-blue-600
-              "
+              onClick={handleLogin}
+              className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               {t("login") || "Login"}
             </button>

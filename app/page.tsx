@@ -14,7 +14,6 @@ import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import LoadingOwl from "@/components/LoadingOwl";
 import { motion } from "framer-motion";
 
-// Show login once per new tab
 function useShowLoginOnNewTab() {
   const router = useRouter();
 
@@ -27,12 +26,18 @@ function useShowLoginOnNewTab() {
   }, [router]);
 }
 
+interface UpvoteResponse {
+  ok: boolean;
+  error?: string;
+  action?: "added" | "removed";
+}
+
 export default function HomePage() {
   useShowLoginOnNewTab();
 
   const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
 
-  const mainRef = useRef<HTMLElement>(null!);
+  const mainRef = useRef<HTMLDivElement | null>(null);
 
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -43,53 +48,6 @@ export default function HomePage() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const SCROLL_KEY = "homeScrollY";
-
-  // DEBUG: detect navigation type
-  useEffect(() => {
-    const nav = performance.getEntriesByType("navigation")[0] as any;
-
-    console.log(
-      "%c[DEBUG] Navigation type: " + nav?.type,
-      "background:#222; color:#0f0; padding:2px"
-    );
-
-    if (nav?.type === "back_forward") {
-      console.log("%c[DEBUG] Detected BACK navigation", "color: cyan");
-    } else {
-      console.log("%c[DEBUG] Normal page entry", "color: gray");
-    }
-  }, []);
-
-  // Detect back navigation
-  const isBackNavigation = (): boolean => {
-    if (typeof performance === "undefined") return false;
-    const nav = performance.getEntriesByType("navigation")[0] as any;
-    return nav?.type === "back_forward";
-  };
-
-  // Generic scroll restore (for normal back/forward navigation)
-  useEffect(() => {
-    if (isBackNavigation()) {
-      const storedY = sessionStorage.getItem(SCROLL_KEY);
-      if (storedY && mainRef.current) {
-        mainRef.current.scrollTo({
-          top: Number(storedY),
-          behavior: "instant",
-        });
-      }
-    } else {
-      sessionStorage.removeItem(SCROLL_KEY);
-    }
-
-    return () => {
-      if (mainRef.current) {
-        sessionStorage.setItem(SCROLL_KEY, String(mainRef.current.scrollTop));
-      }
-    };
-  }, []);
-
-  // Pull-to-refresh
   usePullToRefresh(mainRef, async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -100,7 +58,6 @@ export default function HomePage() {
     }
   });
 
-  // Delete-flow
   function requestDelete(id: string) {
     setDeletePostId(id);
     setConfirmDeleteOpen(true);
@@ -118,11 +75,10 @@ export default function HomePage() {
     }
   }
 
-  // Upvote call
   async function upvotePost(
     id: string,
     userId: string
-  ): Promise<{ ok: boolean; error?: string; action?: "added" | "removed" }> {
+  ): Promise<UpvoteResponse> {
     try {
       const res = await fetch(`/api/posts/${id}/upvote`, {
         method: "POST",
@@ -139,77 +95,40 @@ export default function HomePage() {
     }
   }
 
-  // ============================================
-  // PERFECT SCROLL RESTORE (Method 2 — ID anchor)
-  // ============================================
+  // 🔥 STRICT POST RESTORE
   useEffect(() => {
     const targetPostId = sessionStorage.getItem("scrollToPost");
-
-    console.log(
-      "%c[DEBUG] scrollToPost in session = " + targetPostId,
-      "color: orange; font-weight: bold"
-    );
-
-    if (!targetPostId) {
-      console.log("%c[DEBUG] No target, abort restore", "color: orange");
-      return;
-    }
-
-    if (!mainRef.current) {
-      console.log("%c[DEBUG] mainRef missing!", "color: red");
-      return;
-    }
-
-    let tries = 0;
+    if (!targetPostId) return;
 
     const tryScroll = () => {
       const el = document.getElementById(`post-${targetPostId}`);
-      tries++;
-
-      console.log(
-        `%c[DEBUG] Try #${tries}: element = `,
-        "color: lightblue",
-        el
-      );
-
       if (el) {
-        console.log(
-          "%c[DEBUG] SCROLLING TO POST!",
-          "background:green; color:white; padding:2px"
-        );
-        sessionStorage.removeItem("scrollToPost");
         el.scrollIntoView({ behavior: "instant", block: "start" });
+        sessionStorage.removeItem("scrollToPost");
         return true;
       }
-
-      if (tries >= 20) {
-        console.log(
-          "%c[DEBUG] STOPPING after 20 tries — element never appeared",
-          "color:red"
-        );
-        return true;
-      }
-
       return false;
     };
 
+    // Try immediately
     if (tryScroll()) return;
 
-    console.log("%c[DEBUG] Using mutation observer", "color: purple");
-
+    // Fallback: wait for infinite scroll to load
     const observer = new MutationObserver(() => {
       if (tryScroll()) observer.disconnect();
     });
 
-    observer.observe(mainRef.current, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
 
     return () => observer.disconnect();
   }, [posts]);
 
   return (
     <>
-      {/* ===== Modals ===== */}
-
+      {/* Modals */}
       <PostFormBox
         open={showPostBox}
         onClose={() => setShowPostBox(false)}
@@ -238,7 +157,6 @@ export default function HomePage() {
         onConfirm={confirmDelete}
       />
 
-      {/* ===== Loading Overlay ===== */}
       {loading && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -256,11 +174,14 @@ export default function HomePage() {
         </motion.div>
       )}
 
-      {/* ===== Main Layout ===== */}
-      <div className="fixed inset-0 pt-[4.3rem]">
-        <div className="h-full w-full grid grid-cols-1 lg:grid-cols-[20%_1fr_20%] bg-white dark:bg-black">
+      {/* Main Layout */}
+      <div className="min-h-[calc(100vh-4.3rem)] bg-white dark:bg-black">
+        <div
+          ref={mainRef}
+          className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[20%_1fr_20%]"
+        >
           {/* Left Sidebar */}
-          <aside className="hidden lg:block bg-black text-white px-4 py-4 overflow-hidden">
+          <aside className="hidden lg:block bg-black text-white px-4 py-4 h-screen sticky top-[4.3rem]">
             <button
               onClick={() => setShowPostBox(true)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg transition"
@@ -269,15 +190,8 @@ export default function HomePage() {
             </button>
           </aside>
 
-          {/* Center */}
-          <main
-            ref={mainRef}
-            className="
-              overflow-y-auto mt-2 px-1
-              pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-              lg:pb-4
-            "
-          >
+          {/* Center Feed */}
+          <main className="mt-2 px-1 pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pb-4">
             {isRefreshing && (
               <div className="flex justify-center items-center py-2">
                 <div className="animate-spin w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full"></div>
@@ -289,45 +203,15 @@ export default function HomePage() {
               onEdit={(p) => setEditingPost(p)}
               onDelete={async (id) => requestDelete(id)}
               onUpvote={upvotePost}
-              scrollContainerRef={mainRef}
             />
           </main>
 
           {/* Right Sidebar */}
-          <aside className="hidden lg:block bg-black text-white px-4 py-4 overflow-hidden">
-            <p>Right Content (fixed)</p>
+          <aside className="hidden lg:block bg-black text-white px-4 py-4 h-screen sticky top-[4.3rem]">
+            <p>Right Content</p>
           </aside>
         </div>
-
-        {/* Mobile bottom bar */}
-        {!showPostBox && (
-          <MobileBottomBar onCreate={() => setShowPostBox(true)} />
-        )}
       </div>
     </>
-  );
-}
-
-// ===== Mobile Bottom Bar =====
-function MobileBottomBar({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div
-      className="
-        lg:hidden fixed bottom-0 inset-x-0 z-50
-        border-t border-neutral-200 dark:border-neutral-800
-        bg-white/90 dark:bg-black/80 backdrop-blur
-        shadow-[0_-6px_20px_rgba(0,0,0,0.12)]
-        px-4 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]
-      "
-    >
-      <div className="max-w-screen-sm mx-auto flex items-center gap-3">
-        <button
-          onClick={onCreate}
-          className="flex-1 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition"
-        >
-          + Create Post
-        </button>
-      </div>
-    </div>
   );
 }

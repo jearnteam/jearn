@@ -9,16 +9,19 @@ export function usePosts() {
   const [loading, setLoading] = useState(true);
   const sseRef = useRef<EventSource | null>(null);
 
-  /** ✅ Fetch posts initially */
+  /** --------------------------------------
+   *  Initial Load — run ONLY once
+   * -------------------------------------- */
   const fetchPosts = useCallback(async () => {
-    setLoading(true);
     try {
       const res = await fetch("/api/posts", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch posts");
       const data = await res.json();
+
       const topLevel = Array.isArray(data)
         ? data.filter((p) => !p.parentId)
         : data.posts || [];
+
       setPosts(topLevel);
     } catch (err) {
       console.error("❌ Failed to fetch posts:", err);
@@ -27,9 +30,11 @@ export function usePosts() {
     }
   }, []);
 
-  /** ✅ Realtime sync via SSE */
+  /** --------------------------------------
+   *  SSE setup — run only once
+   * -------------------------------------- */
   useEffect(() => {
-    fetchPosts();
+    fetchPosts(); // Initial fetch only
 
     const es = new EventSource("/api/stream");
     sseRef.current = es;
@@ -40,23 +45,19 @@ export function usePosts() {
 
         setPosts((prev) => {
           switch (data.type) {
-            /* 🆕 CREATE */
             case "new-post":
               if (!data.post || data.post.parentId) return prev;
               if (prev.some((x) => x._id === data.post._id)) return prev;
               return [data.post, ...prev];
 
-            /* ✏️ EDIT */
             case "update-post":
               return prev.map((p) =>
                 p._id === data.postId ? { ...p, ...data.post } : p
               );
 
-            /* 🗑 DELETE */
             case "delete-post":
               return prev.filter((p) => p._id !== data.id);
 
-            /* 👍 UPVOTE */
             case "upvote":
               if (isRecentTx(data.txId)) return prev;
               return prev.map((p) =>
@@ -74,14 +75,10 @@ export function usePosts() {
                   : p
               );
 
-            /* 💬 COMMENT COUNT */
             case "update-comment-count":
               return prev.map((p) =>
                 p._id === data.parentId
-                  ? {
-                      ...p,
-                      commentCount: (p.commentCount ?? 0) + data.delta,
-                    }
+                  ? { ...p, commentCount: (p.commentCount ?? 0) + data.delta }
                   : p
               );
 
@@ -95,13 +92,16 @@ export function usePosts() {
     };
 
     es.onerror = () => console.warn("⚠️ SSE Error — Retrying...");
+
     return () => {
       es.close();
       sseRef.current = null;
     };
-  }, [fetchPosts]);
+  }, []); // ❗ EMPTY DEP ARRAY — runs once
 
-  /** ✅ Add Post (now supports categories) */
+  /** --------------------------------------
+   *  Add Post
+   * -------------------------------------- */
   const addPost = useCallback(
     async (
       title: string,
@@ -113,30 +113,25 @@ export function usePosts() {
         console.warn("Skipping post: no author ID");
         return;
       }
-
-      try {
-        const res = await fetch("/api/posts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, content, authorId, categories }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          console.error("❌ addPost failed:", errData.error || res.statusText);
-        }
-      } catch (err) {
-        console.error("🔥 addPost error:", err);
-      }
+      await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, content, authorId, categories }),
+      }).catch((err) => console.error("🔥 addPost error:", err));
     },
     []
   );
 
-  /** ✅ Edit Post */
+  /** --------------------------------------
+   *  Edit Post
+   * -------------------------------------- */
   const editPost = useCallback(
     async (id: string, title: string, content: string) => {
+      // optimistic update
       setPosts((prev) =>
-        prev.map((p) => (p._id === id ? { ...p, title, content } : p))
+        prev.map((p) =>
+          p._id === id ? { ...p, title, content } : p
+        )
       );
 
       const res = await fetch("/api/posts", {
@@ -145,12 +140,14 @@ export function usePosts() {
         body: JSON.stringify({ id, title, content }),
       });
 
-      if (!res.ok) fetchPosts(); // fallback refetch
+      if (!res.ok) fetchPosts();
     },
     [fetchPosts]
   );
 
-  /** ✅ Delete Post */
+  /** --------------------------------------
+   *  Delete Post
+   * -------------------------------------- */
   const deletePost = useCallback(async (id: string) => {
     await fetch("/api/posts", {
       method: "DELETE",
@@ -159,7 +156,9 @@ export function usePosts() {
     }).catch((e) => console.error("❌ deletePost:", e));
   }, []);
 
-  /** ✅ Upvote Post */
+  /** --------------------------------------
+   *  Upvote Post
+   * -------------------------------------- */
   const upvotePost = useCallback(
     async (id: string, userId: string, txId: string) => {
       await fetch(`/api/posts/${id}/upvote`, {
@@ -175,7 +174,7 @@ export function usePosts() {
     posts,
     loading,
     refetch: fetchPosts,
-    addPost, // now takes (title, content, authorId, categories)
+    addPost,
     editPost,
     deletePost,
     upvotePost,
