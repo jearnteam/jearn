@@ -32,7 +32,7 @@ export default function CommentItem({
   onReply?: (id: string, content: string) => void;
 }) {
   const { user } = useCurrentUser();
-  const userId = user?.uid ?? "";
+  const userId = user?._id ?? "";
   const hasUpvoted = userId && comment.upvoters?.includes(userId);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 

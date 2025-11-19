@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 
 //
 // -------------------------------------------------------
@@ -9,22 +9,25 @@ import { useState, useEffect, useCallback, useRef } from "react";
 let cachedUser: any = null;
 let fetchPromise: Promise<any> | null = null;
 
-async function getUserOnce() {
-  // Already fetched → return cached version instantly
-  if (cachedUser) return cachedUser;
-
-  // If already fetching → return the same promise
-  if (fetchPromise) return fetchPromise;
-
-  // First fetch → create a single promise
-  fetchPromise = fetch("/api/user/current", {
+async function fetchUser() {
+  const res = await fetch("/api/user/current", {
     cache: "no-store",
     credentials: "include",
-  })
-    .then(async (res) => {
-      const data = await res.json();
-      cachedUser = data; // Save globally
-      return data;
+  });
+
+  const data = await res.json();
+  return data?.user ?? null;
+}
+
+async function getUserOnce() {
+  if (cachedUser) return cachedUser;
+
+  if (fetchPromise) return fetchPromise;
+
+  fetchPromise = fetchUser()
+    .then((u) => {
+      cachedUser = u;
+      return u;
     })
     .catch((err) => {
       console.error("getUserOnce error:", err);
@@ -35,9 +38,9 @@ async function getUserOnce() {
   return fetchPromise;
 }
 
-
+//
 // -------------------------------------------------------
-//  HOOK BEGINS HERE
+//  MAIN HOOK
 // -------------------------------------------------------
 export function useCurrentUser() {
   const [user, setUser] = useState<any>(null);
@@ -46,29 +49,19 @@ export function useCurrentUser() {
   useEffect(() => {
     let active = true;
 
-    getUserOnce().then((data) => {
+    getUserOnce().then((u) => {
       if (!active) return;
 
-      if (!data || !data.user) {
+      if (!u) {
         setUser(null);
       } else {
-        const { _id, uid, name, bio, theme, language, hasPicture } = data.user;
-
-        const avatar = hasPicture
-          ? `/api/user/avatar/${_id}?v=${Date.now()}`
-          : "/default-avatar.png";
-
         setUser({
-          _id,
-          uid,
-          name,
-          bio,
-          theme,
-          language,
-          picture: avatar,
+          ...u,
+          picture: u.hasPicture
+            ? `/api/user/avatar/${u._id}?v=${Date.now()}`
+            : "/default-avatar.png",
         });
       }
-
       setLoading(false);
     });
 
@@ -77,5 +70,22 @@ export function useCurrentUser() {
     };
   }, []);
 
-  return { user, loading };
+  // IMPORTANT: re-fetch user and update global + local state
+  const update = async () => {
+    const newUser = await fetchUser();
+    cachedUser = newUser;
+
+    setUser(
+      !newUser
+        ? null
+        : {
+            ...newUser,
+            picture: newUser.hasPicture
+              ? `/api/user/avatar/${newUser._id}?v=${Date.now()}`
+              : "/default-avatar.png",
+          }
+    );
+  };
+
+  return { user, loading, update };
 }

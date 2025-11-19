@@ -38,6 +38,8 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const [visibleCount, setVisibleCount] = useState(5);
   const [categoryReady, setCategoryReady] = useState(false);
 
+  const [animatingLayout, setAnimatingLayout] = useState(false);
+
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
@@ -52,6 +54,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     const html = editorRef.current?.getHTML() ?? "";
     const text = html.replace(/<[^>]+>/g, "").trim();
     if (!text) return;
+    const checkText = `title: ${title}\n${text}`;
 
     setContentChanged(false);
     setCategoryReady(false);
@@ -64,7 +67,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
       const res = await fetch("/api/categorize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }), // ← FIXED HERE
+        body: JSON.stringify({ content: checkText }),
       });
 
       if (!res.ok) throw new Error("Categorization failed");
@@ -95,9 +98,11 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   /* -------------------------------------------------------------------------- */
 
   const handleSelectCategory = (label: string) => {
-    setSelected((p) =>
-      p.includes(label) ? p.filter((x) => x !== label) : [...p, label]
-    );
+    setSelected((prev) => {
+      if (prev.includes(label)) return prev.filter((x) => x !== label);
+      if (prev.length >= 3) return prev; // limit 3
+      return [...prev, label];
+    });
   };
 
   /* -------------------------------------------------------------------------- */
@@ -116,6 +121,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     try {
       await onSubmit(title, html, authorId, selected);
 
+      // Reset everything
       editorRef.current?.clearEditor();
       setCategories([]);
       setSelected([]);
@@ -169,6 +175,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
           type="text"
           placeholder={t("title") || "Title"}
           value={title}
+          maxLength={200}
           onChange={(e) => {
             setTitle(e.target.value);
             setContentChanged(true);
@@ -176,8 +183,13 @@ export default function PostForm({ onSubmit }: PostFormProps) {
           onFocus={() => setIsTitleFocused(true)}
           onBlur={() => setIsTitleFocused(false)}
           className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
+          autoComplete="off"
         />
       </motion.div>
+      {/* Character count */}
+      <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
+        {title.length}/200
+      </p>
 
       {/* ------------------------------ Editor ------------------------------ */}
       <div className="flex-1 overflow-y-auto rounded-md">
@@ -199,6 +211,8 @@ export default function PostForm({ onSubmit }: PostFormProps) {
             exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.25 }}
             className="space-y-3"
+            onLayoutAnimationStart={() => setAnimatingLayout(true)}
+            onLayoutAnimationComplete={() => setAnimatingLayout(false)}
           >
             <motion.div layout className="overflow-hidden">
               <motion.div
@@ -222,6 +236,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                       className="flex flex-col"
                     >
                       <motion.button
+                        type="button"
                         layout
                         whileTap={{ scale: 0.92 }}
                         whileHover={{ scale: 1.05 }}
@@ -249,24 +264,30 @@ export default function PostForm({ onSubmit }: PostFormProps) {
               </motion.div>
             </motion.div>
 
-            <motion.div layout className="flex gap-4 text-sm">
-              {visibleCount < ordered.length && (
-                <button
-                  onClick={() => setVisibleCount((v) => v + 5)}
-                  className="text-blue-500 hover:underline"
-                >
-                  Show more
-                </button>
-              )}
-              {visibleCount > 5 && (
-                <button
-                  onClick={() => setVisibleCount(5)}
-                  className="text-blue-500 hover:underline"
-                >
-                  Show less
-                </button>
-              )}
-            </motion.div>
+            {/* ---------------------- Show More / Show Less ---------------------- */}
+            {!animatingLayout && (
+              <motion.div layout className="flex gap-4 text-sm">
+                {visibleCount < ordered.length && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((v) => v + 5)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Show more
+                  </button>
+                )}
+
+                {visibleCount > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount(5)}
+                    className="text-blue-500 hover:underline"
+                  >
+                    Show less
+                  </button>
+                )}
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -274,7 +295,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
       {/* ------------------------------ Footer ------------------------------ */}
       <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700 pt-3 pb-4">
         <div className="flex justify-between items-center">
-          {/* User info */}
           <div className="flex items-center gap-2 text-sm">
             {user ? (
               <img
@@ -284,18 +304,16 @@ export default function PostForm({ onSubmit }: PostFormProps) {
             ) : (
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
-
-            <span className="flex items-center gap-1">
+            <span>
               Posting as{" "}
               {user ? (
                 <strong>{user.name}</strong>
               ) : (
-                <div className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md" />
+                <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
               )}
             </span>
           </div>
 
-          {/* Buttons */}
           <div className="flex gap-3 items-center">
             {categories.length === 0 || contentChanged ? (
               <motion.button

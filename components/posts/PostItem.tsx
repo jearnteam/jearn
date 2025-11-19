@@ -103,10 +103,31 @@ export default function PostItem({
         );
         const data = await res.json();
         setAlreadyReported(data.alreadyReported);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
     }
     checkReport();
   }, [post._id, userId]);
+
+  const toggleExpand = () => {
+    setExpanded((prev) => {
+      const next = !prev;
+
+      // If collapsing → scroll to top immediately
+      if (prev === true && next === false) {
+        const el = document.getElementById(`post-${postState._id}`);
+        if (el) {
+          el.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }
+      }
+
+      return next;
+    });
+  };
 
   const handleEdit = async () => {
     setMenuOpen(false);
@@ -120,6 +141,13 @@ export default function PostItem({
 
   const handleReport = async () => {
     if (!userId) return alert("Login required to report.");
+
+    // 🚫 block self-report
+    if (userId === String(postState.authorId)) {
+      alert("You can't report your own post.");
+      return;
+    }
+
     if (alreadyReported) return alert("Already reported.");
 
     const reason = prompt("Why report?");
@@ -210,7 +238,7 @@ export default function PostItem({
         {/* HEADER */}
         <div className="flex items-center justify-between mb-3">
           <Link
-            href={`/posts/${postState._id}`}
+            href={`/profile/${postState.authorId}`}
             scroll={false}
             onClick={() => {
               sessionStorage.setItem("lastPostId", postState._id);
@@ -249,12 +277,68 @@ export default function PostItem({
             </div>
           </Link>
 
-          {/* MENU (unchanged) */}
+          {/* MENU (edit/delete for owner, report for others) */}
+          {userId && (
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
+              >
+                <MoreVertical size={20} />
+              </button>
+
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="absolute right-0 mt-2 w-40 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden"
+                  >
+                    {userId === String(postState.authorId) ? (
+                      <>
+                        <button
+                          onClick={handleEdit}
+                          className="block w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        >
+                          ✏️ Edit
+                        </button>
+                        <button
+                          onClick={handleDelete}
+                          className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        >
+                          🗑 Delete
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={handleReport}
+                        disabled={alreadyReported}
+                        className={`block w-full px-4 py-2 text-left text-yellow-600 ${
+                          alreadyReported
+                            ? "opacity-50 cursor-not-allowed"
+                            : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                        }`}
+                      >
+                        ⚠️ {alreadyReported ? "Reported" : "Report"}
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
         {/* TITLE */}
         {!isComment && (
-          <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
+          <h2
+            className="
+    font-semibold text-lg 
+    text-gray-800 dark:text-gray-100
+    whitespace-normal break-words break-all
+  "
+          >
             {postState.title}
           </h2>
         )}
@@ -286,7 +370,6 @@ export default function PostItem({
                 : LINE_HEIGHT * COLLAPSED_LINES,
             opacity: 1,
           }}
-          transition={{ duration: 0.35 }}
           className="mt-2 overflow-hidden text-gray-900 dark:text-gray-100"
           ref={contentRef}
           style={{
@@ -299,7 +382,7 @@ export default function PostItem({
 
         {!fullView && !isComment && shouldTruncate && (
           <button
-            onClick={() => setExpanded((x) => !x)}
+            onClick={toggleExpand}
             className="mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             {expanded ? "Show Less ▲" : "Show More ▼"}

@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Shadows_Into_Light,
-} from "next/font/google";
+import { Geist, Geist_Mono, Shadows_Into_Light } from "next/font/google";
 import "@/globals.css";
+
 import I18nProvider from "@/components/I18nProvider";
 import Navbar from "@/components/Navbar";
 import ClientLayout from "./ClientLayout";
@@ -81,11 +78,15 @@ export default function RootLayout({
         <ClientLayout>
           <SWRegister />
           <UserThemeSync />
+
           <I18nProvider>
             <LanguageInitializer />
+
+            {/* GLOBAL NAVBAR */}
             <Navbar />
 
-            <div className="pt-[4.3rem]">
+            {/* MAIN GRID */}
+            <div className="pt-[4.3rem] bg-gray-50 dark:bg-neutral-950 min-h-screen">
               {children}
             </div>
           </I18nProvider>

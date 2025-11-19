@@ -16,36 +16,25 @@ import { motion } from "framer-motion";
 
 function useShowLoginOnNewTab() {
   const router = useRouter();
-
   useEffect(() => {
-    const visited = sessionStorage.getItem("visited");
-    if (!visited) {
+    if (!sessionStorage.getItem("visited")) {
       sessionStorage.setItem("visited", "true");
       router.replace("/login");
     }
   }, [router]);
 }
 
-interface UpvoteResponse {
-  ok: boolean;
-  error?: string;
-  action?: "added" | "removed";
-}
-
 export default function HomePage() {
   useShowLoginOnNewTab();
 
   const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
-
   const mainRef = useRef<HTMLDivElement | null>(null);
 
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
-
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   usePullToRefresh(mainRef, async () => {
@@ -75,56 +64,17 @@ export default function HomePage() {
     }
   }
 
-  async function upvotePost(
-    id: string,
-    userId: string
-  ): Promise<UpvoteResponse> {
-    try {
-      const res = await fetch(`/api/posts/${id}/upvote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) return { ok: false, error: data.error || "Upvote failed" };
-      return { ok: true, action: data.action };
-    } catch (err) {
-      console.error("❌ Upvote error:", err);
-      return { ok: false, error: "Network error" };
-    }
+  async function upvotePost(id: string, userId: string) {
+    const res = await fetch(`/api/posts/${id}/upvote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+    const data = await res.json();
+    return res.ok
+      ? { ok: true, action: data.action }
+      : { ok: false, error: data.error || "Upvote failed" };
   }
-
-  // 🔥 STRICT POST RESTORE
-  useEffect(() => {
-    const targetPostId = sessionStorage.getItem("scrollToPost");
-    if (!targetPostId) return;
-
-    const tryScroll = () => {
-      const el = document.getElementById(`post-${targetPostId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "instant", block: "start" });
-        sessionStorage.removeItem("scrollToPost");
-        return true;
-      }
-      return false;
-    };
-
-    // Try immediately
-    if (tryScroll()) return;
-
-    // Fallback: wait for infinite scroll to load
-    const observer = new MutationObserver(() => {
-      if (tryScroll()) observer.disconnect();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    return () => observer.disconnect();
-  }, [posts]);
 
   return (
     <>
@@ -157,41 +107,77 @@ export default function HomePage() {
         onConfirm={confirmDelete}
       />
 
+      {/* Loading */}
       {loading && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-white/90 dark:bg-neutral-900/90"
+          transition={{ duration: 0.4 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-neutral-900/80"
         >
-          <div className="flex flex-col items-center justify-center text-gray-600 dark:text-gray-300">
-            <div className="w-48 h-48 flex items-center justify-center">
+          <div className="flex flex-col items-center text-gray-700 dark:text-gray-300">
+            <div className="w-40 h-40">
               <LoadingOwl />
             </div>
             <p className="text-lg font-medium mt-4">Loading posts...</p>
           </div>
         </motion.div>
       )}
-
-      {/* Main Layout */}
-      <div className="min-h-[calc(100vh-4.3rem)] bg-white dark:bg-black">
-        <div
-          ref={mainRef}
-          className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[20%_1fr_20%]"
-        >
-          {/* Left Sidebar */}
-          <aside className="hidden lg:block bg-black text-white px-4 py-4 h-screen sticky top-[4.3rem]">
+      {/* PAGE SCROLL DISABLED ONLY HERE */}
+      <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
+        {/* FIXED SIDEBARS + SCROLLING CENTER LAYOUT */}
+        <div className="w-full h-screen overflow-hidden bg-white dark:bg-black">
+          {/* LEFT SIDEBAR - FIXED */}
+          <aside
+            className="
+      hidden xl:flex flex-col
+      fixed top-[4.3rem] left-0
+      w-[320px] h-[calc(100vh-4.3rem)]
+      bg-black text-white px-4 py-4
+      border-r border-neutral-800
+      overflow-y-auto
+      z-30
+    "
+          >
             <button
               onClick={() => setShowPostBox(true)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-lg transition"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition"
             >
               + Create Post
             </button>
           </aside>
 
-          {/* Center Feed */}
-          <main className="mt-2 px-1 pb-[calc(env(safe-area-inset-bottom,0px)+72px)] lg:pb-4">
+          {/* RIGHT SIDEBAR - FIXED */}
+          <aside
+            className="
+      hidden xl:flex flex-col
+      fixed top-[4.3rem] right-0
+      w-[320px] h-[calc(100vh-4.3rem)]
+      bg-black text-white px-4 py-4
+      border-l border-neutral-800
+      overflow-y-auto
+      z-30
+    "
+          >
+            <p>Right Content</p>
+          </aside>
+
+          {/* CENTER CONTENT — SCROLLABLE */}
+          <main
+            ref={mainRef}
+            className="
+      absolute 
+      top-[4.3rem]
+      left-0 right-0
+      xl:left-[320px] xl:right-[320px]
+
+      h-[calc(100vh-4.3rem)]
+      overflow-y-auto
+
+      px-3 md:px-6
+      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+    "
+          >
             {isRefreshing && (
               <div className="flex justify-center items-center py-2">
                 <div className="animate-spin w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full"></div>
@@ -205,11 +191,6 @@ export default function HomePage() {
               onUpvote={upvotePost}
             />
           </main>
-
-          {/* Right Sidebar */}
-          <aside className="hidden lg:block bg-black text-white px-4 py-4 h-screen sticky top-[4.3rem]">
-            <p>Right Content</p>
-          </aside>
         </div>
       </div>
     </>

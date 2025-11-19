@@ -5,7 +5,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
-import { Plugin } from "prosemirror-state";
+import { Plugin, PluginKey } from "prosemirror-state";
 import { Extension, type CommandProps } from "@tiptap/core";
 import Heading, { type Level } from "@tiptap/extension-heading";
 import Underline from "@tiptap/extension-underline";
@@ -17,10 +17,9 @@ import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 
-/* ---------- Base Extensions ---------- */
-const BASE_EXTENSIONS = [Tag, MathExtension, Underline, Strike, Code];
-
-/* ✅ Utility: Remove zero-width chars on paste */
+/* -------------------------------------------------------------------------- */
+/*                    1. Remove Zero-Width Characters                         */
+/* -------------------------------------------------------------------------- */
 export const RemoveZeroWidthChars = Extension.create({
   name: "removeZeroWidthChars",
   addProseMirrorPlugins() {
@@ -42,7 +41,56 @@ export const RemoveZeroWidthChars = Extension.create({
   },
 });
 
-/* ✅ Custom Heading (safe + toggles only current line) */
+/* -------------------------------------------------------------------------- */
+/*                          2. Count Characters w/ LaTeX                      */
+/* -------------------------------------------------------------------------- */
+function countCharactersWithMath(doc: any) {
+  let count = 0;
+
+  doc.descendants((node: any) => {
+    // Math node → count full latex
+    if (node.type?.name === "math") {
+      const latex = node.attrs?.latex || "";
+      count += latex.length;
+      return false;
+    }
+
+    // Normal text
+    if (node.isText) {
+      const clean = node.text.replace(/\u200B/g, "");
+      count += clean.length;
+    }
+
+    return true;
+  });
+
+  return count;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         3. 2000 Character Limit Plugin                     */
+/* -------------------------------------------------------------------------- */
+
+const MAX_CHARS = 20000;
+
+export const TextLimitPlugin = new Plugin({
+  key: new PluginKey("textLimit"),
+  filterTransaction(tr, state) {
+    // 🔥 get the "next" doc directly
+    const newDoc = tr.doc;
+
+    const countAfter = countCharactersWithMath(newDoc);
+    if (countAfter > MAX_CHARS) {
+      return false; // block
+    }
+    return true;
+  },
+});
+
+
+/* -------------------------------------------------------------------------- */
+/*                         4. Custom Heading Toggles                          */
+/* -------------------------------------------------------------------------- */
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     headingNoNewline: {
@@ -55,14 +103,11 @@ const CustomHeading = Heading.extend({
   addCommands() {
     return {
       toggleHeadingNoNewline:
-        (attrs: { level: Level }) =>
-        ({ chain, editor }: CommandProps) => {
-          // If it's already this heading → revert to paragraph
+        (attrs) =>
+        ({ chain, editor }) => {
           if (editor.isActive("heading", attrs)) {
             return chain().focus().setParagraph().run();
           }
-
-          // ✅ Use low-level toggleNode to only affect current block
           return chain()
             .focus()
             .toggleNode("paragraph", "heading", attrs)
@@ -72,7 +117,10 @@ const CustomHeading = Heading.extend({
   },
 });
 
-/* ---------- Component ---------- */
+/* -------------------------------------------------------------------------- */
+/*                               5. Component                                 */
+/* -------------------------------------------------------------------------- */
+
 interface PostEditorInnerProps {
   value: string;
   placeholder?: string;
@@ -88,11 +136,15 @@ export default function PostEditorInner({
 }: PostEditorInnerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
-  const lastSelRef = useRef<{ from: number; to: number } | null>(null);
-  const [menuRefreshToggle, setMenuRefreshToggle] = useState(false);
-  const [isEditorFocused, setIsEditorFocused] = useState(false);
 
-  /* ✅ Initialize editor */
+  const lastSelRef = useRef<{ from: number; to: number } | null>(null);
+
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [charCount, setCharCount] = useState(0);
+
+  /* -------------------------------------------------------------------------- */
+  /*                             Initialize Editor                              */
+  /* -------------------------------------------------------------------------- */
   const editor = useEditor({
     extensions: [
       NoRulesStarterKit.configure({
@@ -101,6 +153,7 @@ export default function PostEditorInner({
         code: false,
         hardBreak: false,
       }),
+
       Tag,
       MathExtension,
       Strike,
@@ -108,47 +161,68 @@ export default function PostEditorInner({
       CustomHeading.configure({ levels: [1, 2, 3] }),
       HardBreak.configure({ keepMarks: true }),
       RemoveZeroWidthChars,
+
       Placeholder.configure({
         placeholder,
         showOnlyWhenEditable: true,
       }),
+
+      /* 🔥 Add hard limit plugin */
+      Extension.create({
+        name: "limitExtension",
+        addProseMirrorPlugins() {
+          return [TextLimitPlugin];
+        },
+      }),
     ],
+
     content: value?.trim() || "<p></p>",
+
     editorProps: {
       attributes: {
         class:
           "tiptap ProseMirror w-full h-full text-base text-gray-800 dark:text-gray-200 overflow-y-auto p-2",
       },
     },
+
     immediatelyRender: false,
+
+    /* 🔥 Update character counter */
+    onUpdate({ editor }) {
+      const doc = editor.state.doc;
+      setCharCount(countCharactersWithMath(doc));
+    },
   });
 
-  /* 🔌 Pass editor instance to parent */
+  /* Pass editor to parent */
   useEffect(() => {
     if (editor && onReady) onReady(editor);
-  }, [editor, onReady]);
+  }, [editor]);
 
-  /* ✅ Focus tracking */
+  /* Focus tracking */
   useEffect(() => {
     if (!editor) return;
-    const handleFocus = () => setIsEditorFocused(true);
-    const handleBlur = () => setIsEditorFocused(false);
-    editor.on("focus", handleFocus);
-    editor.on("blur", handleBlur);
+    const focus = () => setIsEditorFocused(true);
+    const blur = () => setIsEditorFocused(false);
+    editor.on("focus", focus);
+    editor.on("blur", blur);
     return () => {
-      editor.off("focus", handleFocus);
-      editor.off("blur", handleBlur);
+      editor.off("focus", focus);
+      editor.off("blur", blur);
     };
   }, [editor]);
 
-  /* 🎯 Floating Menu Logic */
+  /* -------------------------------------------------------------------------- */
+  /*                            Floating Toolbar Logic                           */
+  /* -------------------------------------------------------------------------- */
   useEffect(() => {
     if (!editor || !menuRef.current) return;
-    let rafId: number;
-    const reference = document.createElement("div");
-    document.body.appendChild(reference);
 
-    const instance = tippy(reference, {
+    let rafId: number;
+    const refEl = document.createElement("div");
+    document.body.appendChild(refEl);
+
+    const instance = tippy(refEl, {
       getReferenceClientRect: null,
       content: menuRef.current,
       trigger: "manual",
@@ -156,44 +230,44 @@ export default function PostEditorInner({
       interactive: true,
       hideOnClick: false,
       appendTo: document.body,
-      zIndex: 10050,
+      zIndex: 20000,
     });
 
-    const updateToolbarPosition = () => {
-      if (!editor?.view?.dom) return;
+    const updatePosition = () => {
       const sel = window.getSelection();
-      const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
-      if (!sel || !range) return;
-      const editorEl = editor.view.dom;
-      const isInEditor = editorEl.contains(sel.anchorNode);
-      if (!isInEditor || range.collapsed) {
+      if (!sel || sel.rangeCount === 0) return;
+
+      const range = sel.getRangeAt(0);
+      const isCollapsed = range.collapsed;
+
+      if (isCollapsed) {
         instance.hide();
         return;
       }
+
       const rect = range.getBoundingClientRect();
       instance.setProps({ getReferenceClientRect: () => rect });
       instance.show();
-      setMenuRefreshToggle((prev) => !prev);
     };
 
-    const debouncedUpdate = () => {
+    const debounced = () => {
       cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updateToolbarPosition);
+      rafId = requestAnimationFrame(updatePosition);
     };
 
-    editor.on("selectionUpdate", debouncedUpdate);
-    editor.on("transaction", debouncedUpdate);
-    document.addEventListener("selectionchange", debouncedUpdate);
+    editor.on("selectionUpdate", debounced);
+    editor.on("transaction", debounced);
+    document.addEventListener("selectionchange", debounced);
 
     tippyRef.current = instance;
 
     return () => {
       cancelAnimationFrame(rafId);
-      editor.off("selectionUpdate", debouncedUpdate);
-      editor.off("transaction", debouncedUpdate);
-      document.removeEventListener("selectionchange", debouncedUpdate);
+      editor.off("selectionUpdate", debounced);
+      editor.off("transaction", debounced);
+      document.removeEventListener("selectionchange", debounced);
       instance.destroy();
-      document.body.removeChild(reference);
+      document.body.removeChild(refEl);
     };
   }, [editor]);
 
@@ -201,19 +275,23 @@ export default function PostEditorInner({
   const e = editor;
 
   const withRestoredSelection = (
-    chainOp: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
+    fn: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
   ) => {
-    const sel = lastSelRef.current;
     let chain = e.chain().focus();
+    const sel = lastSelRef.current;
     if (sel && sel.from !== sel.to) chain = chain.setTextSelection(sel);
-    chainOp(chain).run();
+    fn(chain).run();
   };
 
   const headingLevels: Level[] = [1, 2, 3];
 
+  /* -------------------------------------------------------------------------- */
+  /*                                  JSX                                       */
+  /* -------------------------------------------------------------------------- */
+
   return (
     <div className="w-full mx-auto">
-      {/* Floating Toolbar */}
+      {/* Floating toolbar */}
       <div
         ref={menuRef}
         className="flex gap-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md p-1 text-black dark:text-white"
@@ -292,6 +370,7 @@ export default function PostEditorInner({
           onClick={() => {
             const selection = window.getSelection()?.toString();
             if (!selection?.trim()) return;
+
             const { from, to } = e.state.selection;
             withRestoredSelection((c) =>
               c.deleteRange({ from, to }).insertMath(selection.trim())
@@ -303,7 +382,7 @@ export default function PostEditorInner({
         </button>
       </div>
 
-      {/* Editor Container */}
+      {/* Editor */}
       <div
         className={`flex flex-col rounded-lg border transition ${
           isEditorFocused
@@ -315,8 +394,15 @@ export default function PostEditorInner({
           <EditorContent editor={editor} />
         </div>
 
-        <div className="text-right text-xs text-gray-500 dark:text-gray-400 px-4 py-1 border-t border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm">
-          {e.getText().length} / 280
+        {/* Character Counter */}
+        <div
+          className={`text-right text-xs px-4 py-1 border-t border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm ${
+            charCount >= MAX_CHARS
+              ? "text-red-500"
+              : "text-gray-500 dark:text-gray-400"
+          }`}
+        >
+          {charCount} / {MAX_CHARS}
         </div>
       </div>
     </div>
