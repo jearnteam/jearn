@@ -1,105 +1,131 @@
-// @/features/Tag.ts
-import { Mark, mergeAttributes, getMarkRange } from "@tiptap/core";
+import { Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
 
-export const Tag = Mark.create({
+export const tagPluginKey = new PluginKey("tag-node");
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    tag: {
+      insertTag: (value: string) => ReturnType;
+    };
+  }
+}
+
+export const Tag = Node.create({
   name: "tag",
+  group: "inline",
+  inline: true,
+  atom: true,
+  selectable: true,
 
   addAttributes() {
     return {
-      tag: { default: null },
+      value: { default: "" },
     };
   },
 
   parseHTML() {
-    return [
-      {
-        tag: "a[data-tag]",
-        getAttrs: (el) =>
-          el instanceof HTMLElement
-            ? { tag: el.getAttribute("data-tag") }
-            : false,
-      },
-    ];
+    return [{ tag: "a[data-type='tag']" }];
   },
 
   renderHTML({ HTMLAttributes }) {
     return [
       "a",
       mergeAttributes(HTMLAttributes, {
-        href: `/tags/${HTMLAttributes.tag}`,
+        "data-type": "tag",
+        "data-value": HTMLAttributes.value,
+        href: `/tags/${HTMLAttributes.value}`,
+        target: "_blank",                  // ALWAYS OPEN NEW TAB
+        rel: "noopener noreferrer",
         class:
-          "hashtag-tag text-blue-600 dark:text-blue-400 hover:underline cursor-pointer select-none",
+          "hashtag-tag text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline",
       }),
+      `#${HTMLAttributes.value}`,
     ];
   },
 
-  addProseMirrorPlugins() {
-    const type = this.type;
+  addNodeView() {
+    return ({ node }) => {
+      const tag = node.attrs.value;
+      const dom = document.createElement("a");
 
+      dom.dataset.type = "tag";
+      dom.dataset.value = tag;
+      dom.href = `/tags/${tag}`;
+      dom.target = "_blank";                     // ALWAYS NEW TAB
+      dom.rel = "noopener noreferrer";
+      dom.textContent = `#${tag}`;
+      dom.className =
+        "hashtag-tag text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline select-none";
+
+      // Force new tab on left-click too
+      dom.addEventListener("click", (e) => {
+        e.preventDefault();                      // Stop default navigation
+        window.open(`/tags/${tag}`, "_blank");   // FORCE NEW TAB
+      });
+
+      // Middle click → opens new tab automatically
+      dom.addEventListener("auxclick", (e) => {
+        if (e.button === 1) {
+          window.open(`/tags/${tag}`, "_blank");
+        }
+      });
+
+      return { dom };
+    };
+  },
+
+  addCommands() {
+    return {
+      insertTag:
+        (value: string) =>
+        ({ state, dispatch, view }) => {
+          const clean = value.replace(/[^A-Za-z0-9_]/g, "");
+          const { tr, schema } = state;
+          const pos = tr.selection.from;
+
+          const node = schema.nodes.tag.create({ value: clean });
+          const spacer = schema.text("\u200B");
+
+          tr.insert(pos, node);
+          tr.insert(pos + 1, spacer);
+          tr.setSelection(TextSelection.create(tr.doc, pos + 2));
+
+          if (dispatch) dispatch(tr);
+
+          setTimeout(() => {
+            if (view) {
+              view.focus();
+              const sel = window.getSelection();
+              const domAtPos = view.domAtPos(pos + 2);
+
+              if (sel && domAtPos.node) {
+                sel.removeAllRanges();
+                const range = document.createRange();
+                range.setStart(domAtPos.node, domAtPos.offset ?? 0);
+                range.collapse(true);
+                sel.addRange(range);
+              }
+            }
+          }, 0);
+
+          return true;
+        },
+    };
+  },
+
+  /* Auto-detect #tag when typing */
+  addProseMirrorPlugins() {
     return [
       new Plugin({
-        key: new PluginKey("hashtag"),
-
+        key: tagPluginKey,
         props: {
-          handleKeyDown(view: any, event: KeyboardEvent) {
-            const { state, dispatch } = view;
-            const { $from } = state.selection;
+          handleTextInput(view, from, _to, text) {
+            if (text !== " ") return false;
 
-            /* -----------------------------------------------------------
-             * BREAK TAG IF SPACE IS TYPED INSIDE A TAG (#je|arn)
-             * ----------------------------------------------------------- */
-            if (event.key === " ") {
-              const markRange = getMarkRange($from, type);
+            const { state } = view;
+            const $from = state.doc.resolve(from);
 
-              if (markRange) {
-                const tr = state.tr;
-
-                const { from, to } = markRange;
-
-                // 1) Insert the space
-                tr.insertText(" ", $from.pos);
-
-                // 2) Remove tag mark over ORIGINAL range
-                tr.removeMark(from, to, type);
-
-                // 3) Remove tag mark from the shifted positions as well
-                tr.removeMark(from, to + 1, type); // +1 because of inserted space
-
-                // 4) Ensure no stored tag mark leaks
-                tr.removeStoredMark(type);
-
-                // 5) Move cursor after inserted space
-                tr.setSelection(TextSelection.create(tr.doc, $from.pos + 1));
-
-                dispatch(tr);
-                event.preventDefault();
-                return true;
-              }
-            }
-
-            /* -----------------------------------------------------------
-             * 2) REMOVE TAG MARK WHEN DELETING INSIDE / ADJACENT
-             * ----------------------------------------------------------- */
-            if (event.key === "Backspace" || event.key === "Delete") {
-              const markRange = getMarkRange($from, type);
-
-              if (markRange) {
-                const tr = state.tr;
-                tr.removeMark(markRange.from, markRange.to, type);
-                dispatch(tr);
-                return false; // allow normal delete of characters
-              }
-            }
-
-            /* -----------------------------------------------------------
-             * 3) TAG CREATION: when SPACE typed after "#word"
-             *    Example: "This is #jearn⎵" -> "#jearn" becomes link
-             * ----------------------------------------------------------- */
-            const isSpace = event.key === " ";
-            if (!isSpace) return false;
-
-            // Text before cursor within the current block
             const textBefore = $from.parent.textBetween(
               0,
               $from.parentOffset,
@@ -107,36 +133,28 @@ export const Tag = Mark.create({
               "\uFFFC"
             );
 
-            // Match "#word" right before cursor
             const match = textBefore.match(/#([\p{L}\p{N}_]+)$/u);
             if (!match) return false;
 
-            const [fullHashtag, tagValue] = match;
-
-            const hashtagEnd = $from.pos; // cursor position
-            const hashtagStart = hashtagEnd - fullHashtag.length;
-            if (hashtagStart < 0) return false;
+            const tagValue = match[1];
+            const full = `#${tagValue}`;
+            const start = from - full.length;
 
             const tr = state.tr;
 
-            // Insert the space after the hashtag
-            tr.insertText(" ", hashtagEnd);
+            tr.delete(start, from);
 
-            // Add the tag mark over "#word"
-            tr.addMark(
-              hashtagStart,
-              hashtagEnd,
-              type.create({ tag: tagValue })
-            );
+            const node = state.schema.nodes.tag.create({ value: tagValue });
+            const spacer = state.schema.text("\u200B");
 
-            // Move cursor after the inserted space
-            tr.setSelection(TextSelection.create(tr.doc, hashtagEnd + 1));
+            tr.insert(start, node);
+            tr.insert(start + 1, spacer);
 
-            // Ensure future typed text is not tagged
-            tr.removeStoredMark(type);
+            tr.insert(start + 2, state.schema.text(" "));
 
-            dispatch(tr);
-            event.preventDefault();
+            tr.setSelection(TextSelection.create(tr.doc, start + 3));
+
+            view.dispatch(tr);
             return true;
           },
         },
