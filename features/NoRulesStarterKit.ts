@@ -1,47 +1,45 @@
-import StarterKit from "@tiptap/starter-kit";
-import HardBreak from "@tiptap/extension-hard-break";
-import { InputRule } from "@tiptap/core";
+import { Extension, InputRule } from "@tiptap/core";
 
-/**
- * Custom StarterKit:
- * - Lets you type `---` anywhere to insert <hr>
- * - Keeps normal list behavior
- * - Fixes Enter near <hr>
- */
-export const NoRulesStarterKit = StarterKit.extend({
+export const NoRulesStarterKit = Extension.create({
+  name: "noRulesStarter",
+
   addInputRules() {
-    const hrInputRule = new InputRule({
-      find: /---$/,
-      handler: ({ range, chain }) => {
-        chain()
-          .deleteRange(range)
-          .insertContent("<hr>")
-          .createParagraphNear()
-          .run();
-
-        // ✅ No return value → satisfies (void | null)
-      },
-    });
-
-    return [hrInputRule];
+    return [
+      new InputRule({
+        find: /---$/,
+        handler: ({ range, chain }) => {
+          chain()
+            .deleteRange(range)
+            .insertContent("<hr>")
+            .createParagraphNear()
+            .run();
+        },
+      }),
+    ];
   },
 
   addKeyboardShortcuts() {
-    const parentShortcuts = this.parent?.() ?? {};
     return {
-      ...parentShortcuts,
       Enter: ({ editor }) => {
         const { $from } = editor.state.selection;
-        const nodeBefore = $from.nodeBefore;
-        const nodeAfter = $from.nodeAfter;
+
+        // 🚫 Don't handle Enter inside heading
+        if ($from.parent.type.name === "heading") {
+          return false;   // let TipTap handle correctly
+        }
+
+        // HR behavior stays
+        const before = $from.nodeBefore;
+        const after = $from.nodeAfter;
 
         if (
-          nodeBefore?.type.name === "horizontalRule" ||
-          nodeAfter?.type.name === "horizontalRule"
+          before?.type.name === "horizontalRule" ||
+          after?.type.name === "horizontalRule"
         ) {
           return editor.commands.insertContent("<p></p>");
         }
 
+        // Default fallback (lists/code/etc)
         return editor.commands.first(({ commands }) => [
           () => commands.newlineInCode(),
           () => commands.createParagraphNear(),
@@ -51,12 +49,4 @@ export const NoRulesStarterKit = StarterKit.extend({
       },
     };
   },
-}).configure({
-  paragraph: {},
-  hardBreak: { keepMarks: true },
-  heading: { levels: [1, 2, 3] },
-  bulletList: {},
-  orderedList: {},
-  listItem: {},
-  horizontalRule: {},
 });

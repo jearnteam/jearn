@@ -1,3 +1,4 @@
+// @/features/Tag.ts
 import { Mark, mergeAttributes, getMarkRange } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
 
@@ -22,7 +23,6 @@ export const Tag = Mark.create({
     ];
   },
 
-  // ✅ Let the DOM node control text content, don't repeat #tag in renderHTML
   renderHTML({ HTMLAttributes }) {
     return [
       "a",
@@ -40,59 +40,37 @@ export const Tag = Mark.create({
     return [
       new Plugin({
         key: new PluginKey("hashtag"),
+
         props: {
-          handleKeyDown(view, event) {
-            const isSpace = event.key === " ";
-            const isEnter = event.key === "Enter";
-            if (!isSpace && !isEnter) return false;
-
+          handleKeyDown(view: any, event: KeyboardEvent) {
             const { state, dispatch } = view;
-            const { $from, empty } = state.selection;
+            const { $from } = state.selection;
 
-            // === Case 1: Cursor is inside an existing tag mark -> split it cleanly ===
-            if (empty) {
-              const insideRange = getMarkRange($from, type);
-              if (insideRange) {
-                const splitPos = $from.pos;
+            /* -----------------------------------------------------------
+             * BREAK TAG IF SPACE IS TYPED INSIDE A TAG (#je|arn)
+             * ----------------------------------------------------------- */
+            if (event.key === " ") {
+              const markRange = getMarkRange($from, type);
+
+              if (markRange) {
                 const tr = state.tr;
 
-                const node = $from.parent;
-                const nodeStart = $from.start();
-                const offset = $from.parentOffset;
-                const fullText = node.textContent;
+                const { from, to } = markRange;
 
-                const leftText = fullText.slice(0, offset); // still part of tag
-                const rightText = fullText.slice(offset); // plain text
+                // 1) Insert the space
+                tr.insertText(" ", $from.pos);
 
-                // Remove original full text
-                tr.delete(nodeStart, nodeStart + fullText.length);
+                // 2) Remove tag mark over ORIGINAL range
+                tr.removeMark(from, to, type);
 
-                // Insert left-side shortened link
-                if (leftText.length > 0) {
-                  const newTag = leftText.slice(1); // remove leading '#'
-                  tr.insert(
-                    nodeStart,
-                    state.schema.text(leftText, [type.create({ tag: newTag })])
-                  );
-                }
+                // 3) Remove tag mark from the shifted positions as well
+                tr.removeMark(from, to + 1, type); // +1 because of inserted space
 
-                let cursorPos = nodeStart + leftText.length;
+                // 4) Ensure no stored tag mark leaks
+                tr.removeStoredMark(type);
 
-                // Insert the right-side plain text
-                if (rightText.length > 0) {
-                  tr.insert(cursorPos, state.schema.text(rightText));
-                }
-
-                // Space or Enter behavior
-                if (isSpace) {
-                  tr.insertText(" ", cursorPos);
-                  cursorPos += 1;
-                } else if (isEnter) {
-                  tr.split(cursorPos);
-                }
-
-                tr.setSelection(TextSelection.create(tr.doc, cursorPos));
-                tr.removeStoredMark(type); // prevent leaking blue marks
+                // 5) Move cursor after inserted space
+                tr.setSelection(TextSelection.create(tr.doc, $from.pos + 1));
 
                 dispatch(tr);
                 event.preventDefault();
@@ -100,7 +78,28 @@ export const Tag = Mark.create({
               }
             }
 
-            // === Case 2: Create a tag from raw "#word" right before the cursor ===
+            /* -----------------------------------------------------------
+             * 2) REMOVE TAG MARK WHEN DELETING INSIDE / ADJACENT
+             * ----------------------------------------------------------- */
+            if (event.key === "Backspace" || event.key === "Delete") {
+              const markRange = getMarkRange($from, type);
+
+              if (markRange) {
+                const tr = state.tr;
+                tr.removeMark(markRange.from, markRange.to, type);
+                dispatch(tr);
+                return false; // allow normal delete of characters
+              }
+            }
+
+            /* -----------------------------------------------------------
+             * 3) TAG CREATION: when SPACE typed after "#word"
+             *    Example: "This is #jearn⎵" -> "#jearn" becomes link
+             * ----------------------------------------------------------- */
+            const isSpace = event.key === " ";
+            if (!isSpace) return false;
+
+            // Text before cursor within the current block
             const textBefore = $from.parent.textBetween(
               0,
               $from.parentOffset,
@@ -108,40 +107,34 @@ export const Tag = Mark.create({
               "\uFFFC"
             );
 
-            // Match the last "#word" before cursor
+            // Match "#word" right before cursor
             const match = textBefore.match(/#([\p{L}\p{N}_]+)$/u);
             if (!match) return false;
 
             const [fullHashtag, tagValue] = match;
-            const hashtagStart = $from.pos - fullHashtag.length;
+
+            const hashtagEnd = $from.pos; // cursor position
+            const hashtagStart = hashtagEnd - fullHashtag.length;
+            if (hashtagStart < 0) return false;
 
             const tr = state.tr;
 
-            // Remove raw "#tag"
-            tr.delete(hashtagStart, $from.pos);
+            // Insert the space after the hashtag
+            tr.insertText(" ", hashtagEnd);
 
-            // Insert marked text
-            const tagNode = state.schema.text(`#${tagValue}`, [
-              type.create({ tag: tagValue }),
-            ]);
-            tr.insert(hashtagStart, tagNode);
+            // Add the tag mark over "#word"
+            tr.addMark(
+              hashtagStart,
+              hashtagEnd,
+              type.create({ tag: tagValue })
+            );
 
-            const afterTagPos = hashtagStart + tagNode.nodeSize;
+            // Move cursor after the inserted space
+            tr.setSelection(TextSelection.create(tr.doc, hashtagEnd + 1));
 
-            if (isSpace) {
-              const nextChar = tr.doc.textBetween(
-                afterTagPos,
-                afterTagPos + 1,
-                undefined,
-                "\uFFFC"
-              );
-              if (nextChar !== " ") tr.insertText(" ", afterTagPos);
-              tr.setSelection(TextSelection.create(tr.doc, afterTagPos + 1));
-            } else if (isEnter) {
-              tr.split(afterTagPos);
-            }
-
+            // Ensure future typed text is not tagged
             tr.removeStoredMark(type);
+
             dispatch(tr);
             event.preventDefault();
             return true;

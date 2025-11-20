@@ -2,23 +2,36 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+
 import Placeholder from "@tiptap/extension-placeholder";
+
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
+
 import { Plugin, PluginKey } from "prosemirror-state";
-import { Extension, type CommandProps } from "@tiptap/core";
-import Heading, { type Level } from "@tiptap/extension-heading";
+
 import Underline from "@tiptap/extension-underline";
 import Strike from "@tiptap/extension-strike";
 import Code from "@tiptap/extension-code";
+import Bold from "@tiptap/extension-bold";
+import Italic from "@tiptap/extension-italic";
+import Document from "@tiptap/extension-document";
+import Paragraph from "@tiptap/extension-paragraph";
+import Text from "@tiptap/extension-text";
+import Heading from "@tiptap/extension-heading";
 import HardBreak from "@tiptap/extension-hard-break";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 
+import { HeadingPatch } from "@/features/HeadingPatch";
+import type { Level } from "@tiptap/extension-heading";
+
+import { Extension } from "@tiptap/core";
+
 /* -------------------------------------------------------------------------- */
-/*                    1. Remove Zero-Width Characters                         */
+/* ZERO WIDTH REMOVAL */
 /* -------------------------------------------------------------------------- */
 export const RemoveZeroWidthChars = Extension.create({
   name: "removeZeroWidthChars",
@@ -42,140 +55,88 @@ export const RemoveZeroWidthChars = Extension.create({
 });
 
 /* -------------------------------------------------------------------------- */
-/*                          2. Count Characters w/ LaTeX                      */
+/* CHARACTER COUNT */
 /* -------------------------------------------------------------------------- */
 function countCharactersWithMath(doc: any) {
   let count = 0;
 
   doc.descendants((node: any) => {
-    // Math node → count full latex
     if (node.type?.name === "math") {
-      const latex = node.attrs?.latex || "";
-      count += latex.length;
+      count += (node.attrs?.latex || "").length;
       return false;
     }
-
-    // Normal text
     if (node.isText) {
-      const clean = node.text.replace(/\u200B/g, "");
-      count += clean.length;
+      count += node.text.replace(/\u200B/g, "").length;
     }
-
     return true;
   });
 
   return count;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                         3. 2000 Character Limit Plugin                     */
-/* -------------------------------------------------------------------------- */
-
 const MAX_CHARS = 20000;
 
 export const TextLimitPlugin = new Plugin({
   key: new PluginKey("textLimit"),
-  filterTransaction(tr, state) {
-    // 🔥 get the "next" doc directly
-    const newDoc = tr.doc;
-
-    const countAfter = countCharactersWithMath(newDoc);
-    if (countAfter > MAX_CHARS) {
-      return false; // block
-    }
-    return true;
-  },
-});
-
-
-/* -------------------------------------------------------------------------- */
-/*                         4. Custom Heading Toggles                          */
-/* -------------------------------------------------------------------------- */
-declare module "@tiptap/core" {
-  interface Commands<ReturnType> {
-    headingNoNewline: {
-      toggleHeadingNoNewline: (attrs: { level: Level }) => ReturnType;
-    };
-  }
-}
-
-const CustomHeading = Heading.extend({
-  addCommands() {
-    return {
-      toggleHeadingNoNewline:
-        (attrs) =>
-        ({ chain, editor }) => {
-          if (editor.isActive("heading", attrs)) {
-            return chain().focus().setParagraph().run();
-          }
-          return chain()
-            .focus()
-            .toggleNode("paragraph", "heading", attrs)
-            .run();
-        },
-    };
+  filterTransaction(tr) {
+    const nextDoc = tr.doc;
+    const count = countCharactersWithMath(nextDoc);
+    return count <= MAX_CHARS;
   },
 });
 
 /* -------------------------------------------------------------------------- */
-/*                               5. Component                                 */
+/* COMPONENT */
 /* -------------------------------------------------------------------------- */
 
 interface PostEditorInnerProps {
   value: string;
   placeholder?: string;
-  compact?: boolean;
   onReady?: (editor: Editor) => void;
 }
 
 export default function PostEditorInner({
   value,
   placeholder = "Start typing...",
-  compact = false,
   onReady,
 }: PostEditorInnerProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
-
   const lastSelRef = useRef<{ from: number; to: number } | null>(null);
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [charCount, setCharCount] = useState(0);
 
   /* -------------------------------------------------------------------------- */
-  /*                             Initialize Editor                              */
+  /* EDITOR INIT */
   /* -------------------------------------------------------------------------- */
   const editor = useEditor({
     extensions: [
-      NoRulesStarterKit.configure({
-        heading: false,
-        strike: false,
-        code: false,
-        hardBreak: false,
+      Document,
+      Paragraph,
+      Text,
+
+      Heading.configure({ levels: [1, 2, 3] }),
+      HeadingPatch,
+
+      HardBreak.configure({
+        keepMarks: true,
       }),
+
+      NoRulesStarterKit.configure({ heading: false }),
+
+      Bold,
+      Italic,
+      Underline,
+      Strike,
+      Code,
 
       Tag,
       MathExtension,
-      Strike,
-      Code,
-      CustomHeading.configure({ levels: [1, 2, 3] }),
-      HardBreak.configure({ keepMarks: true }),
       RemoveZeroWidthChars,
 
-      Placeholder.configure({
-        placeholder,
-        showOnlyWhenEditable: true,
-      }),
-
-      /* 🔥 Add hard limit plugin */
-      Extension.create({
-        name: "limitExtension",
-        addProseMirrorPlugins() {
-          return [TextLimitPlugin];
-        },
-      }),
+      Placeholder.configure({ placeholder }),
     ],
-
     content: value?.trim() || "<p></p>",
 
     editorProps: {
@@ -185,74 +146,87 @@ export default function PostEditorInner({
       },
     },
 
-    immediatelyRender: false,
-
-    /* 🔥 Update character counter */
-    onUpdate({ editor }) {
-      const doc = editor.state.doc;
-      setCharCount(countCharactersWithMath(doc));
+    onUpdate: ({ editor }) => {
+      setCharCount(countCharactersWithMath(editor.state.doc));
     },
+
+    immediatelyRender: false,
   });
 
-  /* Pass editor to parent */
+  /* Pass editor instance upward */
   useEffect(() => {
     if (editor && onReady) onReady(editor);
   }, [editor]);
 
-  /* Focus tracking */
+  /* Focus events */
   useEffect(() => {
     if (!editor) return;
-    const focus = () => setIsEditorFocused(true);
-    const blur = () => setIsEditorFocused(false);
-    editor.on("focus", focus);
-    editor.on("blur", blur);
+
+    const f = () => setIsEditorFocused(true);
+    const b = () => setIsEditorFocused(false);
+
+    editor.on("focus", f);
+    editor.on("blur", b);
     return () => {
-      editor.off("focus", focus);
-      editor.off("blur", blur);
+      editor.off("focus", f);
+      editor.off("blur", b);
     };
   }, [editor]);
 
-  /* -------------------------------------------------------------------------- */
-  /*                            Floating Toolbar Logic                           */
-  /* -------------------------------------------------------------------------- */
+  /* Track selection for floating menu */
+  useEffect(() => {
+    if (!editor) return;
+
+    const update = () => {
+      const { from, to } = editor.state.selection;
+      lastSelRef.current = { from, to };
+    };
+
+    editor.on("selectionUpdate", update);
+    editor.on("transaction", update);
+
+    return () => {
+      editor.off("selectionUpdate", update);
+      editor.off("transaction", update);
+    };
+  }, [editor]);
+
+  /* Floating toolbar */
   useEffect(() => {
     if (!editor || !menuRef.current) return;
 
-    let rafId: number;
-    const refEl = document.createElement("div");
-    document.body.appendChild(refEl);
+    let raf: number;
 
-    const instance = tippy(refEl, {
+    const el = document.createElement("div");
+    document.body.appendChild(el);
+
+    const instance = tippy(el, {
       getReferenceClientRect: null,
       content: menuRef.current,
       trigger: "manual",
       placement: "top",
       interactive: true,
-      hideOnClick: false,
       appendTo: document.body,
+      hideOnClick: false,
       zIndex: 20000,
     });
 
-    const updatePosition = () => {
+    const update = () => {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return;
+      if (!sel || sel.rangeCount === 0) return instance.hide();
 
       const range = sel.getRangeAt(0);
-      const isCollapsed = range.collapsed;
+      if (range.collapsed) return instance.hide();
 
-      if (isCollapsed) {
-        instance.hide();
-        return;
-      }
-
-      const rect = range.getBoundingClientRect();
-      instance.setProps({ getReferenceClientRect: () => rect });
+      instance.setProps({
+        getReferenceClientRect: () => range.getBoundingClientRect(),
+      });
       instance.show();
     };
 
     const debounced = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(updatePosition);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
     };
 
     editor.on("selectionUpdate", debounced);
@@ -262,60 +236,60 @@ export default function PostEditorInner({
     tippyRef.current = instance;
 
     return () => {
-      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(raf);
       editor.off("selectionUpdate", debounced);
       editor.off("transaction", debounced);
       document.removeEventListener("selectionchange", debounced);
       instance.destroy();
-      document.body.removeChild(refEl);
+      document.body.removeChild(el);
     };
   }, [editor]);
 
   if (!editor) return null;
-  const e = editor;
 
-  const withRestoredSelection = (
-    fn: (chain: ReturnType<typeof e.chain>) => ReturnType<typeof e.chain>
-  ) => {
-    let chain = e.chain().focus();
-    const sel = lastSelRef.current;
-    if (sel && sel.from !== sel.to) chain = chain.setTextSelection(sel);
+  /* helper with non-null assertions */
+  const withRestore = (fn: (chain: any) => any) => {
+    if (!editor) return;
+    let chain = editor.chain().focus();
+    if (lastSelRef.current) {
+      chain = chain.setTextSelection(lastSelRef.current);
+    }
     fn(chain).run();
   };
 
-  const headingLevels: Level[] = [1, 2, 3];
-
-  /* -------------------------------------------------------------------------- */
-  /*                                  JSX                                       */
-  /* -------------------------------------------------------------------------- */
+  const levels: Level[] = [1, 2, 3];
 
   return (
     <div className="w-full mx-auto">
-      {/* Floating toolbar */}
+      {/* Floating Toolbar */}
       <div
         ref={menuRef}
-        className="flex gap-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md p-1 text-black dark:text-white"
+        className="flex gap-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md p-1"
       >
-        {headingLevels.map((level) => (
+        {levels.map((lv) => (
           <button
-            key={level}
+            key={lv}
             onClick={() =>
-              withRestoredSelection((c) => c.toggleHeadingNoNewline({ level }))
+              withRestore((c) =>
+                c.toggleHeading({
+                  level: lv,
+                })
+              )
             }
             className={`px-2 py-1 rounded ${
-              e.isActive("heading", { level })
+              editor!.isActive("heading", { level: lv })
                 ? "bg-gray-200 dark:bg-gray-700"
                 : "hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
           >
-            H{level}
+            H{lv}
           </button>
         ))}
 
         <button
-          onClick={() => withRestoredSelection((c) => c.toggleBold())}
+          onClick={() => withRestore((c) => c.toggleBold())}
           className={`px-2 py-1 rounded ${
-            e.isActive("bold")
+            editor!.isActive("bold")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -324,20 +298,20 @@ export default function PostEditorInner({
         </button>
 
         <button
-          onClick={() => withRestoredSelection((c) => c.toggleItalic())}
+          onClick={() => withRestore((c) => c.toggleItalic())}
           className={`px-2 py-1 rounded ${
-            e.isActive("italic")
+            editor!.isActive("italic")
               ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover-bg-gray-700"
           }`}
         >
           I
         </button>
 
         <button
-          onClick={() => withRestoredSelection((c) => c.toggleUnderline())}
+          onClick={() => withRestore((c) => c.toggleUnderline())}
           className={`px-2 py-1 rounded ${
-            e.isActive("underline")
+            editor!.isActive("underline")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -346,9 +320,9 @@ export default function PostEditorInner({
         </button>
 
         <button
-          onClick={() => withRestoredSelection((c) => c.toggleStrike())}
+          onClick={() => withRestore((c) => c.toggleStrike())}
           className={`px-2 py-1 rounded ${
-            e.isActive("strike")
+            editor!.isActive("strike")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -358,9 +332,11 @@ export default function PostEditorInner({
 
         <button
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => withRestoredSelection((c) => c.toggleCode())}
+          onClick={() => withRestore((c) => c.toggleCode())}
           className={`px-2 py-1 rounded ${
-            e.isActive("code") ? "bg-gray-200 dark:bg-gray-700" : ""
+            editor!.isActive("code")
+              ? "bg-gray-200 dark:bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           {"</>"}
@@ -368,12 +344,11 @@ export default function PostEditorInner({
 
         <button
           onClick={() => {
-            const selection = window.getSelection()?.toString();
-            if (!selection?.trim()) return;
-
-            const { from, to } = e.state.selection;
-            withRestoredSelection((c) =>
-              c.deleteRange({ from, to }).insertMath(selection.trim())
+            const sel = window.getSelection()?.toString();
+            if (!sel?.trim()) return;
+            const { from, to } = editor!.state.selection;
+            withRestore((c) =>
+              c.deleteRange({ from, to }).insertMath(sel.trim())
             );
           }}
           className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -382,7 +357,7 @@ export default function PostEditorInner({
         </button>
       </div>
 
-      {/* Editor */}
+      {/* EDITOR */}
       <div
         className={`flex flex-col rounded-lg border transition ${
           isEditorFocused
@@ -390,13 +365,12 @@ export default function PostEditorInner({
             : "border-gray-300 dark:border-gray-500"
         }`}
       >
-        <div className="flex-1 relative max-h-[300px] overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 relative max-h-[300px] overflow-y-auto">
           <EditorContent editor={editor} />
         </div>
 
-        {/* Character Counter */}
         <div
-          className={`text-right text-xs px-4 py-1 border-t border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm ${
+          className={`text-right text-xs px-4 py-1 border-t ${
             charCount >= MAX_CHARS
               ? "text-red-500"
               : "text-gray-500 dark:text-gray-400"

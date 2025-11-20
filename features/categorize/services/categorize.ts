@@ -39,7 +39,7 @@ export async function categorize(content: string): Promise<CategoryResult[]> {
   if (!response.ok) {
     const err = await response.text();
     console.error("❌ HF error:", err);
-    throw new Error("Categorization failed");
+    throw new Error("Categorization failed: " + err);
   }
 
   const result = await response.json();
