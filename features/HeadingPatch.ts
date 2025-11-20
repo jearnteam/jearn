@@ -1,21 +1,32 @@
-import { Extension } from "@tiptap/core";
+import { Extension, type CommandProps } from "@tiptap/core";
 import type { Level } from "@tiptap/extension-heading";
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    headingPatch: {
+      setHeadingLevel: (attrs: { level: Level }) => ReturnType;
+    };
+  }
+}
 
 export const HeadingPatch = Extension.create({
   name: "headingPatch",
 
   addCommands() {
     return {
-      toggleHeading:
+      setHeadingLevel:
         (attrs: { level: Level }) =>
-        ({ editor, chain }) => {
-          // Already same level → convert to paragraph
-          if (editor.isActive("heading", { level: attrs.level })) {
-            return chain().setParagraph().run();
+        ({ editor, chain }: CommandProps) => {
+          const isSame = editor.isActive("heading", {
+            level: attrs.level,
+          });
+
+          if (isSame) {
+            // No toggle back to paragraph
+            return true;
           }
 
-          // Switch to heading WITHOUT calling toggleHeading() again
-          return chain().setNode("heading", attrs).run();
+          return chain().toggleHeading(attrs).run();
         },
     };
   },

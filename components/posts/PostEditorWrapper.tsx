@@ -107,7 +107,6 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
         <PostEditorInner
           value={value}
           placeholder={placeholder}
-          compact={compact}
           onReady={handleReady}
         />
       </div>

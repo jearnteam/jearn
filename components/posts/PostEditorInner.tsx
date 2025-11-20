@@ -20,19 +20,18 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Heading from "@tiptap/extension-heading";
 import HardBreak from "@tiptap/extension-hard-break";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
-import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 
+import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 import { HeadingPatch } from "@/features/HeadingPatch";
 import type { Level } from "@tiptap/extension-heading";
 
 import { Extension } from "@tiptap/core";
 
-/* -------------------------------------------------------------------------- */
-/* ZERO WIDTH REMOVAL */
-/* -------------------------------------------------------------------------- */
+/* ----------------------- ZERO WIDTH REMOVAL ----------------------- */
 export const RemoveZeroWidthChars = Extension.create({
   name: "removeZeroWidthChars",
   addProseMirrorPlugins() {
@@ -54,9 +53,7 @@ export const RemoveZeroWidthChars = Extension.create({
   },
 });
 
-/* -------------------------------------------------------------------------- */
-/* CHARACTER COUNT */
-/* -------------------------------------------------------------------------- */
+/* ------------------------ CHARACTER COUNT ------------------------ */
 function countCharactersWithMath(doc: any) {
   let count = 0;
 
@@ -85,13 +82,39 @@ export const TextLimitPlugin = new Plugin({
   },
 });
 
-/* -------------------------------------------------------------------------- */
-/* COMPONENT */
-/* -------------------------------------------------------------------------- */
+/**
+ * Notion-style Enter:
+ * - Inside heading → split, then next block = paragraph
+ * - In other blocks → let default behavior handle it
+ */
+const SafeHeadingEnterFix = Extension.create({
+  name: "safeHeadingEnterFix",
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: ({ editor }) => {
+        const { $from } = editor.state.selection;
+
+        // Only intercept Enter inside a heading
+        if ($from.parent.type.name !== "heading") return false;
+
+        return editor
+          .chain()
+          .focus()
+          .splitBlock() // create the new empty block
+          .insertContent("<p></p>") // replace heading’s new block with paragraph
+          .run();
+      },
+    };
+  },
+});
+
+/* ----------------------------- COMPONENT ----------------------------- */
 
 interface PostEditorInnerProps {
   value: string;
   placeholder?: string;
+  compact?: boolean;
   onReady?: (editor: Editor) => void;
 }
 
@@ -107,36 +130,51 @@ export default function PostEditorInner({
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [charCount, setCharCount] = useState(0);
 
-  /* -------------------------------------------------------------------------- */
-  /* EDITOR INIT */
-  /* -------------------------------------------------------------------------- */
   const editor = useEditor({
     extensions: [
+      // Schema
       Document,
       Paragraph,
       Text,
 
+      // Headings + custom behavior
       Heading.configure({ levels: [1, 2, 3] }),
-      HeadingPatch,
+      HeadingPatch, // /h1, /h2, /h3 + setHeadingLevel
+      HorizontalRule,
 
-      HardBreak.configure({
-        keepMarks: true,
-      }),
+      // Shift+Enter hard break (optional, Notion-like)
+      HardBreak.configure({ keepMarks: true }),
 
-      NoRulesStarterKit.configure({ heading: false }),
+      // HR input rule, no Enter override
+      NoRulesStarterKit,
 
+      // Notion-style Enter inside headings
+      SafeHeadingEnterFix,
+
+      // Marks
       Bold,
       Italic,
       Underline,
       Strike,
       Code,
 
+      // Custom nodes / extensions
       Tag,
       MathExtension,
       RemoveZeroWidthChars,
 
+      // Placeholder
       Placeholder.configure({ placeholder }),
+
+      // Character limit plugin
+      Extension.create({
+        name: "limitExtension",
+        addProseMirrorPlugins() {
+          return [TextLimitPlugin];
+        },
+      }),
     ],
+
     content: value?.trim() || "<p></p>",
 
     editorProps: {
@@ -153,18 +191,16 @@ export default function PostEditorInner({
     immediatelyRender: false,
   });
 
-  /* Pass editor instance upward */
+  /* Pass editor upward */
   useEffect(() => {
     if (editor && onReady) onReady(editor);
-  }, [editor]);
+  }, [editor, onReady]);
 
-  /* Focus events */
+  /* Focus state */
   useEffect(() => {
     if (!editor) return;
-
     const f = () => setIsEditorFocused(true);
     const b = () => setIsEditorFocused(false);
-
     editor.on("focus", f);
     editor.on("blur", b);
     return () => {
@@ -173,7 +209,7 @@ export default function PostEditorInner({
     };
   }, [editor]);
 
-  /* Track selection for floating menu */
+  /* Track selection */
   useEffect(() => {
     if (!editor) return;
 
@@ -196,7 +232,6 @@ export default function PostEditorInner({
     if (!editor || !menuRef.current) return;
 
     let raf: number;
-
     const el = document.createElement("div");
     document.body.appendChild(el);
 
@@ -214,10 +249,8 @@ export default function PostEditorInner({
     const update = () => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return instance.hide();
-
       const range = sel.getRangeAt(0);
       if (range.collapsed) return instance.hide();
-
       instance.setProps({
         getReferenceClientRect: () => range.getBoundingClientRect(),
       });
@@ -247,9 +280,8 @@ export default function PostEditorInner({
 
   if (!editor) return null;
 
-  /* helper with non-null assertions */
+  /* Restore selection for toolbar actions */
   const withRestore = (fn: (chain: any) => any) => {
-    if (!editor) return;
     let chain = editor.chain().focus();
     if (lastSelRef.current) {
       chain = chain.setTextSelection(lastSelRef.current);
@@ -271,13 +303,13 @@ export default function PostEditorInner({
             key={lv}
             onClick={() =>
               withRestore((c) =>
-                c.toggleHeading({
+                c.setHeadingLevel({
                   level: lv,
                 })
               )
             }
             className={`px-2 py-1 rounded ${
-              editor!.isActive("heading", { level: lv })
+              editor.isActive("heading", { level: lv })
                 ? "bg-gray-200 dark:bg-gray-700"
                 : "hover:bg-gray-100 dark:hover:bg-gray-700"
             }`}
@@ -289,7 +321,7 @@ export default function PostEditorInner({
         <button
           onClick={() => withRestore((c) => c.toggleBold())}
           className={`px-2 py-1 rounded ${
-            editor!.isActive("bold")
+            editor.isActive("bold")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -300,9 +332,9 @@ export default function PostEditorInner({
         <button
           onClick={() => withRestore((c) => c.toggleItalic())}
           className={`px-2 py-1 rounded ${
-            editor!.isActive("italic")
+            editor.isActive("italic")
               ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover-bg-gray-700"
+              : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
         >
           I
@@ -311,7 +343,7 @@ export default function PostEditorInner({
         <button
           onClick={() => withRestore((c) => c.toggleUnderline())}
           className={`px-2 py-1 rounded ${
-            editor!.isActive("underline")
+            editor.isActive("underline")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -322,7 +354,7 @@ export default function PostEditorInner({
         <button
           onClick={() => withRestore((c) => c.toggleStrike())}
           className={`px-2 py-1 rounded ${
-            editor!.isActive("strike")
+            editor.isActive("strike")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -334,7 +366,7 @@ export default function PostEditorInner({
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => withRestore((c) => c.toggleCode())}
           className={`px-2 py-1 rounded ${
-            editor!.isActive("code")
+            editor.isActive("code")
               ? "bg-gray-200 dark:bg-gray-700"
               : "hover:bg-gray-100 dark:hover:bg-gray-700"
           }`}
@@ -346,7 +378,7 @@ export default function PostEditorInner({
           onClick={() => {
             const sel = window.getSelection()?.toString();
             if (!sel?.trim()) return;
-            const { from, to } = editor!.state.selection;
+            const { from, to } = editor.state.selection;
             withRestore((c) =>
               c.deleteRange({ from, to }).insertMath(sel.trim())
             );
@@ -357,7 +389,7 @@ export default function PostEditorInner({
         </button>
       </div>
 
-      {/* EDITOR */}
+      {/* Editor */}
       <div
         className={`flex flex-col rounded-lg border transition ${
           isEditorFocused
