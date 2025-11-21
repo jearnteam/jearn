@@ -7,7 +7,15 @@ import {
   useState,
   useEffect,
 } from "react";
-import { MoreVertical, ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
+import {
+  MoreVertical,
+  ArrowBigUp,
+  MessageCircle,
+  Share2,
+  Pencil,
+  Trash2,
+  Flag,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import dayjs from "dayjs";
@@ -17,6 +25,7 @@ import Link from "next/link";
 import SharePostModal from "@/components/common/SharePostModal";
 import type { Post } from "@/types/post";
 import { rememberTx } from "@/lib/recentTx";
+import { useTranslation } from "react-i18next";
 
 dayjs.extend(relativeTime);
 
@@ -41,6 +50,8 @@ export default function PostItem({
 }: PostItemProps) {
   const { user } = useCurrentUser();
   const userId = user?._id ?? "";
+
+  const { t } = useTranslation();
 
   const [postState, setPostState] = useState(post);
 
@@ -277,7 +288,7 @@ export default function PostItem({
             </div>
           </Link>
 
-          {/* MENU (edit/delete for owner, report for others) */}
+          {/* MENU (edit/delete/report) */}
           {userId && (
             <div className="relative" ref={menuRef}>
               <button
@@ -293,34 +304,57 @@ export default function PostItem({
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
-                    className="absolute right-0 mt-2 w-40 rounded-md bg-white dark:bg-neutral-800 shadow-lg border border-gray-200 dark:border-gray-700 z-20 overflow-hidden"
+                    className="
+            absolute right-0 mt-2 w-44 z-20 
+            rounded-md overflow-hidden shadow-lg
+            bg-white dark:bg-neutral-800 
+            border border-gray-200 dark:border-gray-700
+          "
                   >
                     {userId === String(postState.authorId) ? (
                       <>
+                        {/* Edit */}
                         <button
                           onClick={handleEdit}
-                          className="block w-full px-4 py-2 text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
+                          className="
+                  flex items-center gap-3 w-full px-4 py-2 text-left
+                  hover:bg-gray-100 dark:hover:bg-neutral-700
+                  text-gray-800 dark:text-gray-200
+                "
                         >
-                          ✏️ Edit
+                          <Pencil className="w-4 h-4 text-blue-500" />
+                          <span>{t("edit") || "Edit"}</span>
                         </button>
+
+                        {/* Delete */}
                         <button
                           onClick={handleDelete}
-                          className="block w-full px-4 py-2 text-left text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                          className="
+                  flex items-center gap-3 w-full px-4 py-2 text-left 
+                  text-red-600 
+                  hover:bg-gray-100 dark:hover:bg-neutral-700
+                "
                         >
-                          🗑 Delete
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                          <span>{t("delete") || "Delete"}</span>
                         </button>
                       </>
                     ) : (
+                      // Report
                       <button
                         onClick={handleReport}
                         disabled={alreadyReported}
-                        className={`block w-full px-4 py-2 text-left text-yellow-600 ${
-                          alreadyReported
-                            ? "opacity-50 cursor-not-allowed"
-                            : "hover:bg-gray-100 dark:hover:bg-neutral-700"
-                        }`}
+                        className={`
+                flex items-center gap-3 w-full px-4 py-2 text-left text-yellow-600
+                ${
+                  alreadyReported
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                }
+              `}
                       >
-                        ⚠️ {alreadyReported ? "Reported" : "Report"}
+                        <Flag className="w-4 h-4 text-yellow-500" />
+                        <span>{alreadyReported ? (t("reported") || "Reported") : (t("report") || "Report")}</span>
                       </button>
                     )}
                   </motion.div>
@@ -430,7 +464,7 @@ export default function PostItem({
               onClick={() => setShareOpen(true)}
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
             >
-              <Share2 size={18} /> Share
+              <Share2 size={18} /> {t("share") || "Share"}
             </button>
           )}
         </div>

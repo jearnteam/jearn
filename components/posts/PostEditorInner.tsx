@@ -31,7 +31,7 @@ import type { Level } from "@tiptap/extension-heading";
 
 import { Extension } from "@tiptap/core";
 
-/* ----------------------- ZERO WIDTH REMOVAL ----------------------- */
+/* ----------------------- ZERO WIDTH ----------------------- */
 export const RemoveZeroWidthChars = Extension.create({
   name: "removeZeroWidthChars",
   addProseMirrorPlugins() {
@@ -39,9 +39,10 @@ export const RemoveZeroWidthChars = Extension.create({
       new Plugin({
         props: {
           handlePaste(view, event) {
-            const text = event.clipboardData?.getData("text/plain") ?? "";
-            const clean = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
-            view.dispatch(view.state.tr.insertText(clean));
+            const clean = event.clipboardData
+              ?.getData("text/plain")
+              ?.replace(/[\u200B-\u200D\uFEFF]/g, "");
+            view.dispatch(view.state.tr.insertText(clean || ""));
             return true;
           },
           transformPastedHTML(html) {
@@ -53,21 +54,17 @@ export const RemoveZeroWidthChars = Extension.create({
   },
 });
 
-/* ------------------------ CHARACTER COUNT ------------------------ */
+/* ----------------------- CHARACTER LIMIT ----------------------- */
 function countCharactersWithMath(doc: any) {
   let count = 0;
-
   doc.descendants((node: any) => {
     if (node.type?.name === "math") {
       count += (node.attrs?.latex || "").length;
       return false;
     }
-    if (node.isText) {
-      count += node.text.replace(/\u200B/g, "").length;
-    }
+    if (node.isText) count += node.text.length;
     return true;
   });
-
   return count;
 }
 
@@ -76,34 +73,20 @@ const MAX_CHARS = 20000;
 export const TextLimitPlugin = new Plugin({
   key: new PluginKey("textLimit"),
   filterTransaction(tr) {
-    const nextDoc = tr.doc;
-    const count = countCharactersWithMath(nextDoc);
-    return count <= MAX_CHARS;
+    return countCharactersWithMath(tr.doc) <= MAX_CHARS;
   },
 });
 
-/**
- * Notion-style Enter:
- * - Inside heading → split, then next block = paragraph
- * - In other blocks → let default behavior handle it
- */
+/* ----------------------- NOTION Enter ----------------------- */
 const SafeHeadingEnterFix = Extension.create({
   name: "safeHeadingEnterFix",
-
   addKeyboardShortcuts() {
     return {
       Enter: ({ editor }) => {
         const { $from } = editor.state.selection;
-
-        // Only intercept Enter inside a heading
         if ($from.parent.type.name !== "heading") return false;
 
-        return editor
-          .chain()
-          .focus()
-          .splitBlock() // create the new empty block
-          .insertContent("<p></p>") // replace heading’s new block with paragraph
-          .run();
+        return editor.chain().focus().splitBlock().setNode("paragraph").run();
       },
     };
   },
@@ -129,46 +112,30 @@ export default function PostEditorInner({
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [charCount, setCharCount] = useState(0);
+  const [, forceRerender] = useState({}); // <--- 🔥 forces toolbar re-render
 
   const editor = useEditor({
     extensions: [
-      // Schema
       Document,
       Paragraph,
       Text,
-
-      // Headings + custom behavior
       Heading.configure({ levels: [1, 2, 3] }),
-      HeadingPatch, // /h1, /h2, /h3 + setHeadingLevel
+      HeadingPatch,
       HorizontalRule,
-
-      // Shift+Enter hard break (optional, Notion-like)
-      HardBreak.configure({ keepMarks: true }),
-
-      // HR input rule, no Enter override
-      NoRulesStarterKit,
-
-      // Notion-style Enter inside headings
       SafeHeadingEnterFix,
-
-      // Marks
+      HardBreak.configure({ keepMarks: true }),
+      NoRulesStarterKit,
       Bold,
       Italic,
       Underline,
       Strike,
       Code,
-
-      // Custom nodes / extensions
       Tag,
       MathExtension,
       RemoveZeroWidthChars,
-
-      // Placeholder
       Placeholder.configure({ placeholder }),
-
-      // Character limit plugin
       Extension.create({
-        name: "limitExtension",
+        name: "limitPlugin",
         addProseMirrorPlugins() {
           return [TextLimitPlugin];
         },
@@ -191,12 +158,12 @@ export default function PostEditorInner({
     immediatelyRender: false,
   });
 
-  /* Pass editor upward */
+  /* Editor ready callback */
   useEffect(() => {
     if (editor && onReady) onReady(editor);
-  }, [editor, onReady]);
+  }, [editor]);
 
-  /* Focus state */
+  /* Focus */
   useEffect(() => {
     if (!editor) return;
     const f = () => setIsEditorFocused(true);
@@ -209,13 +176,14 @@ export default function PostEditorInner({
     };
   }, [editor]);
 
-  /* Track selection */
+  /* Track selection for restore */
   useEffect(() => {
     if (!editor) return;
 
     const update = () => {
       const { from, to } = editor.state.selection;
       lastSelRef.current = { from, to };
+      forceRerender({}); // <--- force floating menu UI update
     };
 
     editor.on("selectionUpdate", update);
@@ -227,7 +195,7 @@ export default function PostEditorInner({
     };
   }, [editor]);
 
-  /* Floating toolbar */
+  /* Floating menu */
   useEffect(() => {
     if (!editor || !menuRef.current) return;
 
@@ -249,30 +217,36 @@ export default function PostEditorInner({
     const update = () => {
       const sel = window.getSelection();
       if (!sel || sel.rangeCount === 0) return instance.hide();
+
       const range = sel.getRangeAt(0);
       if (range.collapsed) return instance.hide();
+
       instance.setProps({
         getReferenceClientRect: () => range.getBoundingClientRect(),
       });
+
+      // FIXED — TypeScript-safe
+      instance.setContent(menuRef.current!);
+
       instance.show();
     };
 
-    const debounced = () => {
+    const deb = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(update);
     };
 
-    editor.on("selectionUpdate", debounced);
-    editor.on("transaction", debounced);
-    document.addEventListener("selectionchange", debounced);
+    editor.on("selectionUpdate", deb);
+    editor.on("transaction", deb);
+    document.addEventListener("selectionchange", deb);
 
     tippyRef.current = instance;
 
     return () => {
       cancelAnimationFrame(raf);
-      editor.off("selectionUpdate", debounced);
-      editor.off("transaction", debounced);
-      document.removeEventListener("selectionchange", debounced);
+      editor.off("selectionUpdate", deb);
+      editor.off("transaction", deb);
+      document.removeEventListener("selectionchange", deb);
       instance.destroy();
       document.body.removeChild(el);
     };
@@ -280,13 +254,13 @@ export default function PostEditorInner({
 
   if (!editor) return null;
 
-  /* Restore selection for toolbar actions */
-  const withRestore = (fn: (chain: any) => any) => {
-    let chain = editor.chain().focus();
+  /* Restore selection */
+  const withRestore = (fn: (c: any) => any) => {
+    let c = editor.chain().focus();
     if (lastSelRef.current) {
-      chain = chain.setTextSelection(lastSelRef.current);
+      c = c.setTextSelection(lastSelRef.current);
     }
-    fn(chain).run();
+    fn(c).run();
   };
 
   const levels: Level[] = [1, 2, 3];
@@ -296,7 +270,8 @@ export default function PostEditorInner({
       {/* Floating Toolbar */}
       <div
         ref={menuRef}
-        className="flex gap-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md p-1"
+        className="flex gap-2 bg-white dark:bg-neutral-900 border border-gray-300 
+             dark:border-gray-700 rounded-xl shadow-lg p-2 backdrop-blur-md"
       >
         {levels.map((lv) => (
           <button
@@ -308,11 +283,12 @@ export default function PostEditorInner({
                 })
               )
             }
-            className={`px-2 py-1 rounded ${
-              editor.isActive("heading", { level: lv })
-                ? "bg-gray-200 dark:bg-gray-700"
-                : "hover:bg-gray-100 dark:hover:bg-gray-700"
-            }`}
+            className={`px-3 py-1.5 rounded-md font-semibold text-sm transition
+        ${
+          editor.isActive("heading", { level: lv })
+            ? "bg-black text-white dark:bg-white dark:text-black shadow"
+            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+        }`}
           >
             H{lv}
           </button>
@@ -320,44 +296,48 @@ export default function PostEditorInner({
 
         <button
           onClick={() => withRestore((c) => c.toggleBold())}
-          className={`px-2 py-1 rounded ${
-            editor.isActive("bold")
-              ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
+          className={`px-3 py-1.5 rounded-md font-semibold text-sm transition
+      ${
+        editor.isActive("bold")
+          ? "bg-black text-white dark:bg-white dark:text-black shadow"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+      }`}
         >
           B
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleItalic())}
-          className={`px-2 py-1 rounded ${
-            editor.isActive("italic")
-              ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
+          className={`px-3 py-1.5 rounded-md italic font-semibold text-sm transition
+      ${
+        editor.isActive("italic")
+          ? "bg-black text-white dark:bg-white dark:text-black shadow"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+      }`}
         >
           I
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleUnderline())}
-          className={`px-2 py-1 rounded ${
-            editor.isActive("underline")
-              ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
+          className={`px-3 py-1.5 rounded-md underline font-semibold text-sm transition
+      ${
+        editor.isActive("underline")
+          ? "bg-black text-white dark:bg-white dark:text-black shadow"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+      }`}
         >
           U
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleStrike())}
-          className={`px-2 py-1 rounded ${
-            editor.isActive("strike")
-              ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
+          className={`px-3 py-1.5 rounded-md line-through font-semibold text-sm transition
+      ${
+        editor.isActive("strike")
+          ? "bg-black text-white dark:bg-white dark:text-black shadow"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+      }`}
         >
           S
         </button>
@@ -365,11 +345,12 @@ export default function PostEditorInner({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => withRestore((c) => c.toggleCode())}
-          className={`px-2 py-1 rounded ${
-            editor.isActive("code")
-              ? "bg-gray-200 dark:bg-gray-700"
-              : "hover:bg-gray-100 dark:hover:bg-gray-700"
-          }`}
+          className={`px-3 py-1.5 rounded-md font-mono text-sm transition
+      ${
+        editor.isActive("code")
+          ? "bg-black text-white dark:bg-white dark:text-black shadow"
+          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+      }`}
         >
           {"</>"}
         </button>
@@ -383,7 +364,8 @@ export default function PostEditorInner({
               c.deleteRange({ from, to }).insertMath(sel.trim())
             );
           }}
-          className="px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+          className="px-3 py-1.5 rounded-md transition
+      text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           ∑
         </button>

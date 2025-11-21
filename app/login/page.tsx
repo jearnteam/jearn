@@ -1,34 +1,31 @@
 "use client";
 
-import { useSession, signIn } from "next-auth/react";
+import { useSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 
 export default function LoginPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  // If already authenticated and user presses "Continue"
   const handleContinue = () => {
-    router.replace("/"); // go back to main page
+    router.replace("/");
   };
 
-  // If user wants to log in with another Google account
   const handleSwitchAccount = () => {
-    signIn("google", { prompt: "select_account", callbackUrl: "/" });
+    signIn("google", {
+      callbackUrl: "/",
+      prompt: "select_account",
+      hd: "*",
+    });
   };
 
-  // If not logged in, just show normal login
   const handleLogin = () => {
-    signIn("google", { callbackUrl: "/" });
+    signIn("google", {
+      callbackUrl: "/",
+      prompt: "select_account",
+      hd: "*",
+    });
   };
-
-  // When already authenticated and directly visiting /login → auto redirect
-  useEffect(() => {
-    if (status === "authenticated") {
-      // Do nothing automatically here — let user choose instead
-    }
-  }, [status]);
 
   if (status === "loading") {
     return (
@@ -38,20 +35,16 @@ export default function LoginPage() {
     );
   }
 
-  // ✅ Already logged in → show "Continue" or "Switch"
+  // Already logged in - let user continue or switch
   if (status === "authenticated" && session?.user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
         <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-lg text-center w-80">
-          {session.user.picture ? (
-            <img
-              src={session.user.picture}
-              alt="avatar"
-              className="w-16 h-16 rounded-full mx-auto mb-3 object-cover object-center"
-            />
-          ) : (
-            <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-3" />
-          )}
+          <img
+            src={session.user.picture || ""}
+            className="w-16 h-16 rounded-full mx-auto mb-3 object-cover"
+          />
+
           <h1 className="text-lg font-semibold mb-1">
             Welcome back, {session.user.name || "User"}!
           </h1>
@@ -59,14 +52,14 @@ export default function LoginPage() {
 
           <button
             onClick={handleContinue}
-            className="w-full mb-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+            className="w-full mb-3 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
           >
             Continue as {session.user.name || "this account"}
           </button>
 
           <button
             onClick={handleSwitchAccount}
-            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            className="w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Sign in with another account
           </button>
@@ -82,17 +75,24 @@ export default function LoginPage() {
     );
   }
 
-  // 🚪 Not logged in → show basic Google Sign-in
+  // Not logged in
   return (
     <div className="flex flex-col items-center justify-center h-screen">
       <div className="bg-white dark:bg-gray-900 p-8 rounded-2xl shadow-lg text-center w-80">
         <h1 className="text-2xl font-bold mb-6">Sign in to JEARN</h1>
         <button
           onClick={handleLogin}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Sign in with Google
         </button>
+
+        <p className="text-xs text-gray-400 mt-4">
+          Already logged into wrong account?{" "}
+          <a href="/logout" className="underline hover:text-gray-600">
+            Logout first
+          </a>
+        </p>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+// @/features/HeadingPatch.ts
 import { Extension, type CommandProps } from "@tiptap/core";
 import type { Level } from "@tiptap/extension-heading";
 
@@ -17,16 +18,14 @@ export const HeadingPatch = Extension.create({
       setHeadingLevel:
         (attrs: { level: Level }) =>
         ({ editor, chain }: CommandProps) => {
-          const isSame = editor.isActive("heading", {
-            level: attrs.level,
-          });
+          const isSame = editor.isActive("heading", { level: attrs.level });
 
           if (isSame) {
-            // No toggle back to paragraph
-            return true;
+            return chain().setParagraph().run();
           }
 
-          return chain().toggleHeading(attrs).run();
+          // Always convert new block to heading
+          return chain().setNode("heading", attrs).run();
         },
     };
   },

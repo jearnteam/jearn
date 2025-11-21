@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import LangSwitcher from "@/components/LangSwitcher";
-import { signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 import Avatar from "@/components/Avatar";
 import { useState, useEffect } from "react";
@@ -31,13 +30,9 @@ export default function Navbar() {
     router.push("/"); // SPA navigation
   };
 
-  const handleLogin = () => {
-    router.push("/api/auth/signin");
-  };
-
-  const handleLogout = async () => {
-    await signOut({ redirect: false });
-    router.replace("/");
+  // 🚪 Redirect to local logout page (which handles Google + NextAuth logout)
+  const handleLogout = () => {
+    router.push("/logout");
   };
 
   return (
@@ -93,12 +88,7 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <button
-              onClick={handleLogin}
-              className="text-sm px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-            >
-              {t("login") || "Login"}
-            </button>
+            null
           )}
         </div>
       </div>
