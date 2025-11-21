@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import CommentForm from "@/components/comments/CommentForm";
 import Portal from "@/components/common/Portal";
 import type { PostEditorWrapperRef } from "@/components/posts/PostEditorWrapper";
-
+import { useTranslation } from "react-i18next";
 
 export default function CommentFormModal({
   parentId,
@@ -16,6 +16,8 @@ export default function CommentFormModal({
   onClose: () => void;
   onSubmitted: (content: string) => void; // ✅ Add type
 }) {
+  const { t } = useTranslation();
+
   const dialogRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<PostEditorWrapperRef | null>(null);
   const [openCount] = useState(() => Date.now()); // stable key per open
@@ -53,7 +55,9 @@ export default function CommentFormModal({
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold">Write a Comment</h2>
+            <h2 className="text-lg font-semibold">
+              {t("writeComment") || "Write a Comment"}
+            </h2>
             <button
               onClick={onClose}
               className="text-xl text-gray-600 hover:text-gray-800 dark:hover:text-gray-300"

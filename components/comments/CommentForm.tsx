@@ -6,6 +6,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import PostEditorWrapper, {
   PostEditorWrapperRef,
 } from "@/components/posts/PostEditorWrapper";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   parentId: string;
@@ -26,6 +27,8 @@ export default function CommentForm({
   editorRefFromParent,
   autoFocus = false,
 }: Props) {
+  const { t } = useTranslation();
+
   const innerRef = useRef<PostEditorWrapperRef>(null);
   const editorRef = editorRefFromParent ?? innerRef;
 
@@ -91,7 +94,7 @@ export default function CommentForm({
             disabled={submitting}
             className="text-sm text-gray-600 hover:underline dark:text-gray-300"
           >
-            Cancel
+            {t("cancel") || "Cancel"}
           </button>
         )}
         <button

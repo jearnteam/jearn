@@ -6,6 +6,7 @@ import CommentList from "./CommentList";
 import CommentFormModal from "./CommentFormModal";
 import type { Post } from "@/types/post";
 import { useComments } from "@/features/comments/hooks/useComments";
+import { useTranslation } from "react-i18next";
 
 export default function CommentClientSection({
   comments,
@@ -14,6 +15,8 @@ export default function CommentClientSection({
   comments: Post[];
   postId: string;
 }) {
+  const { t } = useTranslation();
+
   const [isCommentOpen, setIsCommentOpen] = useState(false);
 
   const { addComment } = useComments(comments, postId);
@@ -26,12 +29,12 @@ export default function CommentClientSection({
   return (
     <section id="comments" className="space-y-5">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Comments</h3>
+        <h3 className="text-lg font-semibold">{t("comments") || "Comments"}</h3>
         <button
           onClick={() => setIsCommentOpen(true)}
           className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
         >
-          + Add Comment
+          + {t("addComment") || "Add Comment"}
         </button>
       </div>
 

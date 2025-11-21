@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import dayjs from "dayjs";
+import "dayjs/locale/ja";
+import dayjs from "@/lib/dayjs-burmese";
 import relativeTime from "dayjs/plugin/relativeTime";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import Link from "next/link";
@@ -26,6 +27,7 @@ import SharePostModal from "@/components/common/SharePostModal";
 import type { Post } from "@/types/post";
 import { rememberTx } from "@/lib/recentTx";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
 dayjs.extend(relativeTime);
 
@@ -283,7 +285,7 @@ export default function PostItem({
                 {postState.authorName || ""}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {dayjs(postState.createdAt).fromNow()}
+                {dayjs(postState.createdAt).locale(i18n.language).fromNow()}
               </p>
             </div>
           </Link>
@@ -354,7 +356,11 @@ export default function PostItem({
               `}
                       >
                         <Flag className="w-4 h-4 text-yellow-500" />
-                        <span>{alreadyReported ? (t("reported") || "Reported") : (t("report") || "Report")}</span>
+                        <span>
+                          {alreadyReported
+                            ? t("reported") || "Reported"
+                            : t("report") || "Report"}
+                        </span>
                       </button>
                     )}
                   </motion.div>
@@ -383,12 +389,14 @@ export default function PostItem({
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
               {postState.categories.map((cat) => (
                 <Link
-                  key={cat}
-                  href={`/category/${encodeURIComponent(cat)}`}
+                  key={cat.id}
+                  href={`/category/${encodeURIComponent(cat.id)}`}
                   scroll={false}
-                  className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-600/50 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
+                  className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 
+                     dark:bg-blue-600/50 dark:text-blue-200 
+                     hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
                 >
-                  {cat}
+                  {i18n.language === "ja" ? cat.jname : cat.name}
                 </Link>
               ))}
             </div>

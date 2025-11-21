@@ -11,6 +11,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { rememberTx } from "@/lib/recentTx";
 import EditCommentModal from "@/components/comments/EditCommentModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import { t } from "i18next";
 
 dayjs.extend(relativeTime);
 
@@ -150,13 +151,13 @@ export default function CommentItem({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
                     >
-                      ✏️ Edit
+                      ✏️ {t("edit") || "Edit"}
                     </button>
                     <button
                       onClick={() => setShowDeleteModal(true)}
                       className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
                     >
-                      🗑 Delete
+                      🗑 {t("delete") || "Delete"}
                     </button>
                   </motion.div>
                 )}

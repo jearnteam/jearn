@@ -1,9 +1,12 @@
 import GoogleProvider from "next-auth/providers/google";
 import clientPromise from "@/lib/mongodb";
+import { MongoDBAdapter } from "@auth/mongodb-adapter";   // ⭐ NEW
 import type { AuthOptions, SessionStrategy } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 
 export const authConfig: AuthOptions = {
+  adapter: MongoDBAdapter(clientPromise),   // ⭐ NEW adapter
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_ID!,
@@ -40,15 +43,15 @@ export const authConfig: AuthOptions = {
         const insertFields = {
           createdAt: now,
           bio: "",
-          name: user.name || null, // ✅ Only set on first login
-          picture: null, // user uploads later
+          name: user.name || null,
+          picture: null,
           pictureMime: "image/jpeg",
         };
 
         await db.collection("users").updateOne(
           { email: user.email },
           existingUser
-            ? { $set: updateFields } // ✅ Skip setting name if user exists
+            ? { $set: updateFields }
             : { $set: updateFields, $setOnInsert: insertFields },
           { upsert: true }
         );
@@ -63,7 +66,6 @@ export const authConfig: AuthOptions = {
     // 🧠 2. Whenever the JWT is created or refreshed
     async jwt({ token, account }): Promise<JWT> {
       try {
-        // force-cast because token is `unknown` by default
         const t = token as Record<string, any>;
 
         if (account) {

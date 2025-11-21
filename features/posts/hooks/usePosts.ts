@@ -9,18 +9,16 @@ export function usePosts() {
   const [loading, setLoading] = useState(true);
   const sseRef = useRef<EventSource | null>(null);
 
-  /** --------------------------------------
-   *  Initial Load — run ONLY once
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                 INITIAL FETCH                               */
+  /* -------------------------------------------------------------------------- */
   const fetchPosts = useCallback(async () => {
     try {
       const res = await fetch("/api/posts", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch posts");
-      const data = await res.json();
 
-      const topLevel = Array.isArray(data)
-        ? data.filter((p) => !p.parentId)
-        : data.posts || [];
+      const data = await res.json();
+      const topLevel = data.filter((p: Post) => !p.parentId);
 
       setPosts(topLevel);
     } catch (err) {
@@ -30,13 +28,13 @@ export function usePosts() {
     }
   }, []);
 
-  /** --------------------------------------
-   *  SSE setup — run only once
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                 SSE CONNECTION                              */
+  /* -------------------------------------------------------------------------- */
   useEffect(() => {
-    fetchPosts(); // Initial fetch only
+    fetchPosts();
 
-    const es = new EventSource("/api/stream");
+    const es = new EventSource("/api/stream"); // MUST MATCH YOUR SSE ROUTE
     sseRef.current = es;
 
     es.onmessage = (event) => {
@@ -47,7 +45,7 @@ export function usePosts() {
           switch (data.type) {
             case "new-post":
               if (!data.post || data.post.parentId) return prev;
-              if (prev.some((x) => x._id === data.post._id)) return prev;
+              if (prev.some((p) => p._id === data.post._id)) return prev;
               return [data.post, ...prev];
 
             case "update-post":
@@ -78,7 +76,10 @@ export function usePosts() {
             case "update-comment-count":
               return prev.map((p) =>
                 p._id === data.parentId
-                  ? { ...p, commentCount: (p.commentCount ?? 0) + data.delta }
+                  ? {
+                      ...p,
+                      commentCount: (p.commentCount ?? 0) + data.delta,
+                    }
                   : p
               );
 
@@ -87,21 +88,23 @@ export function usePosts() {
           }
         });
       } catch {
-        console.warn("⚠️ Malformed SSE payload");
+        console.warn("⚠️ SSE parse error");
       }
     };
 
-    es.onerror = () => console.warn("⚠️ SSE Error — Retrying...");
+    es.onerror = () => {
+      console.warn("⚠️ SSE Error — retrying…");
+    };
 
     return () => {
       es.close();
       sseRef.current = null;
     };
-  }, []); // ❗ EMPTY DEP ARRAY — runs once
+  }, [fetchPosts]);
 
-  /** --------------------------------------
-   *  Add Post
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                               ADD POST                                      */
+  /* -------------------------------------------------------------------------- */
   const addPost = useCallback(
     async (
       title: string,
@@ -109,29 +112,24 @@ export function usePosts() {
       authorId: string | null,
       categories: string[]
     ) => {
-      if (!authorId) {
-        console.warn("Skipping post: no author ID");
-        return;
-      }
+      if (!authorId) return;
+
       await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, content, authorId, categories }),
-      }).catch((err) => console.error("🔥 addPost error:", err));
+      }).catch((e) => console.error("🔥 addPost error:", e));
     },
     []
   );
 
-  /** --------------------------------------
-   *  Edit Post
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                 EDIT POST                                   */
+  /* -------------------------------------------------------------------------- */
   const editPost = useCallback(
     async (id: string, title: string, content: string) => {
-      // optimistic update
       setPosts((prev) =>
-        prev.map((p) =>
-          p._id === id ? { ...p, title, content } : p
-        )
+        prev.map((p) => (p._id === id ? { ...p, title, content } : p))
       );
 
       const res = await fetch("/api/posts", {
@@ -145,9 +143,9 @@ export function usePosts() {
     [fetchPosts]
   );
 
-  /** --------------------------------------
-   *  Delete Post
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                               DELETE POST                                   */
+  /* -------------------------------------------------------------------------- */
   const deletePost = useCallback(async (id: string) => {
     await fetch("/api/posts", {
       method: "DELETE",
@@ -156,9 +154,9 @@ export function usePosts() {
     }).catch((e) => console.error("❌ deletePost:", e));
   }, []);
 
-  /** --------------------------------------
-   *  Upvote Post
-   * -------------------------------------- */
+  /* -------------------------------------------------------------------------- */
+  /*                                 UPVOTE POST                                 */
+  /* -------------------------------------------------------------------------- */
   const upvotePost = useCallback(
     async (id: string, userId: string, txId: string) => {
       await fetch(`/api/posts/${id}/upvote`, {
@@ -170,6 +168,9 @@ export function usePosts() {
     []
   );
 
+  /* -------------------------------------------------------------------------- */
+  /*                                   RETURN                                    */
+  /* -------------------------------------------------------------------------- */
   return {
     posts,
     loading,

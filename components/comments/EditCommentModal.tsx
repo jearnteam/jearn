@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal"; // ✅ Use the same working portal
 import PostEditorWrapper, { PostEditorWrapperRef } from "@/components/posts/PostEditorWrapper";
+import { useTranslation } from "react-i18next";
 
 interface EditCommentModalProps {
   comment: { _id: string; content: string };
@@ -13,6 +14,8 @@ interface EditCommentModalProps {
 }
 
 export default function EditCommentModal({ comment, onClose, onSave }: EditCommentModalProps) {
+  const {t} = useTranslation();
+  
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const [saving, setSaving] = useState(false);
 
@@ -52,7 +55,7 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
             onClick={(e) => e.stopPropagation()} // ✅ Prevent click inside from closing modal
           >
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">Edit Comment</h2>
+              <h2 className="text-lg font-semibold">{t("editComment") || "Edit Comment"}</h2>
               <button onClick={onClose} className="text-lg hover:text-gray-600">✕</button>
             </div>
 
@@ -65,7 +68,7 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
                 onClick={onClose}
                 className="px-4 py-2 rounded-md bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600"
               >
-                Cancel
+                {t("cancel") || "Cancel"}
               </button>
               <button
                 disabled={saving}

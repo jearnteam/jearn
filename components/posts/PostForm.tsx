@@ -7,6 +7,7 @@ import PostEditorWrapper, {
   PostEditorWrapperRef,
 } from "@/components/posts/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import i18n from "@/lib/i18n";
 
 export interface PostFormProps {
   onSubmit: (
@@ -18,7 +19,9 @@ export interface PostFormProps {
 }
 
 interface Category {
-  label: string;
+  id: string; // ObjectId
+  label: string; // e.g. "programming"
+  jname: string; // Japanese name
   score: number;
 }
 
@@ -97,11 +100,11 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   /*                          SELECT CATEGORY CLICK                             */
   /* -------------------------------------------------------------------------- */
 
-  const handleSelectCategory = (label: string) => {
+  const handleSelectCategory = (id: string) => {
     setSelected((prev) => {
-      if (prev.includes(label)) return prev.filter((x) => x !== label);
-      if (prev.length >= 3) return prev; // limit 3
-      return [...prev, label];
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 3) return prev;
+      return [...prev, id];
     });
   };
 
@@ -140,8 +143,8 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   /* -------------------------------------------------------------------------- */
 
   const ordered = [
-    ...categories.filter((c) => selected.includes(c.label)),
-    ...categories.filter((c) => !selected.includes(c.label)),
+    ...categories.filter((c) => selected.includes(c.id)),
+    ...categories.filter((c) => !selected.includes(c.id)),
   ];
 
   const visibleCats = ordered.slice(0, visibleCount);
@@ -223,7 +226,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 }}
               >
                 {visibleCats.map((cat) => {
-                  const isSelected = selected.includes(cat.label);
+                  const isSelected = selected.includes(cat.id);
 
                   return (
                     <motion.div
@@ -240,14 +243,14 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                         layout
                         whileTap={{ scale: 0.92 }}
                         whileHover={{ scale: 1.05 }}
-                        onClick={() => handleSelectCategory(cat.label)}
+                        onClick={() => handleSelectCategory(cat.id)}
                         className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
                           isSelected
                             ? "bg-blue-600 text-white shadow"
                             : "bg-gray-200 dark:bg-gray-700"
                         }`}
                       >
-                        {cat.label}
+                        {i18n.language === "ja" ? cat.jname : cat.label}
                       </motion.button>
 
                       <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">

@@ -6,13 +6,12 @@ import { broadcastSSE } from "@/lib/sse";
 
 export const runtime = "nodejs";
 
-/* -----------------------------------------
-   Helper: Enrich post with user info
------------------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                          ENRICH POST WITH USER DATA                        */
+/* -------------------------------------------------------------------------- */
 async function enrichPost(post: any, usersColl: any) {
   let user = null;
 
-  // First try authorId as ObjectId
   if (post.authorId && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
@@ -20,7 +19,6 @@ async function enrichPost(post: any, usersColl: any) {
     );
   }
 
-  // Fallback for provider_id
   if (!user && post.authorId) {
     user = await usersColl.findOne(
       { provider_id: post.authorId },
@@ -28,20 +26,16 @@ async function enrichPost(post: any, usersColl: any) {
     );
   }
 
-  // Final avatarId (user._id OR raw authorId)
   const avatarId = user?._id
-    ? String(user._id)
+    ? user._id.toString()
     : ObjectId.isValid(post.authorId)
     ? post.authorId
     : null;
 
   return {
     ...post,
-    _id: post._id?.toString?.() ?? post._id,
-
-    // 🔥 IMPORTANT: send clean authorId to FE
-    authorId: avatarId ? avatarId.toString() : null,
-
+    _id: post._id.toString(),
+    authorId: avatarId,
     authorName: user?.name ?? "Unknown",
     authorAvatar: avatarId
       ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
@@ -49,9 +43,33 @@ async function enrichPost(post: any, usersColl: any) {
   };
 }
 
-/* -----------------------------------------
-   GET — fetch top-level posts
------------------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                            ENRICH CATEGORIES SAFE                           */
+/* -------------------------------------------------------------------------- */
+async function enrichCategories(catIds: any[], categoriesColl: any) {
+  if (!Array.isArray(catIds) || catIds.length === 0) return [];
+
+  const validIds = catIds
+    .map((c) => (ObjectId.isValid(c) ? new ObjectId(c) : null))
+    .filter((x): x is ObjectId => x !== null);
+
+  if (validIds.length === 0) return [];
+
+  const docs = await categoriesColl
+    .find({ _id: { $in: validIds } })
+    .project({ name: 1, jname: 1 })
+    .toArray();
+
+  return docs.map((c: { _id: ObjectId; name: string; jname: string }) => ({
+    id: c._id.toString(),
+    name: c.name,
+    jname: c.jname,
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  GET POSTS                                 */
+/* -------------------------------------------------------------------------- */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -61,13 +79,15 @@ export async function GET(req: Request) {
     const db = client.db("jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");
+    const categoriesColl = db.collection("categories");
 
     const query: any = { parentId: null };
-    if (category) query.categories = category;
+    if (category && ObjectId.isValid(category)) {
+      query.categories = new ObjectId(category);
+    }
 
     const docs = await posts.find(query).sort({ createdAt: -1 }).toArray();
 
-    // Count comments
     const commentCounts = await posts
       .aggregate([
         { $match: { parentId: { $ne: null } } },
@@ -76,17 +96,20 @@ export async function GET(req: Request) {
       .toArray();
 
     const countMap: Record<string, number> = {};
-    commentCounts.forEach((c: any) => {
+    commentCounts.forEach((c) => {
       countMap[c._id] = c.count;
     });
 
-    // Enrich posts with user & avatar
     const enriched = await Promise.all(
       docs.map(async (p) => {
+        const safeCats = Array.isArray(p.categories) ? p.categories : [];
+        const categoryData = await enrichCategories(safeCats, categoriesColl);
+
         const enrichedPost = await enrichPost(p, users);
 
         return {
           ...enrichedPost,
+          categories: categoryData,
           commentCount: countMap[p._id.toString()] ?? 0,
         };
       })
@@ -99,6 +122,9 @@ export async function GET(req: Request) {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*                              CREATE POST / COMMENT                          */
+/* -------------------------------------------------------------------------- */
 /* -----------------------------------------
    POST — create post / comment / reply
 ----------------------------------------- */
@@ -140,6 +166,7 @@ export async function POST(req: Request) {
     const db = client.db("jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");
+    const categoriesColl = db.collection("categories");
 
     let safeParentId = parentId;
 
@@ -162,6 +189,7 @@ export async function POST(req: Request) {
       safeParentId = target.parentId || target._id.toString();
     }
 
+    // build new post doc
     const doc: any = {
       content,
       authorId,
@@ -174,15 +202,31 @@ export async function POST(req: Request) {
 
     if (isTopLevel) {
       doc.title = title;
-      doc.categories = categories;
+      doc.categories = categories.map((id: string) => new ObjectId(id));
     }
 
+    // insert
     const result = await posts.insertOne(doc);
-    const enriched = await enrichPost(
+
+    // enrich post (user info)
+    const enrichedNoCats = await enrichPost(
       { ...doc, _id: result.insertedId },
       users
     );
 
+    // enrich categories (IMPORTANT FIX)
+    let categoryData = [];
+    if (isTopLevel && Array.isArray(doc.categories)) {
+      categoryData = await enrichCategories(doc.categories, categoriesColl);
+    }
+
+    const finalPost = {
+      ...enrichedNoCats,
+      categories: categoryData,
+      commentCount: 0,
+    };
+
+    // send SSE
     const sseType = replyTo
       ? "new-reply"
       : safeParentId
@@ -192,10 +236,10 @@ export async function POST(req: Request) {
     broadcastSSE({
       type: sseType,
       txId,
-      postId: enriched._id,
-      parentId: enriched.parentId,
-      replyTo: enriched.replyTo,
-      post: enriched,
+      postId: finalPost._id,
+      parentId: finalPost.parentId,
+      replyTo: finalPost.replyTo,
+      post: finalPost,
     });
 
     if (safeParentId) {
@@ -206,16 +250,16 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({ ok: true, post: enriched });
+    return NextResponse.json({ ok: true, post: finalPost });
   } catch (err) {
     console.error("❌ POST /api/posts error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
-/* -----------------------------------------
-   PUT — Edit post / comment / reply
------------------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                                 EDIT POST                                   */
+/* -------------------------------------------------------------------------- */
 export async function PUT(req: Request) {
   try {
     const { id, title, content, txId = null } = await req.json();
@@ -252,9 +296,9 @@ export async function PUT(req: Request) {
   }
 }
 
-/* -----------------------------------------
-   DELETE — delete post + children
------------------------------------------ */
+/* -------------------------------------------------------------------------- */
+/*                                DELETE POST                                  */
+/* -------------------------------------------------------------------------- */
 export async function DELETE(req: Request) {
   try {
     const { id } = await req.json();
@@ -271,6 +315,7 @@ export async function DELETE(req: Request) {
     const children = await posts
       .find({ $or: [{ parentId: id }, { replyTo: id }] })
       .toArray();
+
     const childIds = children.map((c) => c._id.toString());
 
     await posts.deleteMany({ $or: [{ parentId: id }, { replyTo: id }] });

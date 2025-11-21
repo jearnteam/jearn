@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
+import { useTranslation } from "react-i18next";
 
 interface PostFormBoxProps {
   open: boolean;
@@ -15,6 +16,7 @@ export default function PostFormBox({
   onClose,
   onSubmit,
 }: PostFormBoxProps) {
+  const {t} = useTranslation();
   return (
     <Portal>
       <AnimatePresence>
@@ -37,7 +39,7 @@ export default function PostFormBox({
             >
               {/* Header */}
               <header className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-                <h2 className="text-lg font-semibold">Create Post</h2>
+                <h2 className="text-lg font-semibold">{t("createPost") || "Create Post"}</h2>
                 <button
                   onClick={onClose}
                   className="text-xl hover:text-gray-600 dark:hover:text-gray-300"

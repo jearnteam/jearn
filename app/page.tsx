@@ -13,6 +13,7 @@ import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import LoadingOwl from "@/components/LoadingOwl";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 
 function useShowLoginOnNewTab() {
   const router = useRouter();
@@ -26,6 +27,8 @@ function useShowLoginOnNewTab() {
 
 export default function HomePage() {
   useShowLoginOnNewTab();
+
+  const { t } = useTranslation();
 
   const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
   const mainRef = useRef<HTMLDivElement | null>(null);
@@ -143,7 +146,7 @@ export default function HomePage() {
               onClick={() => setShowPostBox(true)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition"
             >
-              + Create Post
+              + {t("createPost") || "Create Post"}
             </button>
           </aside>
 
