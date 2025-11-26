@@ -80,6 +80,7 @@ export default function PostItem({
 
   const [avatarLoaded, setAvatarLoaded] = useState(false);
 
+  const [imageNode, setImageNode] = useState<HTMLImageElement | null>(null);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,21 +101,25 @@ export default function PostItem({
     const el = contentRef.current;
     if (!el) return;
 
-    const handleImageClick = (e: any) => {
-      let target = e.target as HTMLElement;
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== "IMG") return;
 
-      if (target.tagName === "IMG") {
-        const img = target as HTMLImageElement;
+      const original = target as HTMLImageElement;
+      const clone = original.cloneNode(true) as HTMLImageElement;
 
-        // Get real source — MathRenderer sometimes rewrites attributes
-        const realSrc =
-          img.getAttribute("data-src") ||
-          img.getAttribute("src") ||
-          img.currentSrc ||
-          img.src;
+      clone.removeAttribute("width");
+      clone.removeAttribute("height");
 
-        if (realSrc) setFullscreenImage(realSrc);
-      }
+      // Make image scale up/down
+      clone.style.width = "100%";
+      clone.style.height = "100%";
+      clone.style.maxWidth = "100%";
+      clone.style.maxHeight = "100%";
+      clone.style.objectFit = "contain"; // critical
+      clone.style.display = "block";
+
+      setImageNode(clone);
     };
 
     el.addEventListener("click", handleImageClick);
@@ -514,7 +519,7 @@ export default function PostItem({
       {/* ⭐ FULLSCREEN IMAGE VIEWER */}
       <FullScreenPortal>
         <AnimatePresence>
-          {fullscreenImage && (
+          {imageNode && (
             <motion.div
               key="image-viewer"
               initial={{ opacity: 0 }}
@@ -522,38 +527,25 @@ export default function PostItem({
               exit={{ opacity: 0 }}
               className="
           fixed inset-0 
-          bg-black/70 
-          backdrop-blur-sm
+          bg-black/70
           z-[999999999]
           flex items-center justify-center
-          p-6 md:p-10       /* padding around the image */
-        "
-              onClick={() => setFullscreenImage(null)}
+          px-[10vw] py-[10vh]
+          "
+              onClick={() => setImageNode(null)}
             >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
+              <div
+                ref={(container) => {
+                  if (container && imageNode) {
+                    container.innerHTML = "";
+                    container.appendChild(imageNode);
+                  }
+                }}
                 className="
-            max-w-full 
-            max-h-full 
+            w-full h-full                    /* fill available space */
             flex items-center justify-center
           "
-              >
-                <img
-                  src={fullscreenImage}
-                  className="
-              rounded-xl
-              shadow-2xl
-              object-contain
-              max-w-[90vw]      /* image stays inside viewport with padding */
-              max-h-[85vh]
-              min-w-[90vw]      /* makes small images bigger! */
-              min-h-[85vh]
-              transition-all
-            "
-                />
-              </motion.div>
+              />
             </motion.div>
           )}
         </AnimatePresence>

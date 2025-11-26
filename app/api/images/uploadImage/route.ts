@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { GridFSBucket } from "mongodb";
+
+export const runtime = "nodejs";
+
+export const config = {
+  api: {
+    bodyParser: false,
+    sizeLimit: "100mb", // Cloudflare max anyway
+  },
+};
 
 export async function POST(req: Request) {
   try {
@@ -14,27 +23,41 @@ export async function POST(req: Request) {
       );
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
+    // Read file into a Buffer
+    const buffer = Buffer.from(await file.arrayBuffer());
 
+    // MongoDB client
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
-    const imagesColl = db.collection("images");
-    const id = new ObjectId();
-
-    await imagesColl.insertOne({
-      _id: id,
-      data: bytes,
-      type: file.type || "application/octet-stream",
-      createdAt: new Date(),
+    // GridFS bucket
+    const bucket = new GridFSBucket(db, {
+      bucketName: "images",
     });
+
+    // Create upload stream
+    const uploadStream = bucket.openUploadStream(file.name || "upload", {
+      contentType: file.type || "application/octet-stream",
+    });
+
+    // Write the buffer to the stream
+    uploadStream.end(buffer);
+
+    // Wait until upload completes
+    await new Promise((resolve, reject) => {
+      uploadStream.on("finish", resolve);
+      uploadStream.on("error", reject);
+    });
+
+    // The file ID
+    const fileId = uploadStream.id.toString();
 
     return NextResponse.json({
       ok: true,
-      id: id.toString(),
+      id: fileId, // send to frontend
     });
   } catch (err) {
-    console.error("🔥 Error in /api/uploadImage:", err);
+    console.error("🔥 GridFS upload error:", err);
     return NextResponse.json(
       { ok: false, error: "Server error" },
       { status: 500 }
