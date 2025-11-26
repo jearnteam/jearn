@@ -27,6 +27,7 @@ import type { Post } from "@/types/post";
 import { rememberTx } from "@/lib/recentTx";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import FullScreenPortal from "@/features/FullScreenPortal";
 
 dayjs.extend(relativeTime);
 
@@ -79,6 +80,8 @@ export default function PostItem({
 
   const [avatarLoaded, setAvatarLoaded] = useState(false);
 
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+
   useEffect(() => {
     const img = new Image();
     img.src = realAvatarUrl;
@@ -92,6 +95,31 @@ export default function PostItem({
       setMeasureDone(true);
     }
   }, [postState.content]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
+    const handleImageClick = (e: any) => {
+      let target = e.target as HTMLElement;
+
+      if (target.tagName === "IMG") {
+        const img = target as HTMLImageElement;
+
+        // Get real source — MathRenderer sometimes rewrites attributes
+        const realSrc =
+          img.getAttribute("data-src") ||
+          img.getAttribute("src") ||
+          img.currentSrc ||
+          img.src;
+
+        if (realSrc) setFullscreenImage(realSrc);
+      }
+    };
+
+    el.addEventListener("click", handleImageClick);
+    return () => el.removeEventListener("click", handleImageClick);
+  }, []);
 
   const shouldTruncate =
     contentHeight && contentHeight > LINE_HEIGHT * LINE_THRESHOLD;
@@ -483,6 +511,53 @@ export default function PostItem({
         }/posts/${postState._id}`}
         onCancel={() => setShareOpen(false)}
       />
+      {/* ⭐ FULLSCREEN IMAGE VIEWER */}
+      <FullScreenPortal>
+        <AnimatePresence>
+          {fullscreenImage && (
+            <motion.div
+              key="image-viewer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="
+          fixed inset-0 
+          bg-black/70 
+          backdrop-blur-sm
+          z-[999999999]
+          flex items-center justify-center
+          p-6 md:p-10       /* padding around the image */
+        "
+              onClick={() => setFullscreenImage(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                className="
+            max-w-full 
+            max-h-full 
+            flex items-center justify-center
+          "
+              >
+                <img
+                  src={fullscreenImage}
+                  className="
+              rounded-xl
+              shadow-2xl
+              object-contain
+              max-w-[90vw]      /* image stays inside viewport with padding */
+              max-h-[85vh]
+              min-w-[90vw]      /* makes small images bigger! */
+              min-h-[85vh]
+              transition-all
+            "
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </FullScreenPortal>
     </>
   );
 }
