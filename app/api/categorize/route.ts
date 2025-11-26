@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { categorize } from "@/features/categorize/services/categorize";
 import clientPromise from "@/lib/mongodb";
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("AI Timeout")), ms)
+    ),
+  ]);
+}
+
 export async function POST(req: Request) {
   try {
     const { content } = await req.json();
@@ -10,29 +19,58 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing content" }, { status: 400 });
     }
 
-    // 1) Run AI categorization (returns labels + score)
-    const aiResult = await categorize(content);
-    // aiResult = [{ label: "programming", score: 0.92 }, ...]
-
-    // 2) MongoDB connect
+    // Connect DB
     const client = await clientPromise;
     const db = client.db("jearn");
     const categoriesColl = db.collection("categories");
 
-    // 3) Fetch all categories from DB once
-    const allCategories = await categoriesColl.find().toArray();
+    // Fetch all categories once
+    const allCategories = await categoriesColl
+      .find()
+      .project({
+        _id: 1,
+        name: 1,
+        jname: 1,
+        myname: 1,
+      })
+      .toArray();
 
-    // 4) Map AI labels → category_id
+    let aiResult: any[] = [];
+
+    try {
+      // AI must finish in 5 seconds
+      aiResult = await withTimeout<any[]>(categorize(content), 5000);
+    } catch (err) {
+      console.warn("⚠️ AI slow or failed → FULL fallback category list");
+
+      // 🔥 FULL fallback list (shuffled), not just 5
+      const shuffled = [...allCategories].sort(() => Math.random() - 0.5);
+
+      const fallback = shuffled.map((cat) => ({
+        id: cat._id.toString(),
+        label: cat.name,
+        jname: cat.jname,
+        myname: cat.myname,
+        score: 0, // give each random score
+      }));
+
+      return NextResponse.json(fallback);
+    }
+
+    // ---------------------------
+    // AI SUCCESS → map labels
+    // ---------------------------
+
     const enriched = aiResult
       .map((c: any) => {
         const match = allCategories.find((cat) => cat.name === c.label);
-
         if (!match) return null;
 
         return {
           id: match._id.toString(),
           label: match.name,
           jname: match.jname,
+          myname: match.myname,
           score: c.score,
         };
       })
