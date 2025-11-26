@@ -62,7 +62,7 @@ export default function Dashboard() {
   if (!hydrated || !activeTab)
     return (
       <div className="fixed inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        Loading dashboard...
+        {t("loadingDashboard") || "Loading dashboard"}...
       </div>
     );
 

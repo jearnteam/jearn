@@ -7,7 +7,7 @@ import { broadcastSSE } from "@/lib/sse";
 export const runtime = "nodejs";
 
 /* -------------------------------------------------------------------------- */
-/*                          ENRICH POST WITH USER DATA                        */
+/*                         ENRICH POST WITH USER DATA                         */
 /* -------------------------------------------------------------------------- */
 async function enrichPost(post: any, usersColl: any) {
   let user = null;
@@ -44,7 +44,7 @@ async function enrichPost(post: any, usersColl: any) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            ENRICH CATEGORIES SAFE                           */
+/*                        ENRICH CATEGORY OBJECTS (FULL)                      */
 /* -------------------------------------------------------------------------- */
 async function enrichCategories(catIds: any[], categoriesColl: any) {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
@@ -57,13 +57,14 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
 
   const docs = await categoriesColl
     .find({ _id: { $in: validIds } })
-    .project({ name: 1, jname: 1 })
+    .project({ name: 1, jname: 1, myname: 1 })
     .toArray();
 
-  return docs.map((c: { _id: ObjectId; name: string; jname: string }) => ({
+  return docs.map((c: any) => ({
     id: c._id.toString(),
     name: c.name,
     jname: c.jname,
+    myname: c.myname ?? "", // ensure field always exists
   }));
 }
 
@@ -82,12 +83,14 @@ export async function GET(req: Request) {
     const categoriesColl = db.collection("categories");
 
     const query: any = { parentId: null };
+
     if (category && ObjectId.isValid(category)) {
       query.categories = new ObjectId(category);
     }
 
     const docs = await posts.find(query).sort({ createdAt: -1 }).toArray();
 
+    // comment count map
     const commentCounts = await posts
       .aggregate([
         { $match: { parentId: { $ne: null } } },
@@ -102,8 +105,10 @@ export async function GET(req: Request) {
 
     const enriched = await Promise.all(
       docs.map(async (p) => {
-        const safeCats = Array.isArray(p.categories) ? p.categories : [];
-        const categoryData = await enrichCategories(safeCats, categoriesColl);
+        const categoryData = await enrichCategories(
+          Array.isArray(p.categories) ? p.categories : [],
+          categoriesColl
+        );
 
         const enrichedPost = await enrichPost(p, users);
 
@@ -125,9 +130,6 @@ export async function GET(req: Request) {
 /* -------------------------------------------------------------------------- */
 /*                              CREATE POST / COMMENT                          */
 /* -------------------------------------------------------------------------- */
-/* -----------------------------------------
-   POST — create post / comment / reply
------------------------------------------ */
 export async function POST(req: Request) {
   try {
     const {
@@ -170,13 +172,10 @@ export async function POST(req: Request) {
 
     let safeParentId = parentId;
 
-    // If replying
+    // reply logic
     if (replyTo) {
       if (!ObjectId.isValid(replyTo)) {
-        return NextResponse.json(
-          { error: "Invalid replyTo id" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Invalid replyTo id" }, { status: 400 });
       }
 
       const target = await posts.findOne({ _id: new ObjectId(replyTo) });
@@ -189,7 +188,6 @@ export async function POST(req: Request) {
       safeParentId = target.parentId || target._id.toString();
     }
 
-    // build new post doc
     const doc: any = {
       content,
       authorId,
@@ -205,16 +203,13 @@ export async function POST(req: Request) {
       doc.categories = categories.map((id: string) => new ObjectId(id));
     }
 
-    // insert
     const result = await posts.insertOne(doc);
 
-    // enrich post (user info)
     const enrichedNoCats = await enrichPost(
       { ...doc, _id: result.insertedId },
       users
     );
 
-    // enrich categories (IMPORTANT FIX)
     let categoryData = [];
     if (isTopLevel && Array.isArray(doc.categories)) {
       categoryData = await enrichCategories(doc.categories, categoriesColl);
@@ -226,7 +221,6 @@ export async function POST(req: Request) {
       commentCount: 0,
     };
 
-    // send SSE
     const sseType = replyTo
       ? "new-reply"
       : safeParentId
@@ -258,7 +252,7 @@ export async function POST(req: Request) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 EDIT POST                                   */
+/*                                EDIT POST                                   */
 /* -------------------------------------------------------------------------- */
 export async function PUT(req: Request) {
   try {
@@ -297,7 +291,7 @@ export async function PUT(req: Request) {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                DELETE POST                                  */
+/*                                DELETE POST                                 */
 /* -------------------------------------------------------------------------- */
 export async function DELETE(req: Request) {
   try {

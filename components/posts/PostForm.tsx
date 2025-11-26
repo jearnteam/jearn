@@ -276,7 +276,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                     onClick={() => setVisibleCount((v) => v + 5)}
                     className="text-blue-500 hover:underline"
                   >
-                    Show more
+                    {t("showMore") || "Show more"}
                   </button>
                 )}
 
@@ -286,7 +286,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                     onClick={() => setVisibleCount(5)}
                     className="text-blue-500 hover:underline"
                   >
-                    Show less
+                    {t("showLess") || "Show less"}
                   </button>
                 )}
               </motion.div>
@@ -308,12 +308,13 @@ export default function PostForm({ onSubmit }: PostFormProps) {
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
             <span>
-              Posting as{" "}
+              {t("postingAsBefore") ?? "Posting as"}{" "}
               {user ? (
                 <strong>{user.name}</strong>
               ) : (
                 <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
               )}
+              {" "}{t("postingAsAfter") ?? ""}
             </span>
           </div>
 
@@ -327,7 +328,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 onClick={handleCheckCategories}
                 className="px-6 py-2 rounded-lg bg-yellow-500 text-white disabled:bg-gray-400 transition"
               >
-                {checking ? "Checking..." : "Check Categories"}
+                {checking ? "Checking..." : (t("checkCategories") || "Check Categories")}
               </motion.button>
             ) : (
               <motion.button
@@ -337,7 +338,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 disabled={submitting || loading || selected.length === 0}
                 className="px-6 py-2 rounded-lg bg-blue-600 text-white disabled:bg-gray-400 transition"
               >
-                {submitting ? "Submitting..." : "Submit"}
+                {submitting ? "Submitting..." : (t("submit") || "Submit")}
               </motion.button>
             )}
           </div>

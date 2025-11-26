@@ -6,8 +6,8 @@ import type { Post } from "@/types/post";
 import PostItem from "@/components/posts/PostItem";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import EditPostModal from "@/components/posts/EditPostModal"; // ✅ Edit Modal
-import DeleteConfirmModal from "@/components/common/DeleteConfirmModal"; // ✅ Delete Modal
+import EditPostModal from "@/components/posts/EditPostModal";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 
 interface Props {
   initialPost: Post;
@@ -17,15 +17,20 @@ export default function FullPostClient({ initialPost }: Props) {
   const [post, setPost] = useState<Post>(initialPost);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+
   const router = useRouter();
   const { user } = useCurrentUser();
 
+  /* ---------------------------------------------------------
+   * SSE Listener — live sync post (including categories)
+   * --------------------------------------------------------- */
   useEffect(() => {
     const es = new EventSource("/api/stream");
 
     es.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
+      // live upvote sync
       if (data.type === "upvote-post" && data.postId === post._id) {
         setPost((prev) =>
           prev
@@ -42,19 +47,24 @@ export default function FullPostClient({ initialPost }: Props) {
         );
       }
 
+      // live update sync (title, content, categories)
       if (data.type === "update-post" && data.post._id === post._id) {
         setPost((prev) => ({ ...prev, ...data.post }));
       }
 
+      // deleted
       if (data.type === "delete-post" && data.id === post._id) {
         router.push("/");
       }
     };
 
-    es.onerror = () => console.warn("⚠️ SSE connection error in FullPostClient");
+    es.onerror = () => console.warn("⚠️ SSE error (FullPostClient)");
     return () => es.close();
   }, [post._id, router]);
 
+  /* ---------------------------------------------------------
+   * Upvote
+   * --------------------------------------------------------- */
   const handleUpvote = useCallback(async () => {
     if (!user?.uid || !post._id) return;
 
@@ -67,19 +77,25 @@ export default function FullPostClient({ initialPost }: Props) {
     if (!res.ok) console.error("❌ Upvote error", await res.text());
   }, [post._id, user?.uid]);
 
-  // ✏️ Open Edit Modal
+  /* ---------------------------------------------------------
+   * Edit
+   * --------------------------------------------------------- */
   const handleEditClick = useCallback(() => {
     setEditOpen(true);
   }, []);
 
-  // 💾 Update post via API
   const handleSavePost = useCallback(
-    async (title: string, content: string) => {
+    async (title: string, content: string, categories?: string[]) => {
       if (!post._id) return;
 
       const res = await fetch(`/api/posts`, {
         method: "PUT",
-        body: JSON.stringify({ id: post._id, title, content }),
+        body: JSON.stringify({
+          id: post._id,
+          title,
+          content,
+          categories,
+        }),
         headers: { "Content-Type": "application/json" },
       });
 
@@ -91,12 +107,13 @@ export default function FullPostClient({ initialPost }: Props) {
     [post._id]
   );
 
-  // 🗑 Open Delete Confirm Modal
+  /* ---------------------------------------------------------
+   * Delete
+   * --------------------------------------------------------- */
   const handleDeleteClick = useCallback(() => {
     setDeleteOpen(true);
   }, []);
 
-  // ✅ Execute delete on confirm
   const handleConfirmDelete = useCallback(async () => {
     if (!post._id) return;
 
@@ -109,14 +126,18 @@ export default function FullPostClient({ initialPost }: Props) {
     if (res.ok) router.push("/");
   }, [post._id, router]);
 
+  /* ---------------------------------------------------------
+   * RENDER
+   * --------------------------------------------------------- */
   return (
     <>
+      {/* Full-size post view */}
       <PostItem
         post={post}
         fullView
         onUpvote={handleUpvote}
         onEdit={handleEditClick}
-        onDelete={handleDeleteClick} // ✅ Opens confirm modal
+        onDelete={handleDeleteClick}
       />
 
       {/* ✏️ Edit Modal */}
@@ -128,7 +149,7 @@ export default function FullPostClient({ initialPost }: Props) {
         />
       )}
 
-      {/* 🗑 Delete Confirm Modal */}
+      {/* 🗑 Delete Confirm */}
       <DeleteConfirmModal
         open={deleteOpen}
         onCancel={() => setDeleteOpen(false)}

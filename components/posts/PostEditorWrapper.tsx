@@ -31,7 +31,7 @@ const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
 });
 
 const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
-  ({ value, placeholder = "Start typing...", compact = false, onUpdate }, ref) => {
+  ({ value, placeholder, compact = false, onUpdate }, ref) => {
     const editorRef = useRef<Editor | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const [isFocused, setIsFocused] = useState(false);

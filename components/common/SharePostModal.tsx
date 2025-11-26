@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Link2, Check } from "lucide-react";
 import Portal from "./Portal";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function SharePostModal({
   open,
@@ -14,6 +15,8 @@ export default function SharePostModal({
   postUrl: string;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
+
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -44,7 +47,7 @@ export default function SharePostModal({
               <div className="flex items-center gap-3 mb-4">
                 <Link2 size={24} className="text-blue-500 dark:text-blue-400" />
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  Share this post
+                  {t("shareThisPost") || "Share this post"}
                 </h3>
               </div>
 
@@ -58,7 +61,7 @@ export default function SharePostModal({
                   className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-neutral-800
                              text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-neutral-700"
                 >
-                  Cancel
+                  {t("cancel") || "Cancel"}
                 </button>
 
                 <button
@@ -68,11 +71,11 @@ export default function SharePostModal({
                 >
                   {copied ? (
                     <>
-                      <Check size={18} /> Copied!
+                      <Check size={18} /> {t("copied") || "Copied!"}
                     </>
                   ) : (
                     <>
-                      <Link2 size={18} /> Copy Link
+                      <Link2 size={18} /> {t("copyLink") || "Copy Link"}
                     </>
                   )}
                 </button>

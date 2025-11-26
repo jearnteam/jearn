@@ -50,7 +50,7 @@ export default function Navbar() {
             className="text-4xl font-bold"
             style={{ fontFamily: "var(--font-shadows-into-light)" }}
           >
-            JEARN
+            {t("jearn") || "JEARN"}
           </h1>
         </div>
 
@@ -62,7 +62,7 @@ export default function Navbar() {
             <div className="w-8 h-8" />
           ) : loading ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">
-              Loading...
+              {t("loading") || "Loading"}...
             </span>
           ) : user ? (
             <>

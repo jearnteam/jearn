@@ -3,6 +3,7 @@
 import { usePosts } from "@/features/posts/hooks/usePosts";
 import PostList from "@/components/posts/PostList";
 import type { Post } from "@/types/post";
+import { t } from "i18next";
 
 export default function PostsMain() {
   const {
@@ -16,7 +17,7 @@ export default function PostsMain() {
   if (loading) {
     return (
       <div className="text-center py-6 text-gray-500 dark:text-gray-300">
-        Loading...
+        {t("loading") || "Loading"}...
       </div>
     );
   }

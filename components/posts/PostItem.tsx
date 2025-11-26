@@ -389,14 +389,18 @@ export default function PostItem({
             <div className="flex flex-wrap gap-1 mt-2 mb-1">
               {postState.categories.map((cat) => (
                 <Link
-                  key={cat.id}
-                  href={`/category/${encodeURIComponent(cat.id)}`}
+                  key={cat.id} // <-- ADD THIS LINE
+                  href={`/category/${encodeURIComponent(cat.name)}`}
                   scroll={false}
                   className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 
-                     dark:bg-blue-600/50 dark:text-blue-200 
-                     hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
+              dark:bg-blue-600/50 dark:text-blue-200 
+              hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
                 >
-                  {i18n.language === "ja" ? cat.jname : cat.name}
+                  {i18n.language === "ja"
+                    ? cat.jname
+                    : i18n.language === "my"
+                    ? cat.myname
+                    : cat.name}
                 </Link>
               ))}
             </div>
@@ -427,7 +431,9 @@ export default function PostItem({
             onClick={toggleExpand}
             className="mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
-            {expanded ? "Show Less ▲" : "Show More ▼"}
+            {expanded
+              ? `${t("showLess") || "Show Less"} ▲`
+              : `${t("showMore") || "Show More"} ▼`}
           </button>
         )}
 

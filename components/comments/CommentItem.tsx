@@ -228,7 +228,7 @@ export default function CommentItem({
           }`}
         >
           <Reply size={12} strokeWidth={2} />
-          <span className="text-sm">reply</span>
+          <span className="text-sm">{t("reply") || "reply"}</span>
         </button>
       )}
 

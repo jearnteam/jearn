@@ -6,8 +6,11 @@ import FullPostClient from "@/components/posts/FullPostClient";
 import CommentClientSection from "@/components/comments/CommentClientSection";
 import LoadingOwl from "@/components/LoadingOwl";
 import type { Post } from "@/types/post";
+import { useTranslation } from "react-i18next";
 
 export default function PostPage() {
+  const {t} = useTranslation();
+  
   const { id } = useParams() as { id: string };
 
   const [post, setPost] = useState<Post | null>(null);
@@ -50,7 +53,7 @@ export default function PostPage() {
           <div className="w-48 h-48 flex items-center justify-center">
             <LoadingOwl />
           </div>
-          <p className="text-lg font-medium mt-4">Loading post...</p>
+          <p className="text-lg font-medium mt-4">{t("loadingPosts") || "Loading post"}...</p>
         </div>
       </div>
     );

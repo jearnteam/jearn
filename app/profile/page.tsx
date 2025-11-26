@@ -5,8 +5,11 @@ import { useEffect, useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
+
   const { user, loading, update } = useCurrentUser();
   const { status } = useSession();
   const router = useRouter();
@@ -80,7 +83,6 @@ export default function ProfilePage() {
       setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
 
       alert("Profile updated!");
-
     } catch (err) {
       console.error(err);
       alert("Failed to update profile");
@@ -90,17 +92,24 @@ export default function ProfilePage() {
   }
 
   if (sessionLoading)
-    return <div className="flex justify-center items-center h-[70vh]">Loading...</div>;
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        {t("loading") || "Loading"}...
+      </div>
+    );
 
   if (!user)
-    return <div className="flex justify-center items-center h-[70vh]">Not logged in</div>;
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        {t("notLoggedIn") || "Not logged in"}
+      </div>
+    );
 
   return (
     <div className="max-w-lg mx-auto mt-24 px-4">
-      <h1 className="text-2xl font-bold mb-6">Profile Settings</h1>
+      <h1 className="text-2xl font-bold mb-6">{t("profileSettings") || "Profile Settings"}</h1>
 
       <div className="flex flex-col gap-4">
-
         {/* Avatar upload */}
         <div className="flex items-center gap-4">
           <div
@@ -121,14 +130,14 @@ export default function ProfilePage() {
           />
         </div>
 
-        <label>Name</label>
+        <label>{t("name") || "Name"}</label>
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="border rounded px-2 py-1"
         />
 
-        <label>Bio</label>
+        <label>{t("bio") || "Bio"}</label>
         <textarea
           value={bio}
           onChange={(e) => setBio(e.target.value)}
@@ -140,7 +149,7 @@ export default function ProfilePage() {
           disabled={uploading}
           className="px-4 py-2 rounded bg-blue-600 text-white"
         >
-          {uploading ? "Saving..." : "Save Changes"}
+          {uploading ? "Saving..." : (t("saveChanges") || "Save Changes")}
         </button>
       </div>
     </div>

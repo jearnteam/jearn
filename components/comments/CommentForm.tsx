@@ -110,7 +110,7 @@ export default function CommentForm({
               : "Posting..."
             : mode === "reply"
             ? "Reply"
-            : "Post Comment"}
+            : (t("postComment") || "Post Comment")}
         </button>
       </div>
     </form>

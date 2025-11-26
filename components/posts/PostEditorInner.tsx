@@ -30,6 +30,7 @@ import { HeadingPatch } from "@/features/HeadingPatch";
 import type { Level } from "@tiptap/extension-heading";
 
 import { Extension } from "@tiptap/core";
+import { useTranslation } from "react-i18next";
 
 /* ----------------------- ZERO WIDTH ----------------------- */
 export const RemoveZeroWidthChars = Extension.create({
@@ -103,17 +104,24 @@ interface PostEditorInnerProps {
 
 export default function PostEditorInner({
   value,
-  placeholder = "Start typing...",
+  placeholder,
   onReady,
 }: PostEditorInnerProps) {
+  const { t } = useTranslation();
+
+  const finalPlaceholder =
+    placeholder ??
+    (t("placeholder") || "Type in what you wanna share with everyone");
+
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
   const lastSelRef = useRef<{ from: number; to: number } | null>(null);
 
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [charCount, setCharCount] = useState(0);
-  const [, forceRerender] = useState({}); // <--- 🔥 forces toolbar re-render
+  const [, forceRerender] = useState({});
 
+  /* ------------------------- EDITOR INIT -------------------------- */
   const editor = useEditor({
     extensions: [
       Document,
@@ -133,7 +141,9 @@ export default function PostEditorInner({
       Tag,
       MathExtension,
       RemoveZeroWidthChars,
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({
+        placeholder: finalPlaceholder,
+      }),
       Extension.create({
         name: "limitPlugin",
         addProseMirrorPlugins() {
@@ -148,6 +158,7 @@ export default function PostEditorInner({
       attributes: {
         class:
           "tiptap ProseMirror w-full h-full text-base text-gray-800 dark:text-gray-200 overflow-y-auto p-2",
+        "data-placeholder": finalPlaceholder,
       },
     },
 
@@ -158,12 +169,12 @@ export default function PostEditorInner({
     immediatelyRender: false,
   });
 
-  /* Editor ready callback */
+  /* Editor ready */
   useEffect(() => {
     if (editor && onReady) onReady(editor);
-  }, [editor]);
+  }, [editor, onReady]);
 
-  /* Focus */
+  /* Focus handling */
   useEffect(() => {
     if (!editor) return;
     const f = () => setIsEditorFocused(true);
@@ -176,14 +187,14 @@ export default function PostEditorInner({
     };
   }, [editor]);
 
-  /* Track selection for restore */
+  /* Selection tracking */
   useEffect(() => {
     if (!editor) return;
 
     const update = () => {
       const { from, to } = editor.state.selection;
       lastSelRef.current = { from, to };
-      forceRerender({}); // <--- force floating menu UI update
+      forceRerender({});
     };
 
     editor.on("selectionUpdate", update);
@@ -195,7 +206,7 @@ export default function PostEditorInner({
     };
   }, [editor]);
 
-  /* Floating menu */
+  /* Floating menu (tippy) */
   useEffect(() => {
     if (!editor || !menuRef.current) return;
 
@@ -212,6 +223,7 @@ export default function PostEditorInner({
       appendTo: document.body,
       hideOnClick: false,
       zIndex: 20000,
+      maxWidth: "none", // ⭐ allow full width, don't shrink box
     });
 
     const update = () => {
@@ -225,9 +237,7 @@ export default function PostEditorInner({
         getReferenceClientRect: () => range.getBoundingClientRect(),
       });
 
-      // FIXED — TypeScript-safe
       instance.setContent(menuRef.current!);
-
       instance.show();
     };
 
@@ -270,8 +280,14 @@ export default function PostEditorInner({
       {/* Floating Toolbar */}
       <div
         ref={menuRef}
-        className="flex gap-2 bg-white dark:bg-neutral-900 border border-gray-300 
-             dark:border-gray-700 rounded-xl shadow-lg p-2 backdrop-blur-md"
+        className="
+          inline-flex flex-nowrap items-center gap-2
+          whitespace-nowrap
+          bg-white dark:bg-neutral-900 
+          border border-gray-300 dark:border-gray-700 
+          rounded-xl shadow-lg px-3 py-2 backdrop-blur-md
+          min-w-[360px]
+        "
       >
         {levels.map((lv) => (
           <button
@@ -283,12 +299,12 @@ export default function PostEditorInner({
                 })
               )
             }
-            className={`px-3 py-1.5 rounded-md font-semibold text-sm transition
-        ${
-          editor.isActive("heading", { level: lv })
-            ? "bg-black text-white dark:bg-white dark:text-black shadow"
-            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-        }`}
+            className={`shrink-0 px-3 py-1.5 rounded-md font-semibold text-sm transition
+              ${
+                editor.isActive("heading", { level: lv })
+                  ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                  : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
           >
             H{lv}
           </button>
@@ -296,48 +312,48 @@ export default function PostEditorInner({
 
         <button
           onClick={() => withRestore((c) => c.toggleBold())}
-          className={`px-3 py-1.5 rounded-md font-semibold text-sm transition
-      ${
-        editor.isActive("bold")
-          ? "bg-black text-white dark:bg-white dark:text-black shadow"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
+          className={`shrink-0 px-3 py-1.5 rounded-md font-semibold text-sm transition
+            ${
+              editor.isActive("bold")
+                ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
         >
           B
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleItalic())}
-          className={`px-3 py-1.5 rounded-md italic font-semibold text-sm transition
-      ${
-        editor.isActive("italic")
-          ? "bg-black text-white dark:bg-white dark:text-black shadow"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
+          className={`shrink-0 px-3 py-1.5 rounded-md italic font-semibold text-sm transition
+            ${
+              editor.isActive("italic")
+                ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
         >
           I
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleUnderline())}
-          className={`px-3 py-1.5 rounded-md underline font-semibold text-sm transition
-      ${
-        editor.isActive("underline")
-          ? "bg-black text-white dark:bg-white dark:text-black shadow"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
+          className={`shrink-0 px-3 py-1.5 rounded-md underline font-semibold text-sm transition
+            ${
+              editor.isActive("underline")
+                ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
         >
           U
         </button>
 
         <button
           onClick={() => withRestore((c) => c.toggleStrike())}
-          className={`px-3 py-1.5 rounded-md line-through font-semibold text-sm transition
-      ${
-        editor.isActive("strike")
-          ? "bg-black text-white dark:bg-white dark:text-black shadow"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
+          className={`shrink-0 px-3 py-1.5 rounded-md line-through font-semibold text-sm transition
+            ${
+              editor.isActive("strike")
+                ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
         >
           S
         </button>
@@ -345,12 +361,12 @@ export default function PostEditorInner({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => withRestore((c) => c.toggleCode())}
-          className={`px-3 py-1.5 rounded-md font-mono text-sm transition
-      ${
-        editor.isActive("code")
-          ? "bg-black text-white dark:bg-white dark:text-black shadow"
-          : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-      }`}
+          className={`shrink-0 px-3 py-1.5 rounded-md font-mono text-sm transition
+            ${
+              editor.isActive("code")
+                ? "bg-black text-white dark:bg-white dark:text-black shadow"
+                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+            }`}
         >
           {"</>"}
         </button>
@@ -364,8 +380,7 @@ export default function PostEditorInner({
               c.deleteRange({ from, to }).insertMath(sel.trim())
             );
           }}
-          className="px-3 py-1.5 rounded-md transition
-      text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+          className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           ∑
         </button>

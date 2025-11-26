@@ -1,34 +1,46 @@
-import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import type { Post } from "@/types/post";
-import CategoryPostListClient from "@/components/category/CategoryPostListClient"; // ✅ clean import
+import CategoryPageClient from "./CategoryPageClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
+export default async function CategoryPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+
+  // ⭐ The ONLY reliable method in Next.js 15 SSR
   const hdrs = await headers();
   const host = hdrs.get("host");
   const protocol = host?.includes("localhost") ? "http" : "https";
   const baseUrl = `${protocol}://${host}`;
-  const category = decodeURIComponent(params.slug);
 
-  const res = await fetch(`${baseUrl}/api/posts?category=${encodeURIComponent(category)}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    console.error("❌ Failed to fetch category posts:", res.status);
-    notFound();
+  console.log("⭐ Using baseUrl:", baseUrl);
+
+  const catRes = await fetch(
+    `${baseUrl}/api/category/by-name/${encodeURIComponent(slug)}`,
+    {
+      cache: "no-store",
+    }
+  );
+
+  if (!catRes.ok) {
+    console.error("❌ Category not found:", slug);
+    return <h1 className="text-center mt-20">Category Not Found</h1>;
   }
 
-  const posts: Post[] = await res.json();
+  const category = await catRes.json();
 
-  return (
-    <main className="max-w-4xl mx-auto px-4 py-6 mt-16">
-      <h1 className="text-3xl font-bold mb-6 text-blue-600 dark:text-blue-400">
-        {category}
-      </h1>
-      <CategoryPostListClient posts={posts} />
-    </main>
+  const postsRes = await fetch(
+    `${baseUrl}/api/posts?category=${encodeURIComponent(category.id)}`,
+    {
+      cache: "no-store",
+    }
   );
+
+  const posts = postsRes.ok ? await postsRes.json() : [];
+
+  return <CategoryPageClient category={category} posts={posts} />;
 }

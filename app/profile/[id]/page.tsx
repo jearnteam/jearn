@@ -4,8 +4,11 @@ import { use, useState, useEffect } from "react";
 import PostList from "@/components/posts/PostList";
 import Avatar from "@/components/Avatar";
 import type { Post } from "@/types/post";
+import { useTranslation } from "react-i18next";
 
 export default function UserPage({ params }: any) {
+  const {t} = useTranslation();
+  
   const { id } = use(params) as { id: string };
 
   const [user, setUser] = useState<any>(null);
@@ -44,10 +47,10 @@ export default function UserPage({ params }: any) {
 
   if (loading)
     return (
-      <div className="flex justify-center items-center h-[70vh]">Loading...</div>
+      <div className="flex justify-center items-center h-[70vh]">{t("loading") || "Loading"}...</div>
     );
 
-  if (!user) return <div className="p-4">User not found.</div>;
+  if (!user) return <div className="p-4">{t("userNotFound") || "User not found."}</div>;
 
   return (
     <div className="max-w-2xl mx-auto p-4 mt-20">
@@ -62,7 +65,7 @@ export default function UserPage({ params }: any) {
         </div>
       </div>
 
-      <h2 className="text-xl font-semibold mb-3">Posts by {user.name}</h2>
+      <h2 className="text-xl font-semibold mb-3">{t("postsByBefore") ?? "Posts by"} {user.name} {t("postsByAfter") ?? ""}</h2>
 
       {/* ⭐ No scroll div — full body scroll */}
       <PostList

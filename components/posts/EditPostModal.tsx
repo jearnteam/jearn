@@ -6,6 +6,7 @@ import Portal from "@/components/common/Portal";
 import PostEditorWrapper, {
   PostEditorWrapperRef,
 } from "@/components/posts/PostEditorWrapper";
+import { useTranslation } from "react-i18next";
 
 interface EditPostModalProps {
   post: {
@@ -22,6 +23,8 @@ export default function EditPostModal({
   onClose,
   onSave,
 }: EditPostModalProps) {
+  const { t } = useTranslation();
+
   const [title, setTitle] = useState(post.title ?? "");
   const [saving, setSaving] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
@@ -72,7 +75,7 @@ export default function EditPostModal({
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-xl font-semibold">Edit Post</h2>
+              <h2 className="text-xl font-semibold">{t("editPost") || "Edit Post"}</h2>
               <button
                 onClick={onClose}
                 className="text-xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-300"
@@ -109,7 +112,7 @@ export default function EditPostModal({
                 onClick={onClose}
                 className="px-4 py-2 rounded-lg bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600"
               >
-                Cancel
+                {t("cancel") || "Cancel"}
               </button>
               <button
                 disabled={saving || !title.trim()}
@@ -120,7 +123,7 @@ export default function EditPostModal({
                     : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? "Saving..." : (t("saveChanges") || "Save Changes")}
               </button>
             </div>
           </motion.div>
