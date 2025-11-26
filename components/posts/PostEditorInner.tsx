@@ -56,16 +56,62 @@ export const RemoveZeroWidthChars = Extension.create({
 });
 
 /* ----------------------- CHARACTER LIMIT ----------------------- */
+const ZERO_WIDTH_REGEX = /[\u200B-\u200D\uFEFF]/g;
+
 function countCharactersWithMath(doc: any) {
   let count = 0;
+  let paragraphIndex = -1;
+
   doc.descendants((node: any) => {
-    if (node.type?.name === "math") {
-      count += (node.attrs?.latex || "").length;
+    // Count paragraphs for newline logic
+    if (node.type?.name === "paragraph") {
+      paragraphIndex++;
+
+      // Clean paragraph content
+      const clean = node.textContent.replace(ZERO_WIDTH_REGEX, "");
+
+      // ❌ Do NOT count the first empty paragraph
+      if (paragraphIndex === 0) {
+        return true; // skip it
+      }
+
+      // ✔ Count empty paragraphs after first one = newline
+      if (clean.length === 0) {
+        count += 1;
+      }
+
+      return true;
+    }
+
+    // ✔ HardBreak = user pressed Enter
+    if (node.type?.name === "hardBreak") {
+      count += 1;
       return false;
     }
-    if (node.isText) count += node.text.length;
+
+    // ✔ Tag node = count full "#value"
+    if (node.type?.name === "tag") {
+      const val = (node.attrs?.value || "").replace(ZERO_WIDTH_REGEX, "");
+      count += `#${val}`.length;
+      return false;
+    }
+
+    // ✔ Math node = count LaTeX length
+    if (node.type?.name === "math") {
+      const latex = (node.attrs?.latex || "").replace(ZERO_WIDTH_REGEX, "");
+      count += latex.length;
+      return false;
+    }
+
+    // ✔ Normal text
+    if (node.isText) {
+      const clean = node.text.replace(ZERO_WIDTH_REGEX, "");
+      count += clean.length;
+    }
+
     return true;
   });
+
   return count;
 }
 

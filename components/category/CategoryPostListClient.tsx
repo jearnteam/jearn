@@ -16,7 +16,6 @@ export default function CategoryPostListClient({ posts }: Props) {
       onEdit={() => {}}
       onDelete={async () => {}}
       onUpvote={async () => ({ ok: true })}
-      scrollContainerRef={scrollRef}  // ✅ MUST pass this
     />
   );
 }

@@ -110,14 +110,15 @@ export function usePosts() {
       title: string,
       content: string,
       authorId: string | null,
-      categories: string[]
+      categories: string[],
+      tags: string[]
     ) => {
       if (!authorId) return;
 
       await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content, authorId, categories }),
+        body: JSON.stringify({ title, content, authorId, categories, tags }),
       }).catch((e) => console.error("🔥 addPost error:", e));
     },
     []

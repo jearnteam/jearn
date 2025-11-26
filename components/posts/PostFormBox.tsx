@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
 import { useTranslation } from "react-i18next";
+import { Tag, Tags } from "lucide-react";
 
 interface PostFormBoxProps {
   open: boolean;
@@ -55,9 +56,10 @@ export default function PostFormBox({
                     title: string,
                     content: string,
                     authorId: string | null,
-                    categories: string[]
+                    categories: string[],
+                    tags: string[],
                   ) => {
-                    await onSubmit(title, content, authorId, categories);
+                    await onSubmit(title, content, authorId, categories, tags);
                     onClose(); // ✅ auto-close after success
                   }}
                 />

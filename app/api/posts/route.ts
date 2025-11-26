@@ -116,6 +116,7 @@ export async function GET(req: Request) {
           ...enrichedPost,
           categories: categoryData,
           commentCount: countMap[p._id.toString()] ?? 0,
+          tags: p.tags ?? [],
         };
       })
     );
@@ -140,6 +141,7 @@ export async function POST(req: Request) {
       replyTo = null,
       txId = null,
       categories = [],
+      tags = []
     } = await req.json();
 
     if (!authorId)
@@ -201,6 +203,7 @@ export async function POST(req: Request) {
     if (isTopLevel) {
       doc.title = title;
       doc.categories = categories.map((id: string) => new ObjectId(id));
+      doc.tags = tags;
     }
 
     const result = await posts.insertOne(doc);
@@ -218,6 +221,7 @@ export async function POST(req: Request) {
     const finalPost = {
       ...enrichedNoCats,
       categories: categoryData,
+      tags: doc.tags ?? [],
       commentCount: 0,
     };
 

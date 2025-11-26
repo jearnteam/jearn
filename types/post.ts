@@ -16,6 +16,7 @@ export interface Post {
 
   // ⭐ UPDATED: categories are now objects, not strings
   categories?: CategoryObject[];
+  tags?: string[];
 
   createdAt?: string;
 

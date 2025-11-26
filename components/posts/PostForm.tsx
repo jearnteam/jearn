@@ -14,15 +14,30 @@ export interface PostFormProps {
     title: string,
     content: string,
     authorId: string | null,
-    categories: string[]
+    categories: string[],
+    tags: string[]
   ) => Promise<void>;
 }
 
 interface Category {
-  id: string; // ObjectId
-  label: string; // e.g. "programming"
-  jname: string; // Japanese name
+  id: string;
+  label: string;
+  jname: string;
   score: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              TAG EXTRACTION                                 */
+/* -------------------------------------------------------------------------- */
+function extractTagsFromHTML(html: string): string[] {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+
+  const tags = Array.from(div.querySelectorAll("a[data-type='tag']"))
+    .map((a) => a.getAttribute("data-value") || "")
+    .filter(Boolean);
+
+  return Array.from(new Set(tags)); // unique tags
 }
 
 export default function PostForm({ onSubmit }: PostFormProps) {
@@ -50,13 +65,14 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const authorId = user?._id || null;
 
   /* -------------------------------------------------------------------------- */
-  /*                                CHECK CATEGORIES                            */
+  /*                              CHECK CATEGORIES                               */
   /* -------------------------------------------------------------------------- */
 
   const handleCheckCategories = async () => {
     const html = editorRef.current?.getHTML() ?? "";
     const text = html.replace(/<[^>]+>/g, "").trim();
     if (!text) return;
+
     const checkText = `title: ${title}\n${text}`;
 
     setContentChanged(false);
@@ -79,7 +95,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
 
       setCategories(data.slice(0, 15));
       setCategoryReady(true);
-      setContentChanged(false);
     } catch (err) {
       console.error("❌ Category check failed:", err);
       setCategoryReady(false);
@@ -89,7 +104,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                            USER EDIT TRIGGER                               */
+  /*                              CONTENT CHANGE                                 */
   /* -------------------------------------------------------------------------- */
 
   const handleEditorUpdate = () => {
@@ -97,7 +112,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                          SELECT CATEGORY CLICK                             */
+  /*                           CATEGORY SELECTOR                                 */
   /* -------------------------------------------------------------------------- */
 
   const handleSelectCategory = (id: string) => {
@@ -109,7 +124,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                                   SUBMIT                                   */
+  /*                                   SUBMIT                                    */
   /* -------------------------------------------------------------------------- */
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -120,11 +135,15 @@ export default function PostForm({ onSubmit }: PostFormProps) {
 
     const html = editorRef.current?.getHTML() ?? "";
 
+    // 🔥 Extract tags from the rendered HTML
+    const tags = extractTagsFromHTML(html);
+    console.log("Extracted tags:", tags);
+
     setSubmitting(true);
     try {
-      await onSubmit(title, html, authorId, selected);
+      await onSubmit(title, html, authorId, selected, tags);
 
-      // Reset everything
+      // Reset
       editorRef.current?.clearEditor();
       setCategories([]);
       setSelected([]);
@@ -139,7 +158,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                              ARRANGE CATEGORIES                            */
+  /*                              CATEGORY ORDER                                 */
   /* -------------------------------------------------------------------------- */
 
   const ordered = [
@@ -150,7 +169,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const visibleCats = ordered.slice(0, visibleCount);
 
   /* -------------------------------------------------------------------------- */
-  /*                                   RENDER                                   */
+  /*                                   RENDER                                    */
   /* -------------------------------------------------------------------------- */
 
   return (
@@ -189,6 +208,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
           autoComplete="off"
         />
       </motion.div>
+
       {/* Character count */}
       <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
         {title.length}/200
@@ -267,7 +287,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
               </motion.div>
             </motion.div>
 
-            {/* ---------------------- Show More / Show Less ---------------------- */}
+            {/* Show More / Show Less */}
             {!animatingLayout && (
               <motion.div layout className="flex gap-4 text-sm">
                 {visibleCount < ordered.length && (
@@ -313,8 +333,8 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 <strong>{user.name}</strong>
               ) : (
                 <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
-              )}
-              {" "}{t("postingAsAfter") ?? ""}
+              )}{" "}
+              {t("postingAsAfter") ?? ""}
             </span>
           </div>
 
@@ -328,7 +348,9 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 onClick={handleCheckCategories}
                 className="px-6 py-2 rounded-lg bg-yellow-500 text-white disabled:bg-gray-400 transition"
               >
-                {checking ? "Checking..." : (t("checkCategories") || "Check Categories")}
+                {checking
+                  ? "Checking..."
+                  : t("checkCategories") || "Check Categories"}
               </motion.button>
             ) : (
               <motion.button
@@ -338,7 +360,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 disabled={submitting || loading || selected.length === 0}
                 className="px-6 py-2 rounded-lg bg-blue-600 text-white disabled:bg-gray-400 transition"
               >
-                {submitting ? "Submitting..." : (t("submit") || "Submit")}
+                {submitting ? "Submitting..." : t("submit") || "Submit"}
               </motion.button>
             )}
           </div>
