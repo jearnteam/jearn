@@ -4,44 +4,67 @@ import { useTranslation } from "react-i18next";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
+const LANGS = {
+  en: "🇺🇸 English",
+  ja: "🇯🇵 日本語",
+  my: "🇲🇲 မြန်မာ",
+} as const;
+
+// 👇 Create a type from LANGS keys
+type SupportedLang = keyof typeof LANGS;
+
 export default function LangSwitcher() {
   const { i18n } = useTranslation();
   const { status } = useSession();
   const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
-  if (!mounted) return null; // prevent hydration mismatch
+  if (!mounted) return null;
 
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLang = e.target.value;
-    i18n.changeLanguage(newLang);
+  // 👇 Ensure language is one of the supported keys
+  const currentLang = (i18n.language as SupportedLang) || "en";
+
+  const changeLanguage = async (lang: SupportedLang) => {
+    i18n.changeLanguage(lang);
+    setOpen(false);
 
     if (status === "authenticated") {
-      try {
-        const res = await fetch("/api/user/update-language", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ language: newLang }),
-        });
-
-        if (!res.ok) {
-          console.warn("⚠️ Could not save language preference");
-        }
-      } catch (err) {
-        console.error("❌ Failed to save language:", err);
-      }
+      await fetch("/api/user/update-language", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: lang }),
+      });
     }
   };
 
   return (
-    <select
-      onChange={handleChange}
-      value={i18n.language}
-      className="px-3 py-1 text-sm border rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
-    >
-      <option value="en">English</option>
-      <option value="ja">日本語</option>
-      <option value="my">မြန်မာ</option>
-    </select>
+    <div className="relative text-sm">
+      {/* Main button */}
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full px-3 py-2 flex justify-between items-center hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-md"
+      >
+        <span>{LANGS[currentLang]}</span>
+        <span>▼</span>
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          className="absolute mt-1 w-full rounded-md bg-white dark:bg-neutral-800 border dark:border-neutral-700 shadow-lg z-20"
+        >
+          {Object.entries(LANGS).map(([key, label]) => (
+            <button
+              key={key}
+              className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-md"
+              onClick={() => changeLanguage(key as SupportedLang)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

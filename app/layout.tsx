@@ -8,7 +8,8 @@ import ClientLayout from "./ClientLayout";
 import UserThemeSync from "@/components/UserThemeSync";
 import LanguageInitializer from "@/components/LanguageInitializer";
 import SWRegister from "./sw-register";
-import Script from "next/script";
+
+import Providers from "./providers"; // ✅ next-auth + next-themes wrapper
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -41,56 +42,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-
-        <Script
-          id="theme-preload"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                const theme = localStorage.getItem('theme');
-                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  document.documentElement.classList.add('dark');
-                } else {
-                  document.documentElement.classList.remove('dark');
-                }
-              } catch (_) {}
-            `,
-          }}
-        />
-      </head>
-
       <body
         className={`
           ${geistSans.variable}
           ${geistMono.variable}
           ${shadowsIntoLight.variable}
           antialiased transition-colors duration-300
-          bg-white dark:bg-neutral-900
-          text-gray-900 dark:text-gray-100
         `}
       >
-        <ClientLayout>
-          <SWRegister />
-          <UserThemeSync />
+        {/* ⭐ Global Providers (next-auth + next-themes) */}
+        <Providers>
+          <ClientLayout>
+            <SWRegister />
+            <UserThemeSync />
 
-          <I18nProvider>
-            <LanguageInitializer />
+            <I18nProvider>
+              <LanguageInitializer />
 
-            {/* GLOBAL NAVBAR */}
-            <Navbar />
+              {/* ⭐ Navbar reacts to theme immediately */}
+              <Navbar />
 
-            {/* MAIN GRID */}
-            <div className="pt-[4.3rem] bg-gray-50 dark:bg-neutral-950 min-h-screen">
-              {children}
-            </div>
-          </I18nProvider>
-        </ClientLayout>
+              {/* ⭐ Page content */}
+              <div className="pt-[4.3rem] min-h-screen bg-background text-foreground">
+                {children}
+              </div>
+            </I18nProvider>
+          </ClientLayout>
+        </Providers>
       </body>
     </html>
   );
