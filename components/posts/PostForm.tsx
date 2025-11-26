@@ -93,7 +93,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
 
       const data: Category[] = await res.json();
 
-      setCategories(data.slice(0, 15));
+      setCategories(data.slice(0));
       setCategoryReady(true);
     } catch (err) {
       console.error("❌ Category check failed:", err);
