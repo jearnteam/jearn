@@ -33,4 +33,5 @@ export interface Post {
   commentCount?: number;
 
   _optimisticTx?: string;
+  isAdmin?: boolean;
 }

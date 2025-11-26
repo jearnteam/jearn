@@ -15,16 +15,22 @@ async function enrichPost(post: any, usersColl: any) {
   if (post.authorId && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, picture: 1 } }
+      { projection: { name: 1, picture: 1, email: 1 } }
     );
   }
 
+  // Also check provider_id users
   if (!user && post.authorId) {
     user = await usersColl.findOne(
       { provider_id: post.authorId },
-      { projection: { name: 1, picture: 1 } }
+      { projection: { name: 1, picture: 1, email: 1 } }
     );
   }
+
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
+
+  const isAdmin =
+    user?.email && adminEmails.includes(user.email.trim());
 
   const avatarId = user?._id
     ? user._id.toString()
@@ -40,6 +46,8 @@ async function enrichPost(post: any, usersColl: any) {
     authorAvatar: avatarId
       ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
       : "/default-avatar.png",
+
+    isAdmin, // ⭐ ADD THIS
   };
 }
 

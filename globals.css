@@ -214,3 +214,64 @@ code {
 .hashtag-tag:hover {
   text-decoration: underline;
 }
+
+/* ADMIN border with running light */
+.admin-post-glow {
+  position: relative;
+  border-radius: 16px;
+  overflow: visible;
+}
+
+.admin-post-glow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    var(--glow-current, var(--glow-base)) 60%,
+    transparent 80%,
+    transparent 100%
+  );
+
+  background-size: 300% 100%;
+  background-position: 200% 0;
+
+  animation: runBorder var(--speed, 3.5s) linear infinite,
+    glowColor 6s ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+
+  /* hollow border */
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes runBorder {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* 🔥 This blends between the base color and a rotated hue */
+@keyframes glowColor {
+  0% {
+    --glow-current: var(--glow-base);
+  }
+  50% {
+    --glow-current: hsl(calc(var(--glow-hue) + 70), 100%, 70%);
+  }
+  100% {
+    --glow-current: var(--glow-base);
+  }
+}

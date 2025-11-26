@@ -12,6 +12,7 @@ const PUBLIC_PATHS = [
   "/api/posts",
   "/api/categories",
   "/api/category",
+  "/api/tags",
   "/favicon.ico",
   "/_next",
   "/icons",

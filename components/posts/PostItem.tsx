@@ -72,6 +72,8 @@ export default function PostItem({
   const [shareOpen, setShareOpen] = useState(false);
   const [alreadyReported, setAlreadyReported] = useState(false);
 
+  const isAdminAuthor = postState.isAdmin === true;
+
   const defaultAvatar = "/default-avatar.png";
 
   const realAvatarUrl =
@@ -238,15 +240,25 @@ export default function PostItem({
   const isComment = !!post.parentId;
   const WrapperTag: any = fullView || isComment ? "div" : "li";
 
+  const randomSpeed = 2 + Math.random() * 2;
+  const randomHue = Math.floor(Math.random() * 360);
+
   return (
     <>
       <WrapperTag
         id={`post-${postState._id}`}
-        className={`${
-          fullView
-            ? "bg-white dark:bg-neutral-900 border border-gray-300 dark:border-gray-700 rounded-xl p-6"
-            : "bg-white dark:bg-neutral-900 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm hover:shadow-md transition-all"
-        } list-none`}
+        className={`
+    relative ${isAdminAuthor ? "admin-post-glow" : ""}
+    bg-white dark:bg-neutral-900 
+    border border-gray-200 dark:border-gray-700 
+    rounded-xl p-4 shadow-sm hover:shadow-md transition-all
+    list-none
+  `}
+        style={{
+          "--speed": `${randomSpeed}s`,
+          "--glow-hue": randomHue,
+          "--glow-base": `hsl(${randomHue}, 100%, 65%)`,
+        }}
       >
         {/* HEADER */}
         <div className="flex items-center justify-between mb-3">
