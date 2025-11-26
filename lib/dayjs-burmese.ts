@@ -22,29 +22,28 @@ function toBurmeseDigits(input: string | number): string {
     .join("");
 }
 
-// Relative time with Burmese numbers
+// Relative time
 const relativeTime: any = {
   future: "%sအတွင်း",
   past: "%s",
-
-  s: "စက္ကန့်အနည်းငယ်အကြာက",
-  m: "၁မိနစ် အကြာက",
-
-  mm: (n: number) => `${toBurmeseDigits(n)}မိနစ် အကြာက`,
-  h: "၁နာရီ အကြာက",
-  hh: (n: number) => `${toBurmeseDigits(n)}နာရီ အကြာက`,
-  d: "၁ရက် အကြာက",
-  dd: (n: number) => `${toBurmeseDigits(n)}ရက် အကြာက`,
-  M: "၁လ အကြာက",
-  MM: (n: number) => `${toBurmeseDigits(n)}လ အကြာက`,
-  y: "၁နှစ် အကြာက",
-  yy: (n: number) => `${toBurmeseDigits(n)}နှစ် အကြာက`,
+  s: "စက္ကန့်အနည်းငယ်က",
+  m: "၁ မိနစ်က",
+  mm: (n: number) => `${toBurmeseDigits(n)} မိနစ်က`,
+  h: "၁ နာရီက",
+  hh: (n: number) => `${toBurmeseDigits(n)} နာရီက`,
+  d: "၁ ရက်က",
+  dd: (n: number) => `${toBurmeseDigits(n)} ရက်က`,
+  M: "၁ လက",
+  MM: (n: number) => `${toBurmeseDigits(n)} လက`,
+  y: "၁ နှစ်က",
+  yy: (n: number) => `${toBurmeseDigits(n)} နှစ်က`,
 };
 
-// Register Burmese locale (skip typing check)
+// Register only Burmese locale
 dayjs.locale("my", {
   name: "my",
   relativeTime,
 } as any);
 
-export default dayjs;
+// ❗ Export nothing — just registering the locale
+export {};

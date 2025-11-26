@@ -28,6 +28,7 @@ import { Tag } from "@/features/Tag";
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 import { HeadingPatch } from "@/features/HeadingPatch";
 import type { Level } from "@tiptap/extension-heading";
+import { ImagePlaceholder } from "@/features/ImagePlaceholder";
 
 import { Extension } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
@@ -185,6 +186,7 @@ export default function PostEditorInner({
       Strike,
       Code,
       Tag,
+      ImagePlaceholder,
       MathExtension,
       RemoveZeroWidthChars,
       Placeholder.configure({
@@ -429,6 +431,37 @@ export default function PostEditorInner({
           className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           ∑
+        </button>
+        <button
+          onClick={async () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "image/*";
+
+            input.onchange = async () => {
+              const file = input.files?.[0];
+              if (!file) return;
+
+              // upload image → get ID
+              const form = new FormData();
+              form.append("file", file);
+
+              const res = await fetch("/api/images/uploadImage", {
+                method: "POST",
+                body: form,
+              });
+
+              const { id } = await res.json();
+
+              // insert placeholder block
+              withRestore((c) => c.insertImagePlaceholder(id));
+            };
+
+            input.click();
+          }}
+          className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+        >
+          🖼️
         </button>
       </div>
 
