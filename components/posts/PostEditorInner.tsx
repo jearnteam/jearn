@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 
 import Placeholder from "@tiptap/extension-placeholder";
@@ -34,11 +34,14 @@ import { Extension } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
 
 /* ----------------------- ZERO WIDTH ----------------------- */
+const removeZeroWidthCharsKey = new PluginKey("remove-zero-width-chars");
+const textLimitPluginKey = new PluginKey("text-limit");
 export const RemoveZeroWidthChars = Extension.create({
   name: "removeZeroWidthChars",
   addProseMirrorPlugins() {
     return [
       new Plugin({
+        key: removeZeroWidthCharsKey, // ✅ give it a unique key
         props: {
           handlePaste(view, event) {
             const clean = event.clipboardData
@@ -64,47 +67,31 @@ function countCharactersWithMath(doc: any) {
   let paragraphIndex = -1;
 
   doc.descendants((node: any) => {
-    // Count paragraphs for newline logic
     if (node.type?.name === "paragraph") {
       paragraphIndex++;
-
-      // Clean paragraph content
       const clean = node.textContent.replace(ZERO_WIDTH_REGEX, "");
-
-      // ❌ Do NOT count the first empty paragraph
-      if (paragraphIndex === 0) {
-        return true; // skip it
-      }
-
-      // ✔ Count empty paragraphs after first one = newline
-      if (clean.length === 0) {
-        count += 1;
-      }
-
+      if (paragraphIndex === 0) return true;
+      if (clean.length === 0) count++;
       return true;
     }
 
-    // ✔ HardBreak = user pressed Enter
     if (node.type?.name === "hardBreak") {
-      count += 1;
+      count++;
       return false;
     }
 
-    // ✔ Tag node = count full "#value"
     if (node.type?.name === "tag") {
       const val = (node.attrs?.value || "").replace(ZERO_WIDTH_REGEX, "");
       count += `#${val}`.length;
       return false;
     }
 
-    // ✔ Math node = count LaTeX length
     if (node.type?.name === "math") {
       const latex = (node.attrs?.latex || "").replace(ZERO_WIDTH_REGEX, "");
       count += latex.length;
       return false;
     }
 
-    // ✔ Normal text
     if (node.isText) {
       const clean = node.text.replace(ZERO_WIDTH_REGEX, "");
       count += clean.length;
@@ -118,14 +105,15 @@ function countCharactersWithMath(doc: any) {
 
 const MAX_CHARS = 20000;
 
+/* ⭐ IMPORTANT: NO KEYED PLUGIN */
 export const TextLimitPlugin = new Plugin({
-  key: new PluginKey("textLimit"),
+  key: textLimitPluginKey, // ✅ give it a unique key
   filterTransaction(tr) {
     return countCharactersWithMath(tr.doc) <= MAX_CHARS;
   },
 });
 
-/* ----------------------- NOTION Enter ----------------------- */
+/* ----------------------- SAFE ENTER FOR HEADINGS ----------------------- */
 const SafeHeadingEnterFix = Extension.create({
   name: "safeHeadingEnterFix",
   addKeyboardShortcuts() {
@@ -133,7 +121,6 @@ const SafeHeadingEnterFix = Extension.create({
       Enter: ({ editor }) => {
         const { $from } = editor.state.selection;
         if ($from.parent.type.name !== "heading") return false;
-
         return editor.chain().focus().splitBlock().setNode("paragraph").run();
       },
     };
@@ -145,7 +132,6 @@ const SafeHeadingEnterFix = Extension.create({
 interface PostEditorInnerProps {
   value: string;
   placeholder?: string;
-  compact?: boolean;
   onReady?: (editor: Editor) => void;
 }
 
@@ -168,30 +154,36 @@ export default function PostEditorInner({
   const [charCount, setCharCount] = useState(0);
   const [, forceRerender] = useState({});
 
-  /* ------------------------- EDITOR INIT -------------------------- */
-  const editor = useEditor({
-    extensions: [
+  /* ------------------------- FIXED EXTENSIONS -------------------------- */
+  const extensions = useMemo(
+    () => [
       Document,
       Paragraph,
       Text,
       Heading.configure({ levels: [1, 2, 3] }),
       HeadingPatch,
+
       HorizontalRule,
       SafeHeadingEnterFix,
       HardBreak.configure({ keepMarks: true }),
+
       NoRulesStarterKit,
+
       Bold,
       Italic,
       Underline,
       Strike,
       Code,
+
       Tag,
       ImagePlaceholder,
       MathExtension,
       RemoveZeroWidthChars,
+
       Placeholder.configure({
         placeholder: finalPlaceholder,
       }),
+
       Extension.create({
         name: "limitPlugin",
         addProseMirrorPlugins() {
@@ -199,23 +191,28 @@ export default function PostEditorInner({
         },
       }),
     ],
+    [finalPlaceholder]
+  );
 
-    content: value?.trim() || "<p></p>",
-
-    editorProps: {
-      attributes: {
-        class:
-          "tiptap ProseMirror w-full h-full text-base text-gray-800 dark:text-gray-200 overflow-y-auto p-2",
-        "data-placeholder": finalPlaceholder,
+  /* ------------------------- EDITOR INIT -------------------------- */
+  const editor = useEditor(
+    {
+      extensions,
+      content: value?.trim() || "<p></p>",
+      editorProps: {
+        attributes: {
+          class:
+            "tiptap ProseMirror w-full h-full text-base text-gray-800 dark:text-gray-200 overflow-y-auto p-2",
+          "data-placeholder": finalPlaceholder,
+        },
       },
+      onUpdate: ({ editor }) => {
+        setCharCount(countCharactersWithMath(editor.state.doc));
+      },
+      immediatelyRender: false,
     },
-
-    onUpdate: ({ editor }) => {
-      setCharCount(countCharactersWithMath(editor.state.doc));
-    },
-
-    immediatelyRender: false,
-  });
+    []
+  );
 
   /* Editor ready */
   useEffect(() => {
@@ -271,7 +268,7 @@ export default function PostEditorInner({
       appendTo: document.body,
       hideOnClick: false,
       zIndex: 20000,
-      maxWidth: "none", // ⭐ allow full width, don't shrink box
+      maxWidth: "none",
     });
 
     const update = () => {
@@ -423,15 +420,13 @@ export default function PostEditorInner({
           onClick={() => {
             const sel = window.getSelection()?.toString();
             if (!sel?.trim()) return;
-            const { from, to } = editor.state.selection;
-            withRestore((c) =>
-              c.deleteRange({ from, to }).insertMath(sel.trim())
-            );
+            withRestore((c) => c.insertMath(sel.trim()));
           }}
           className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
         >
           ∑
         </button>
+
         <button
           onClick={async () => {
             const input = document.createElement("input");
@@ -442,7 +437,6 @@ export default function PostEditorInner({
               const file = input.files?.[0];
               if (!file) return;
 
-              // upload image → get ID
               const form = new FormData();
               form.append("file", file);
 
@@ -453,7 +447,6 @@ export default function PostEditorInner({
 
               const { id } = await res.json();
 
-              // insert placeholder block
               withRestore((c) => c.insertImagePlaceholder(id));
             };
 

@@ -45,7 +45,10 @@ export const MathExtension = Node.create({
       dom.dataset.type = "math";
 
       // ✅ strip zero-width chars before render
-      const cleanLatex = (node.attrs.latex || "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+      const cleanLatex = (node.attrs.latex || "").replace(
+        /[\u200B-\u200D\uFEFF]/g,
+        ""
+      );
       dom.setAttribute("latex", cleanLatex);
       dom.className = "math-node";
       dom.style.cursor = "pointer";
@@ -82,28 +85,41 @@ export const MathExtension = Node.create({
       insertMath:
         (latex: string) =>
         ({ state, dispatch, view }) => {
-          const cleanLatex = (latex || "").replace(/[\u200B-\u200D\uFEFF]/g, "");
+          const cleanLatex = (latex || "").replace(
+            /[\u200B-\u200D\uFEFF]/g,
+            ""
+          );
           const { tr, schema } = state;
+
+          const { from, to } = state.selection;
+
+          // 1️⃣ Always delete selected text first
+          if (from !== to) {
+            tr.delete(from, to);
+          }
+
+          // New insertion start position
           const pos = tr.selection.from;
 
-          // ✅ always sanitize input latex before inserting
+          // 2️⃣ Insert math node
           const mathNode = schema.nodes.math.create({ latex: cleanLatex });
 
-          // Spacer is good for cursor UX - keep it here
+          // 3️⃣ Add spacer after math node
           const spacer = schema.text("\u200B");
 
           tr.insert(pos, mathNode);
           tr.insert(pos + 1, spacer);
 
+          // 4️⃣ Move cursor after spacer
           const targetPos = pos + 2;
           tr.setSelection(TextSelection.create(tr.doc, targetPos));
 
           if (dispatch) dispatch(tr);
 
+          // 5️⃣ Fix focus
           setTimeout(() => {
             if (view) {
               view.focus();
-
               const domSelection = window.getSelection();
               const domAtPos = view.domAtPos(targetPos);
               if (domSelection && domAtPos.node) {
@@ -120,7 +136,6 @@ export const MathExtension = Node.create({
         },
     };
   },
-
   addProseMirrorPlugins() {
     return [
       new Plugin({

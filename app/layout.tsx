@@ -44,11 +44,11 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         className={`
-          ${geistSans.variable}
-          ${geistMono.variable}
-          ${shadowsIntoLight.variable}
-          antialiased transition-colors duration-300
-        `}
+    antialiased transition-colors duration-300
+    ${geistSans.variable}
+    ${geistMono.variable}
+    ${shadowsIntoLight.variable}
+  `}
       >
         {/* ⭐ Global Providers (next-auth + next-themes) */}
         <Providers>

@@ -358,6 +358,11 @@ code {
 }
 
 @layer base {
+  html,
+  body {
+    font-family: var(--font-geist-sans), "Apple Color Emoji", "Segoe UI Emoji",
+      "Noto Color Emoji", sans-serif !important;
+  }
   * {
     @apply border-border;
   }
