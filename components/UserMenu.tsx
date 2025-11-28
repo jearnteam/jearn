@@ -92,6 +92,14 @@ export default function UserMenu({ user }: { user: User }) {
             <LangSwitcher />
           </div>
 
+          {/* DASHBOARD */} {/* TODO: It should shows only admin account */}
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
+          >
+            Dashboard
+          </button>
+
           {/* LOGOUT */}
           <button
             onClick={handleLogout}
