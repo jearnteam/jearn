@@ -10,20 +10,52 @@ export async function POST(req: NextRequest) {
   try {
     const form = await req.formData();
 
-    const userId = form.get("userId") as string | null;
+    /** _id (ObjectId) */
+    const user_id = form.get("user_id") as string | null;
     const name = (form.get("name") as string | null) ?? "";
+    /** userId (@userId) */
+    const userId = (form.get("userId") as string | null) ?? "";
     const bio = (form.get("bio") as string | null) ?? "";
     const file = form.get("picture") as File | null;
 
-    if (!userId) {
+    if (!user_id) {
       return NextResponse.json(
-        { ok: false, error: "Missing userId" },
+        { ok: false, error: "Missing user_id" },
         { status: 400 }
       );
     }
 
     const client = await clientPromise;
     const db = client.db("jearn");
+
+// -------------------------------------------------
+    // 🔥 VALIDATE & CHECK UNIQUE USERID
+    // -------------------------------------------------
+    let userIdUpdate: any = {};
+    if (userId) {
+      // 文字数制限チェック (3文字以上32文字以下)
+      if (userId.length < 3 || userId.length > 32) {
+        return NextResponse.json(
+          { ok: false, error: "UserID must be between 3 and 32 characters" },
+          { status: 400 }
+        );
+      }
+
+      // 重複チェック (自分自身以外のユーザーで同じuserIdを持つものがいるか)
+      const existingUser = await db.collection("users").findOne({
+        userId: userId,
+        _id: { $ne: new ObjectId(user_id) },
+      });
+
+      if (existingUser) {
+        return NextResponse.json(
+          { ok: false, error: "UserID is already taken" },
+          { status: 400 }
+        );
+      }
+
+      userIdUpdate.userId = userId;
+    }
 
     let pictureUpdate: any = {};
 
@@ -84,11 +116,12 @@ export async function POST(req: NextRequest) {
       name,
       bio,
       updatedAt: new Date(),
+      ...userIdUpdate,
       ...pictureUpdate,
     };
 
     const result = await db.collection("users").updateOne(
-      { _id: new ObjectId(userId) },
+      { _id: new ObjectId(user_id) },
       { $set: updateData }
     );
 

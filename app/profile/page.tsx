@@ -15,6 +15,8 @@ export default function ProfilePage() {
   const router = useRouter();
 
   const [name, setName] = useState("");
+  // ✅ userId用のstate追加
+  const [userId, setUserId] = useState("");
   const [bio, setBio] = useState("");
 
   const [preview, setPreview] = useState("/default-avatar.png");
@@ -35,6 +37,7 @@ export default function ProfilePage() {
   useEffect(() => {
     if (!loading && user) {
       setName(user.name || "");
+      setUserId(user.userId || ""); 
       setBio(user.bio || "");
 
       // Always cache bust
@@ -59,8 +62,10 @@ export default function ProfilePage() {
     setUploading(true);
 
     const fd = new FormData();
-    fd.append("userId", user._id); // IMPORTANT — use _id, NOT uid
+    fd.append("user_id", user._id); // IMPORTANT — use _id, NOT uid
     fd.append("name", name);
+    // ✅ userIdを追加
+    fd.append("userId", userId);
     fd.append("bio", bio);
     if (file) fd.append("picture", file);
 
@@ -73,6 +78,7 @@ export default function ProfilePage() {
       const data = await res.json();
 
       if (!res.ok || !data.ok) {
+        // エラーメッセージを表示 (例: UserID is already taken)
         throw new Error(data.error || "Update failed");
       }
 
@@ -83,9 +89,9 @@ export default function ProfilePage() {
       setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
 
       alert("Profile updated!");
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Failed to update profile");
+      alert(err.message || "Failed to update profile");
     } finally {
       setUploading(false);
     }
@@ -136,6 +142,23 @@ export default function ProfilePage() {
           onChange={(e) => setName(e.target.value)}
           className="border rounded px-2 py-1"
         />
+
+        {/* ✅ User ID Input */}
+        <label>{"User ID"}</label>
+        <div className="flex items-center">
+          <span className="mr-1 text-gray-500">@</span>
+          <input
+            value={userId}
+            onChange={(e) => setUserId(e.target.value)}
+            className="border rounded px-2 py-1 flex-1"
+            placeholder="unique_id"
+            minLength={3}
+            maxLength={32}
+          />
+        </div>
+        <p className="text-xs text-gray-500 -mt-2">
+          {"3~32"}
+        </p>
 
         <label>{t("bio") || "Bio"}</label>
         <textarea

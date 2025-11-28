@@ -29,6 +29,7 @@ export async function GET() {
         _id: user._id.toString(),
         uid: user.provider_id || null,
         name: user.name ?? "",
+        userId: user.userId || undefined,
         bio: user.bio ?? "",
         theme: user.theme ?? "light",
         language: user.language ?? "en",

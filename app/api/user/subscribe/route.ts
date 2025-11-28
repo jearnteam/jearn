@@ -6,10 +6,10 @@ export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("id");
+  const user_id = searchParams.get("id");
 
-  if (!userId) {
-    return new Response("Missing user ID", { status: 400 });
+  if (!user_id) {
+    return new Response("Missing user _id", { status: 400 });
   }
 
   const client = await clientPromise;
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       controller.enqueue(`data: {"status":"connected"}\n\n`);
 
       const pipeline = [
-        { $match: { "documentKey._id": new ObjectId(userId) } },
+        { $match: { "documentKey._id": new ObjectId(user_id) } },
       ];
       const changeStream = users.watch(pipeline, {
         fullDocument: "updateLookup",
@@ -47,8 +47,9 @@ export async function GET(req: NextRequest) {
         controller.enqueue(
           `data: ${JSON.stringify({
             name: doc.name,
+            userId: doc.userId,
             bio: doc.bio,
-            picture: `/api/user/avatar/${userId}?t=${Date.now()}`,
+            picture: `/api/user/avatar/${user_id}?t=${Date.now()}`,
           })}\n\n`
         );
       });
