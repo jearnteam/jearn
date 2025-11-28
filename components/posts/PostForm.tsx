@@ -27,7 +27,7 @@ interface Category {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              TAG EXTRACTION                                 */
+/*                              TAG EXTRACTION                                */
 /* -------------------------------------------------------------------------- */
 function extractTagsFromHTML(html: string): string[] {
   const div = document.createElement("div");
@@ -65,7 +65,7 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   const authorId = user?._id || null;
 
   /* -------------------------------------------------------------------------- */
-  /*                              CHECK CATEGORIES                               */
+  /*                              CHECK CATEGORIES                              */
   /* -------------------------------------------------------------------------- */
 
   const handleCheckCategories = async () => {
