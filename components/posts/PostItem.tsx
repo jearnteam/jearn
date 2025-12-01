@@ -469,49 +469,54 @@ export default function PostItem({
           )}
 
           {/* FOOTER */}
-          <div className="mt-4 flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
-            <button
-              onClick={handleUpvote}
-              disabled={pending}
-              className={`flex items-center gap-1 ${
-                hasUpvoted
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "hover:text-blue-600 dark:hover:text-blue-400"
-              }`}
-            >
-              <ArrowBigUp size={18} /> {postState.upvoteCount ?? 0}
-            </button>
-
-            {!fullView && !isComment && (
-              <Link
-                href={`/posts/${postState._id}#comments`}
-                scroll={false}
-                onClick={() => {
-                  sessionStorage.setItem("restore-post-id", postState._id);
-                  sessionStorage.setItem(
-                    "restore-scroll-y",
-                    String(window.scrollY)
-                  );
-                  sessionStorage.setItem(
-                    "restore-visible-count",
-                    sessionStorage.getItem("postListVisibleCount") || "5"
-                  );
-                }}
-                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-              >
-                <MessageCircle size={18} />
-                {postState.commentCount ?? 0}
-              </Link>
-            )}
-
-            {!isComment && (
+          <div className="mt-4 flex space-x-6 text-sm text-gray-600 dark:text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-3">
+            <div className="flex-1 flex items-center gap-5">
               <button
-                onClick={() => setShareOpen(true)}
-                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                onClick={handleUpvote}
+                disabled={pending}
+                className={`flex items-center gap-1 ${
+                  hasUpvoted
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "hover:text-blue-600 dark:hover:text-blue-400"
+                }`}
               >
-                <Share2 size={18} /> {t("share") || "Share"}
+                <ArrowBigUp size={18} /> {postState.upvoteCount ?? 0}
               </button>
-            )}
+
+              {!fullView && !isComment && (
+                <Link
+                  href={`/posts/${postState._id}#comments`}
+                  scroll={false}
+                  onClick={() => {
+                    sessionStorage.setItem("restore-post-id", postState._id);
+                    sessionStorage.setItem(
+                      "restore-scroll-y",
+                      String(window.scrollY)
+                    );
+                    sessionStorage.setItem(
+                      "restore-visible-count",
+                      sessionStorage.getItem("postListVisibleCount") || "5"
+                    );
+                  }}
+                  className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  <MessageCircle size={18} />
+                  {postState.commentCount ?? 0}
+                </Link>
+              )}
+
+              {!isComment && (
+                <button
+                  onClick={() => setShareOpen(true)}
+                  className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                >
+                  <Share2 size={18} /> {t("share") || "Share"}
+                </button>
+              )}
+            </div>
+            <div className="">
+              {postState.edited ? `(edited ${dayjs(postState.editedAt).locale(i18n.language).fromNow()})` : ""}
+            </div>
           </div>
         </WrapperTag>
       </motion.div>
