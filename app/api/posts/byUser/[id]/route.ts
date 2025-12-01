@@ -53,10 +53,11 @@ export async function GET(_req: Request, { params }: any) {
     /* ---------------------------------------------------------- */
     const user = await usersColl.findOne(
       { _id: new ObjectId(id) },
-      { projection: { name: 1 } }
+      { projection: { name: 1, userId: 1 } }
     );
 
     const authorName = user?.name ?? "Unknown User";
+    const authorUserId = user?.userId;
 
     /* ---------------------------------------------------------- */
     /*                     USER POSTS                              */
@@ -83,6 +84,7 @@ export async function GET(_req: Request, { params }: any) {
           createdAt: post.createdAt,
           authorId: id,
           authorName,
+          authorUserId,
           authorAvatar: `/api/user/avatar/${id}?t=${Date.now()}`,
           categories: categoryData,
           tags: post.tags ?? [],
