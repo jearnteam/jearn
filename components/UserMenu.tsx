@@ -79,7 +79,10 @@ export default function UserMenu({ user }: { user: User }) {
         <div className="p-2 flex flex-col gap-1">
           {/* PROFILE */}
           <button
-            onClick={() => router.push("/profile")}
+            onClick={() => {
+              setOpen(false);
+              router.push("/profile");
+            }}
             className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
           >
             Profile
@@ -102,14 +105,20 @@ export default function UserMenu({ user }: { user: User }) {
           </div>
           {/* DASHBOARD */} {/* TODO: It should shows only admin account */}
           <button
-            onClick={() => router.push("/dashboard")}
+            onClick={() => {
+              setOpen(false);
+              router.push("/dashboard");
+            }}
             className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
           >
             Dashboard
           </button>
           {/* LOGOUT */}
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setOpen(false);
+              handleLogout;
+            }}
             className="px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-left"
           >
             Logout
