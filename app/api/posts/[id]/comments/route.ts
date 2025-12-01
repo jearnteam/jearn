@@ -10,14 +10,14 @@ async function resolveAuthor(users: any, authorId?: string | null) {
   if (!authorId) return { name: "Anonymous", avatar: null, avatarId: null };
   let user = null;
   if (ObjectId.isValid(authorId)) {
-    user = await users.findOne({ _id: new ObjectId(authorId) }, { projection: { name: 1 } });
+    user = await users.findOne({ _id: new ObjectId(authorId) }, { projection: { name: 1, userId: 1 } });
   }
   if (!user) {
-    user = await users.findOne({ provider_id: authorId }, { projection: { name: 1 } });
+    user = await users.findOne({ provider_id: authorId }, { projection: { name: 1, userId: 1 } });
   }
   const avatarId = user?._id ? String(user._id) : (ObjectId.isValid(authorId) ? authorId : null);
   const avatar = avatarId ? `/api/user/avatar/${avatarId}?t=${Date.now()}` : null;
-  return { name: user?.name ?? "Anonymous", avatar, avatarId };
+  return { name: user?.name ?? "Anonymous", userId: user?.userId, avatar, avatarId };
 }
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -35,6 +35,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
           ...c,
           _id: c._id.toString(),
           authorName: a.name,
+          authorUserId: a.userId,
           authorAvatar: a.avatar,
         };
       })

@@ -15,14 +15,14 @@ async function resolveAuthor(users: any, authorId?: string | null) {
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1 } }
+      { projection: { name: 1, userId: 1 } }
     );
   }
 
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1 } }
+      { projection: { name: 1, userId: 1 } }
     );
   }
 
@@ -38,6 +38,7 @@ async function resolveAuthor(users: any, authorId?: string | null) {
 
   return {
     name: user?.name ?? "Anonymous",
+    userId: user?.userId,
     avatar,
     avatarId,
   };
@@ -95,6 +96,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       ...post,
       _id: id,
       authorName: author.name,
+      authorUserId: author.userId,
       authorAvatar: author.avatar,
       commentCount,
       categories: populatedCategories,  // <-- added here
