@@ -68,6 +68,8 @@ export default function CommentItem({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [expanded, setExpanded] = useState(false);
+  const [height, setHeight] = useState<number | "auto">("auto");
+  const [measuredHeight, setMeasuredHeight] = useState<number>(0);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
 
@@ -85,11 +87,20 @@ export default function CommentItem({
   /* Measure content height */
   useEffect(() => {
     const el = contentRef.current;
-    if (el) {
-      setContentHeight(el.scrollHeight);
-      setIsReady(true);
+    if (!el) return;
+
+    const full = el.scrollHeight;
+    setMeasuredHeight(full);
+    setContentHeight(full);
+    setIsReady(true);
+
+    // if collapsed, enforce collapsed height
+    if (!expanded) {
+      setHeight(COLLAPSED_HEIGHT);
+    } else {
+      setHeight("auto");
     }
-  }, [comment.content]);
+  }, [comment.content, expanded]);
 
   const canExpand = contentHeight && contentHeight > COLLAPSED_HEIGHT;
 
@@ -131,53 +142,48 @@ export default function CommentItem({
   /* ============================================
      Show Less → Scroll to top of comment
   ============================================ */
+  /* ============================================
+   Show Less → Scroll to top of comment (improved)
+=============================================== */
   const toggleExpand = () => {
+    const el = contentRef.current;
+    if (!el) return;
+
     if (!expanded) {
+      // EXPAND
+      const full = el.scrollHeight;
+      setHeight(full);
       setExpanded(true);
-      return;
-    }
 
-    const el = commentRef.current;
-    if (!el) {
-      setExpanded(false);
-      return;
-    }
-
-    const scrollParent = getScrollParent(el);
-    const NAVBAR_OFFSET = 80;
-
-    // Instant scroll
-    if (scrollParent.type === "window") {
-      const rect = el.getBoundingClientRect();
-      window.scrollTo({
-        top: window.scrollY + rect.top - NAVBAR_OFFSET,
-      });
+      // after animation ends → use auto height
+      setTimeout(() => setHeight("auto"), 250);
     } else {
-      const parentRect = scrollParent.el.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      scrollParent.el.scrollTo({
-        top: scrollParent.el.scrollTop + (elRect.top - parentRect.top) - NAVBAR_OFFSET,
+      // COLLAPSE
+      const full = el.scrollHeight;
+      setHeight(full); // set current height first
+
+      requestAnimationFrame(() => {
+        setHeight(COLLAPSED_HEIGHT);
+        setExpanded(false);
       });
     }
 
-    // Wait for scroll to finish
-    let last = -1;
-    const check = () => {
-      const now =
-        scrollParent.type === "window"
-          ? window.scrollY
-          : scrollParent.el.scrollTop;
+    /* ---------------------------------------
+     SCROLL TO TOP BEFORE COLLAPSING (like PostItem)
+  ---------------------------------------- */
+    if (expanded) {
+      const elBox = commentRef.current;
+      if (!elBox) return;
 
-      if (now === last) {
-        setExpanded(false);
-        return;
+      const rect = elBox.getBoundingClientRect();
+      const isTopVisible = rect.top >= 0;
+
+      if (!isTopVisible) {
+        window.scrollTo({
+          top: window.scrollY + rect.top - 80,
+        });
       }
-
-      last = now;
-      requestAnimationFrame(check);
-    };
-
-    requestAnimationFrame(check);
+    }
   };
 
   return (
@@ -198,7 +204,10 @@ export default function CommentItem({
               />
             </div>
 
-            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
+            <motion.div
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
               <div className="flex gap-3">
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
                   {comment.authorName || "Anonymous"}
@@ -256,27 +265,19 @@ export default function CommentItem({
 
         {/* Content */}
         {comment.content?.trim() ? (
-          <div
+          <motion.div
+            animate={{ height }}
+            transition={{ duration: 0.25 }}
             className="relative overflow-hidden text-sm text-gray-800 dark:text-gray-200"
-            style={{
-              maxHeight: expanded ? contentHeight || "none" : COLLAPSED_HEIGHT,
-              transition: "max-height 0.3s ease",
-            }}
           >
-            <div
-              ref={contentRef}
-              className="break-words whitespace-pre-wrap"
-              style={{ wordBreak: "break-word" }}
-            >
+            <div ref={contentRef} className="break-words whitespace-pre-wrap">
               <MathRenderer html={comment.content} />
             </div>
 
-            {!expanded &&
-              contentHeight &&
-              contentHeight > COLLAPSED_HEIGHT && (
-                <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-gray-50 dark:from-neutral-800 to-transparent pointer-events-none" />
-              )}
-          </div>
+            {!expanded && measuredHeight > COLLAPSED_HEIGHT && (
+              <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-gray-50 dark:from-neutral-800 to-transparent pointer-events-none" />
+            )}
+          </motion.div>
         ) : null}
 
         {canExpand && isReady && (

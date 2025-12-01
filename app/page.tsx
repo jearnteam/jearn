@@ -14,6 +14,7 @@ import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import LoadingOwl from "@/components/LoadingOwl";
 import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import FullScreenLoader from "@/components/common/FullScreenLoader";
 
 function useShowLoginOnNewTab() {
   const router = useRouter();
@@ -111,23 +112,7 @@ export default function HomePage() {
       />
 
       {/* Loading overlay */}
-      {loading && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-neutral-900/80"
-        >
-          <div className="flex flex-col items-center text-gray-700 dark:text-gray-300">
-            <div className="w-40 h-40">
-              <LoadingOwl />
-            </div>
-            <p className="text-lg font-medium mt-4">
-              {t("loadingPosts") || "Loading posts"}...
-            </p>
-          </div>
-        </motion.div>
-      )}
+      {loading && <FullScreenLoader text={t("loadingUser")} />}
 
       {/* Scroll layout */}
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">

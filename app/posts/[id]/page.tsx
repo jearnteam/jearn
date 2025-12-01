@@ -7,6 +7,7 @@ import CommentClientSection from "@/components/comments/CommentClientSection";
 import LoadingOwl from "@/components/LoadingOwl";
 import type { Post } from "@/types/post";
 import { useTranslation } from "react-i18next";
+import FullScreenLoader from "@/components/common/FullScreenLoader";
 
 export default function PostPage() {
   const { t } = useTranslation();
@@ -41,16 +42,7 @@ export default function PostPage() {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white dark:bg-neutral-900 z-50">
-        <div className="flex flex-col items-center text-gray-600 dark:text-gray-300">
-          <div className="w-48 h-48 flex items-center justify-center">
-            <LoadingOwl />
-          </div>
-          <p className="text-lg font-medium mt-4">
-            {t("loadingPosts") || "Loading post"}...
-          </p>
-        </div>
-      </div>
+      <FullScreenLoader text={t("loadingUser")} />
     );
   }
 
@@ -100,6 +92,7 @@ export default function PostPage() {
             xl:left-[320px] xl:right-[320px]
             h-[calc(100vh-4.3rem)]
             overflow-y-auto
+            no-scrollbar
             px-3 md:px-6
             pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
           "

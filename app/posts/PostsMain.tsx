@@ -4,33 +4,20 @@ import { usePosts } from "@/features/posts/hooks/usePosts";
 import PostList from "@/components/posts/PostList";
 import type { Post } from "@/types/post";
 import { t } from "i18next";
+import FullScreenLoader from "@/components/common/FullScreenLoader";
 
 export default function PostsMain() {
-  const {
-    posts,
-    loading,
-    editPost,
-    deletePost,
-    upvotePost,
-  } = usePosts();
+  const { posts, loading, editPost, deletePost, upvotePost } = usePosts();
 
   if (loading) {
-    return (
-      <div className="text-center py-6 text-gray-500 dark:text-gray-300">
-        {t("loading") || "Loading"}...
-      </div>
-    );
+    return <FullScreenLoader text={t("loadingUser")} />;
   }
 
   return (
     <PostList
       posts={posts}
       onEdit={(post: Post) =>
-        editPost(
-          post._id,
-          post.title ?? "", 
-          post.content ?? "" 
-        )
+        editPost(post._id, post.title ?? "", post.content ?? "")
       }
       onDelete={deletePost}
       onUpvote={(id: string, userId: string) =>

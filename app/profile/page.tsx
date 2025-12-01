@@ -1,4 +1,3 @@
-// app/profile/page.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,45 +6,97 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
+import PostList from "@/components/posts/PostList";
+import EditPostModal from "@/components/posts/EditPostModal";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import LoadingOwl from "@/components/LoadingOwl";
+import type { Post } from "@/types/post";
+import FullScreenLoader from "@/components/common/FullScreenLoader";
+
 export default function ProfilePage() {
   const { t } = useTranslation();
+  const router = useRouter();
 
   const { user, loading, update } = useCurrentUser();
   const { status } = useSession();
-  const router = useRouter();
 
+  /* -------------------------
+        Profile state
+  -------------------------- */
   const [name, setName] = useState("");
-  // ✅ userId用のstate追加
   const [userId, setUserId] = useState("");
   const [bio, setBio] = useState("");
 
   const [preview, setPreview] = useState("/default-avatar.png");
   const [file, setFile] = useState<File | null>(null);
-
   const [uploading, setUploading] = useState(false);
+
+  /* -------------------------
+        Posts state
+  -------------------------- */
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+
+  const [editingPost, setEditingPost] = useState<Post | null>(null);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const sessionLoading = loading || status === "loading";
 
-  // Redirect if not logged in
+  /* -------------------------
+      Redirect if not logged in
+  -------------------------- */
   useEffect(() => {
     if (!sessionLoading && status === "unauthenticated") {
       router.push("/");
     }
   }, [sessionLoading, status]);
 
-  // Load user data
+  /* -------------------------
+      Load user profile data
+  -------------------------- */
   useEffect(() => {
     if (!loading && user) {
       setName(user.name || "");
-      setUserId(user.userId || ""); 
+      setUserId(user.userId || "");
       setBio(user.bio || "");
 
-      // Always cache bust
       setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
     }
   }, [user, loading]);
 
-  // Local preview for uploaded file
+  /* -------------------------
+      Load user's posts
+  -------------------------- */
+  async function loadPosts() {
+    if (!user?._id) return;
+
+    try {
+      const res = await fetch(`/api/posts/byUser/${user._id}`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+
+      const cleaned = (data.posts || []).map((p: any) => ({
+        ...p,
+        isAdmin: p.isAdmin === true,
+      }));
+
+      setPosts(cleaned);
+    } finally {
+      setPostsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadPosts();
+  }, [user]);
+
+  /* -------------------------
+      Local preview for avatar
+  -------------------------- */
   useEffect(() => {
     if (!file) return;
     const url = URL.createObjectURL(file);
@@ -53,6 +104,9 @@ export default function ProfilePage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  /* -------------------------
+      Save profile data
+  -------------------------- */
   async function handleSave() {
     if (!user?._id) {
       alert("Invalid user session.");
@@ -62,9 +116,8 @@ export default function ProfilePage() {
     setUploading(true);
 
     const fd = new FormData();
-    fd.append("user_id", user._id); // IMPORTANT — use _id, NOT uid
+    fd.append("user_id", user._id);
     fd.append("name", name);
-    // ✅ userIdを追加
     fd.append("userId", userId);
     fd.append("bio", bio);
     if (file) fd.append("picture", file);
@@ -76,33 +129,62 @@ export default function ProfilePage() {
       });
 
       const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Update failed");
 
-      if (!res.ok || !data.ok) {
-        // エラーメッセージを表示 (例: UserID is already taken)
-        throw new Error(data.error || "Update failed");
-      }
-
-      // Refresh backend state
       await update();
-
-      // Refresh avatar preview
       setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
-
       alert("Profile updated!");
     } catch (err: any) {
-      console.error(err);
-      alert(err.message || "Failed to update profile");
+      alert(err.message);
     } finally {
       setUploading(false);
     }
   }
 
-  if (sessionLoading)
-    return (
-      <div className="flex justify-center items-center h-[70vh]">
-        {t("loading") || "Loading"}...
-      </div>
-    );
+  /* -------------------------
+      Post Actions
+  -------------------------- */
+  function requestDelete(id: string) {
+    setDeletePostId(id);
+    setConfirmDeleteOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deletePostId) return;
+
+    try {
+      setIsDeleting(true);
+
+      await fetch(`/api/posts/${deletePostId}`, {
+        method: "DELETE",
+      });
+
+      await loadPosts();
+    } finally {
+      setIsDeleting(false);
+      setConfirmDeleteOpen(false);
+      setDeletePostId(null);
+    }
+  }
+
+  async function upvotePost(postId: string, userId: string) {
+    const res = await fetch(`/api/posts/${postId}/upvote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId }),
+    });
+
+    const data = await res.json();
+    return res.ok
+      ? { ok: true, action: data.action }
+      : { ok: false, error: data.error };
+  }
+
+  /* -------------------------
+      Loading UI
+  -------------------------- */
+  if (sessionLoading || postsLoading)
+    return <FullScreenLoader text={t("loadingPosts")} />;
 
   if (!user)
     return (
@@ -111,70 +193,178 @@ export default function ProfilePage() {
       </div>
     );
 
+  /* -------------------------
+      Page UI
+  -------------------------- */
   return (
-    <div className="max-w-lg mx-auto mt-24 px-4">
-      <h1 className="text-2xl font-bold mb-6">{t("profileSettings") || "Profile Settings"}</h1>
+    <>
+      {/* Edit Modal */}
+      {editingPost && (
+        <EditPostModal
+          post={editingPost}
+          onClose={() => setEditingPost(null)}
+          onSave={async (title, content, categories, tags) => {
+            await fetch(`/api/posts/${editingPost._id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title,
+                content,
+                categories,
+                tags,
+              }),
+            });
 
-      <div className="flex flex-col gap-4">
-        {/* Avatar upload */}
-        <div className="flex items-center gap-4">
-          <div
-            className="rounded-full overflow-hidden border flex items-center justify-center"
-            style={{ width: 80, height: 80 }}
-          >
-            <img
-              src={preview}
-              className="w-full h-full object-cover object-center"
-              alt="avatar preview"
-            />
-          </div>
-
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          />
-        </div>
-
-        <label>{t("name") || "Name"}</label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="border rounded px-2 py-1"
+            await loadPosts();
+            setEditingPost(null);
+          }}
         />
+      )}
 
-        {/* ✅ User ID Input */}
-        <label>{"User ID"}</label>
-        <div className="flex items-center">
-          <span className="mr-1 text-gray-500">@</span>
-          <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            className="border rounded px-2 py-1 flex-1"
-            placeholder="unique_id"
-            minLength={3}
-            maxLength={32}
-          />
-        </div>
-        <p className="text-xs text-gray-500 -mt-2">
-          {"3~32"}
-        </p>
+      {/* Delete Modal */}
+      <DeleteConfirmModal
+        open={confirmDeleteOpen}
+        onCancel={() => {
+          if (!isDeleting) {
+            setConfirmDeleteOpen(false);
+            setDeletePostId(null);
+          }
+        }}
+        onConfirm={confirmDelete}
+      />
 
-        <label>{t("bio") || "Bio"}</label>
-        <textarea
-          value={bio}
-          onChange={(e) => setBio(e.target.value)}
-          className="border rounded px-2 py-1"
-        />
-
-        <button
-          onClick={handleSave}
-          disabled={uploading}
-          className="px-4 py-2 rounded bg-blue-600 text-white"
+      <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
+        <main
+          className="
+      absolute top-[4.3rem]
+      left-0 right-0
+      h-[calc(100vh-4.3rem)]
+      overflow-y-auto no-scrollbar
+      px-3 md:px-6
+      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+    "
         >
-          {uploading ? "Saving..." : (t("saveChanges") || "Save Changes")}
-        </button>
+          <div className="max-w-2xl mx-auto mt-10">
+            {/* PROFILE SETTINGS */}
+            <h1 className="text-2xl font-bold mb-6">
+              {t("profileSettings") || "Profile Settings"}
+            </h1>
+
+            <div className="flex flex-col gap-4">
+              {/* Avatar Upload */}
+              <div className="flex items-center gap-6">
+                {/* Avatar Preview + Overlay */}
+                <div className="relative group cursor-pointer">
+                  <div
+                    className="rounded-full overflow-hidden border border-gray-300 dark:border-gray-600 
+                 flex items-center justify-center transition-all duration-200 
+                 group-hover:opacity-80 group-hover:scale-105"
+                    style={{ width: 96, height: 96 }}
+                    onClick={() =>
+                      document.getElementById("avatarInput")?.click()
+                    }
+                  >
+                    <img
+                      src={preview}
+                      className="w-full h-full object-cover"
+                      alt="avatar preview"
+                    />
+                  </div>
+
+                  {/* Hover Overlay */}
+                  <div
+                    className="absolute inset-0 rounded-full bg-black/40 text-white 
+                 opacity-0 group-hover:opacity-100 transition-opacity 
+                 flex items-center justify-center text-sm font-medium"
+                    onClick={() =>
+                      document.getElementById("avatarInput")?.click()
+                    }
+                  >
+                    Change
+                  </div>
+                </div>
+
+                {/* Hidden input */}
+                <input
+                  id="avatarInput"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+
+                {/* Text */}
+                <div
+                  className="cursor-pointer select-none"
+                  onClick={() =>
+                    document.getElementById("avatarInput")?.click()
+                  }
+                >
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                    Change profile picture
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    using JPG, PNG is Recommended
+                  </p>
+                </div>
+              </div>
+
+              {/* Name */}
+              <label>{t("name") || "Name"}</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="border rounded px-2 py-1"
+              />
+
+              {/* User ID */}
+              <label>User ID</label>
+              <div className="flex items-center">
+                <span className="mr-1 text-gray-500">@</span>
+                <input
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  className="border rounded px-2 py-1 flex-1"
+                  placeholder="unique_id"
+                  minLength={3}
+                  maxLength={32}
+                />
+              </div>
+
+              <label>{t("bio") || "Bio"}</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                className="border rounded px-2 py-1"
+              />
+
+              <button
+                onClick={handleSave}
+                disabled={uploading}
+                className="px-4 py-2 rounded bg-blue-600 text-white"
+              >
+                {uploading ? "Saving..." : t("saveChanges") || "Save Changes"}
+              </button>
+            </div>
+
+            {/* -------------------------
+              USER POSTS
+        -------------------------- */}
+            <div className="mt-16">
+              <h2 className="text-xl font-semibold mb-4">
+                {t("yourPosts") || "Your Posts"}
+              </h2>
+
+              <PostList
+                posts={posts}
+                onEdit={(p) => setEditingPost(p)}
+                onDelete={(id) => Promise.resolve(requestDelete(id))}
+                onUpvote={upvotePost}
+              />
+            </div>
+          </div>
+        </main>
       </div>
-    </div>
+    </>
   );
 }

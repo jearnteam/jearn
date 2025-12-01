@@ -83,7 +83,11 @@ export default function PostItem({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const [ready, setReady] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [height, setHeight] = useState<number | "auto">("auto");
+  const [measuredHeight, setMeasuredHeight] = useState<number>(0);
+
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [measureDone, setMeasureDone] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -115,38 +119,60 @@ export default function PostItem({
     img.onerror = () => setAvatarLoaded(true);
   }, [realAvatarUrl]);
 
+  const LINE_HEIGHT = 20;
+  const COLLAPSED_LINES = 5;
+  const FULL_LINES_LIMIT = 10;
+
   useLayoutEffect(() => {
-    if (contentRef.current) {
-      setContentHeight(contentRef.current.scrollHeight);
-      setMeasureDone(true);
-    }
-  }, [postState.content]);
+    const el = contentRef.current;
+    if (!el) return;
+
+    // Wait for MathRenderer to finish rendering
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const full = el.scrollHeight;
+        setMeasuredHeight(full);
+        setMeasureDone(true);
+
+        const tenLinesHeight = LINE_HEIGHT * FULL_LINES_LIMIT;
+        const fiveLinesHeight = LINE_HEIGHT * COLLAPSED_LINES;
+
+        if (full <= tenLinesHeight) {
+          // short content → show full → no show more
+          setContentHeight(full);
+          setHeight("auto");
+        } else {
+          // long content → show collapsed / expanded
+          setContentHeight(full);
+          setHeight(expanded ? "auto" : fiveLinesHeight);
+        }
+      });
+    });
+  }, [postState.content, expanded]);
 
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
-    const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== "IMG") return;
+    // re-measure whenever content changes size
+    const observer = new ResizeObserver(() => {
+      const full = el.scrollHeight;
+      setMeasuredHeight(full);
+      setContentHeight(full);
 
-      const original = target as HTMLImageElement;
-      const clone = original.cloneNode(true) as HTMLImageElement;
+      if (!expanded) {
+        setHeight(LINE_HEIGHT * COLLAPSED_LINES);
+      } else {
+        setHeight("auto");
+      }
+    });
 
-      clone.style.width = "100%";
-      clone.style.height = "100%";
-      clone.style.objectFit = "contain";
-      clone.style.display = "block";
+    observer.observe(el);
 
-      setImageNode(clone);
-    };
+    return () => observer.disconnect();
+  }, [expanded]);
 
-    el.addEventListener("click", handler);
-    return () => el.removeEventListener("click", handler);
-  }, []);
-
-  const shouldTruncate =
-    contentHeight && contentHeight > LINE_HEIGHT * LINE_THRESHOLD;
+  const shouldTruncate = measuredHeight > LINE_HEIGHT * FULL_LINES_LIMIT;
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -171,13 +197,16 @@ export default function PostItem({
   }, [post._id, userId]);
 
   const toggleExpand = () => {
+    // If not long enough, do nothing
+    if (!shouldTruncate) return;
+
+    // ========= EXPAND =========
     if (!expanded) {
-      // EXPAND → always expand
       setExpanded(true);
       return;
     }
 
-    // COLLAPSE
+    // ========= COLLAPSE =========
     const el = document.getElementById(
       `post-${postState._id}`
     ) as HTMLElement | null;
@@ -188,49 +217,49 @@ export default function PostItem({
 
     const scrollParent = getScrollParent(el);
 
-    // ---- CHECK IF POST TOP IS ALREADY VISIBLE ----
+    // Check if post top is already visible
     const rect = el.getBoundingClientRect();
-    const viewportTop = 0;
-    const threshold = 20; // small margin
+    const VIEWPORT_TOP = 0;
+    const THRESHOLD = 20; // small margin
 
-    const isTopVisible = rect.top >= viewportTop - threshold;
+    const isTopVisible = rect.top >= VIEWPORT_TOP - THRESHOLD;
 
     if (isTopVisible) {
-      // ⭐ Post top already visible → collapse immediately
+      // ⭐ Top already visible → just collapse, no scroll
       setExpanded(false);
       return;
     }
 
-    // ---- OTHERWISE SCROLL TO TOP FIRST ----
-    const topOffset = 0;
+    // ⭐ Top not visible → scroll to top, then collapse
+    const OFFSET = 0;
 
     if (scrollParent.type === "window") {
       window.scrollTo({
-        top: window.scrollY + rect.top - topOffset,
+        top: window.scrollY + rect.top - OFFSET,
       });
     } else {
       const parentRect = scrollParent.el.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       const target =
-        scrollParent.el.scrollTop + (elRect.top - parentRect.top) - topOffset;
+        scrollParent.el.scrollTop + (elRect.top - parentRect.top) - OFFSET;
 
       scrollParent.el.scrollTo({ top: target });
     }
 
-    // ---- WAIT UNTIL SCROLL SETTLES, THEN COLLAPSE ----
-    let lastPos = -1;
+    // Wait for scroll to settle, then collapse
+    let last = -1;
     const waitScroll = () => {
       const current =
         scrollParent.type === "window"
           ? window.scrollY
           : scrollParent.el.scrollTop;
 
-      if (current === lastPos) {
-        setExpanded(false); // collapse now
+      if (current === last) {
+        setExpanded(false);
         return;
       }
 
-      lastPos = current;
+      last = current;
       requestAnimationFrame(waitScroll);
     };
 
@@ -486,22 +515,21 @@ export default function PostItem({
 
           {/* CONTENT */}
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{
-              height:
-                expanded || !shouldTruncate
-                  ? "auto"
-                  : LINE_HEIGHT * COLLAPSED_LINES,
-              opacity: 1,
-            }}
+            animate={{ height }}
+            transition={{ duration: 0.25 }}
             className="mt-2 overflow-hidden text-gray-900 dark:text-gray-100"
-            ref={contentRef}
-            style={{
-              lineHeight: `${LINE_HEIGHT}px`,
-              visibility: measureDone ? "visible" : "hidden",
-            }}
+            style={{ lineHeight: `${LINE_HEIGHT}px` }}
           >
-            <MathRenderer html={postState.content ?? ""} />
+            <div
+              ref={contentRef}
+              className="mt-2"
+              style={{
+                lineHeight: `${LINE_HEIGHT}px`,
+                visibility: measureDone ? "visible" : "hidden",
+              }}
+            >
+              <MathRenderer html={postState.content ?? ""} />
+            </div>
           </motion.div>
 
           {/* SHOW MORE / LESS */}

@@ -69,6 +69,7 @@ export default function CategoryPageClient({ category, posts }: Props) {
             xl:left-[320px] xl:right-[320px]
             h-[calc(100vh-4.3rem)]
             overflow-y-auto
+            no-scrollbar
             px-3 md:px-6
             pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
           "
