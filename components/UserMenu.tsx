@@ -21,8 +21,13 @@ export default function UserMenu({ user }: { user: User }) {
   const { theme, setTheme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
 
-  const toggleTheme = () => {
+  const toggleTheme = async () => {
     setTheme(currentTheme === "dark" ? "light" : "dark");
+    await fetch("/api/user/update-theme", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme: theme === "light" ? "dark" : "light" }),
+    });
   };
 
   const handleLogout = () => router.push("/logout");
@@ -30,7 +35,10 @@ export default function UserMenu({ user }: { user: User }) {
   // close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
         setOpen(false);
       }
     };
@@ -61,11 +69,14 @@ export default function UserMenu({ user }: { user: User }) {
           absolute right-0 mt-2 w-48 rounded-xl shadow-lg border
           bg-white dark:bg-neutral-800 dark:border-neutral-700
           transition-all duration-200 origin-top-right
-          ${open ? "scale-100 opacity-100" : "scale-95 opacity-0 pointer-events-none"}
+          ${
+            open
+              ? "scale-100 opacity-100"
+              : "scale-95 opacity-0 pointer-events-none"
+          }
         `}
       >
         <div className="p-2 flex flex-col gap-1">
-
           {/* PROFILE */}
           <button
             onClick={() => router.push("/profile")}
@@ -73,7 +84,6 @@ export default function UserMenu({ user }: { user: User }) {
           >
             Profile
           </button>
-
           {/* THEME */}
           <button
             onClick={toggleTheme}
@@ -86,12 +96,10 @@ export default function UserMenu({ user }: { user: User }) {
             )}
             Toggle Theme
           </button>
-
           {/* LANGUAGE */}
           <div className="py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700">
             <LangSwitcher />
           </div>
-
           {/* DASHBOARD */} {/* TODO: It should shows only admin account */}
           <button
             onClick={() => router.push("/dashboard")}
@@ -99,7 +107,6 @@ export default function UserMenu({ user }: { user: User }) {
           >
             Dashboard
           </button>
-
           {/* LOGOUT */}
           <button
             onClick={handleLogout}

@@ -12,6 +12,7 @@ export default function UserThemeSync() {
 
   useEffect(() => {
     if (!hasSyncedRef.current && user?.theme) {
+      console.log("[UserThemeSync] theme loaded: " + user.theme);
       setTheme(user.theme);
       hasSyncedRef.current = true;
     }
