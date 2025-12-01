@@ -17,6 +17,29 @@ dayjs.extend(relativeTime);
 
 const COLLAPSED_HEIGHT = 66;
 
+/* ============================================
+   Scroll Parent Helper (TS-SAFE)
+=============================================== */
+type ScrollContainer =
+  | { type: "window"; el: Window }
+  | { type: "element"; el: HTMLElement };
+
+function getScrollParent(element: HTMLElement | null): ScrollContainer {
+  if (!element) return { type: "window", el: window };
+
+  let parent: HTMLElement | null = element.parentElement;
+
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    if (style.overflowY === "auto" || style.overflowY === "scroll") {
+      return { type: "element", el: parent };
+    }
+    parent = parent.parentElement;
+  }
+
+  return { type: "window", el: window };
+}
+
 export default function CommentItem({
   comment,
   isReply,
@@ -34,18 +57,22 @@ export default function CommentItem({
 }) {
   const { user } = useCurrentUser();
   const userId = user?._id ?? "";
-  const hasUpvoted = userId && comment.upvoters?.includes(userId);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  const hasUpvoted = userId && comment.upvoters?.includes(userId);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [pending, setPending] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [expanded, setExpanded] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
+
   const contentRef = useRef<HTMLDivElement>(null);
+  const commentRef = useRef<HTMLDivElement>(null);
 
   const avatarUrl =
     comment.authorAvatar?.startsWith("http") ||
@@ -55,6 +82,7 @@ export default function CommentItem({
       ? `/api/user/avatar/${comment.authorId}`
       : "/default-avatar.png";
 
+  /* Measure content height */
   useEffect(() => {
     const el = contentRef.current;
     if (el) {
@@ -65,6 +93,7 @@ export default function CommentItem({
 
   const canExpand = contentHeight && contentHeight > COLLAPSED_HEIGHT;
 
+  /* Close menu on outside click */
   useEffect(() => {
     function close(e: MouseEvent) {
       if (!menuRef.current?.contains(e.target as Node)) {
@@ -75,6 +104,7 @@ export default function CommentItem({
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
+  /* Upvote */
   const handleUpvote = async () => {
     if (!userId || !comment._id || pending) return;
     setPending(true);
@@ -92,14 +122,68 @@ export default function CommentItem({
     }
   };
 
+  /* Save edit */
   const handleEditSave = async (newContent: string) => {
     await onEdit(comment._id, newContent);
     setShowEditModal(false);
   };
 
+  /* ============================================
+     Show Less → Scroll to top of comment
+  ============================================ */
+  const toggleExpand = () => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+
+    const el = commentRef.current;
+    if (!el) {
+      setExpanded(false);
+      return;
+    }
+
+    const scrollParent = getScrollParent(el);
+    const NAVBAR_OFFSET = 80;
+
+    // Instant scroll
+    if (scrollParent.type === "window") {
+      const rect = el.getBoundingClientRect();
+      window.scrollTo({
+        top: window.scrollY + rect.top - NAVBAR_OFFSET,
+      });
+    } else {
+      const parentRect = scrollParent.el.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      scrollParent.el.scrollTo({
+        top: scrollParent.el.scrollTop + (elRect.top - parentRect.top) - NAVBAR_OFFSET,
+      });
+    }
+
+    // Wait for scroll to finish
+    let last = -1;
+    const check = () => {
+      const now =
+        scrollParent.type === "window"
+          ? window.scrollY
+          : scrollParent.el.scrollTop;
+
+      if (now === last) {
+        setExpanded(false);
+        return;
+      }
+
+      last = now;
+      requestAnimationFrame(check);
+    };
+
+    requestAnimationFrame(check);
+  };
+
   return (
     <>
       <div
+        ref={commentRef}
         className={`bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-gray-700 
           rounded-lg p-4 shadow-sm ${isReply ? "ml-1" : ""}`}
       >
@@ -114,29 +198,14 @@ export default function CommentItem({
               />
             </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              {/*
-                <div className="flex gap-3">
-                  <p className="font-semibold text-gray-800 dark:text-gray-200">
-                    {postState.authorName || ""}
-                  </p>
-                  <div className="flex items-center">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {postState.authorUserId ? ("@" + postState.authorUserId) : ""}
-                    </p>
-                  </div>
-                </div>
-                */}
+            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}>
               <div className="flex gap-3">
                 <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
                   {comment.authorName || "Anonymous"}
                 </p>
                 <div className="flex items-center">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {comment.authorUserId ? ("@" + comment.authorUserId) : ""}
+                    {comment.authorUserId ? "@" + comment.authorUserId : ""}
                   </p>
                 </div>
               </div>
@@ -166,7 +235,7 @@ export default function CommentItem({
                     <button
                       onClick={() => {
                         setMenuOpen(false);
-                        setShowEditModal(true); // ✅ open modal
+                        setShowEditModal(true);
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
                     >
@@ -186,14 +255,12 @@ export default function CommentItem({
         </div>
 
         {/* Content */}
-        {/* ✅ Fix: prevent content jumping / overflowing during expand */}
-        {/* ✅ Only render content block if there’s text */}
         {comment.content?.trim() ? (
           <div
             className="relative overflow-hidden text-sm text-gray-800 dark:text-gray-200"
             style={{
               maxHeight: expanded ? contentHeight || "none" : COLLAPSED_HEIGHT,
-              transition: "max-height 0.35s ease-in-out",
+              transition: "max-height 0.3s ease",
             }}
           >
             <div
@@ -204,16 +271,18 @@ export default function CommentItem({
               <MathRenderer html={comment.content} />
             </div>
 
-            {!expanded && contentHeight && contentHeight > COLLAPSED_HEIGHT && (
-              <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-gray-50 dark:from-neutral-800 to-transparent pointer-events-none" />
-            )}
+            {!expanded &&
+              contentHeight &&
+              contentHeight > COLLAPSED_HEIGHT && (
+                <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-gray-50 dark:from-neutral-800 to-transparent pointer-events-none" />
+              )}
           </div>
         ) : null}
 
         {canExpand && isReady && (
           <button
-            onClick={() => setExpanded((prev) => !prev)}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            onClick={toggleExpand}
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
           >
             {expanded ? "Show Less ▲" : "Show More ▼"}
           </button>
@@ -238,7 +307,8 @@ export default function CommentItem({
           </div>
         </div>
       </div>
-      {/* ✅ Reply button (for all comments, including replies) */}
+
+      {/* Reply button */}
       {onReply && (
         <button
           onClick={() => onReply(comment._id, comment.content ?? "")}
@@ -251,7 +321,7 @@ export default function CommentItem({
         </button>
       )}
 
-      {/* ✅ Edit Modal */}
+      {/* Edit Modal */}
       <AnimatePresence>
         {showEditModal && (
           <EditCommentModal
@@ -262,7 +332,7 @@ export default function CommentItem({
         )}
       </AnimatePresence>
 
-      {/* ✅ Delete Confirmation Modal */}
+      {/* Delete Modal */}
       <AnimatePresence>
         {showDeleteModal && (
           <DeleteConfirmModal

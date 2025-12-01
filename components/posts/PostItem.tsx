@@ -31,12 +31,33 @@ import FullScreenPortal from "@/features/FullScreenPortal";
 
 dayjs.extend(relativeTime);
 
+type ScrollContainer =
+  | { type: "window"; el: Window }
+  | { type: "element"; el: HTMLElement };
+
+function getScrollParent(element: HTMLElement | null): ScrollContainer {
+  if (!element) return { type: "window", el: window };
+
+  let parent: HTMLElement | null = element.parentElement;
+
+  while (parent) {
+    const style = window.getComputedStyle(parent);
+    const overflowY = style.overflowY;
+    if (overflowY === "auto" || overflowY === "scroll") {
+      return { type: "element", el: parent };
+    }
+    parent = parent.parentElement;
+  }
+
+  return { type: "window", el: window };
+}
+
 interface PostItemProps {
   post: Post;
   onEdit?: (post: Post) => Promise<void> | void;
   onDelete?: (id: string) => Promise<void> | void;
   onUpvote?: (id: string, userId: string, txId?: string) => Promise<any>;
-  fullView?: boolean;
+  isSingle?: boolean;
 }
 
 const LINE_HEIGHT = 20;
@@ -48,7 +69,7 @@ export default function PostItem({
   onEdit,
   onDelete,
   onUpvote,
-  fullView = false,
+  isSingle = false,
 }: PostItemProps) {
   const { user } = useCurrentUser();
   const userId = user?._id ?? "";
@@ -62,7 +83,7 @@ export default function PostItem({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const [expanded, setExpanded] = useState(fullView);
+  const [expanded, setExpanded] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [measureDone, setMeasureDone] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -71,6 +92,11 @@ export default function PostItem({
   const [alreadyReported, setAlreadyReported] = useState(false);
 
   const isAdminAuthor = postState.isAdmin === true;
+
+  // ⭐ Stable glow values (never undefined)
+  const [hue] = useState(() => Math.floor(Math.random() * 360));
+  const [speed] = useState(() => 2 + Math.random() * 2);
+
   const defaultAvatar = "/default-avatar.png";
 
   const realAvatarUrl =
@@ -81,7 +107,6 @@ export default function PostItem({
   const [avatarLoaded, setAvatarLoaded] = useState(false);
 
   const [imageNode, setImageNode] = useState<HTMLImageElement | null>(null);
-  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
 
   useEffect(() => {
     const img = new Image();
@@ -101,29 +126,23 @@ export default function PostItem({
     const el = contentRef.current;
     if (!el) return;
 
-    const handleImageClick = (e: MouseEvent) => {
+    const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName !== "IMG") return;
 
       const original = target as HTMLImageElement;
       const clone = original.cloneNode(true) as HTMLImageElement;
 
-      clone.removeAttribute("width");
-      clone.removeAttribute("height");
-
-      // Make image scale up/down
       clone.style.width = "100%";
       clone.style.height = "100%";
-      clone.style.maxWidth = "100%";
-      clone.style.maxHeight = "100%";
-      clone.style.objectFit = "contain"; // critical
+      clone.style.objectFit = "contain";
       clone.style.display = "block";
 
       setImageNode(clone);
     };
 
-    el.addEventListener("click", handleImageClick);
-    return () => el.removeEventListener("click", handleImageClick);
+    el.addEventListener("click", handler);
+    return () => el.removeEventListener("click", handler);
   }, []);
 
   const shouldTruncate =
@@ -139,8 +158,8 @@ export default function PostItem({
   }, []);
 
   useEffect(() => {
-    async function checkReport() {
-      if (!userId) return;
+    if (!userId) return;
+    (async () => {
       try {
         const res = await fetch(
           `/api/reports/check?postId=${post._id}&userId=${userId}`
@@ -148,26 +167,74 @@ export default function PostItem({
         const data = await res.json();
         setAlreadyReported(data.alreadyReported);
       } catch {}
-    }
-    checkReport();
+    })();
   }, [post._id, userId]);
 
   const toggleExpand = () => {
-    setExpanded((prev) => {
-      const next = !prev;
+    if (!expanded) {
+      // EXPAND → always expand
+      setExpanded(true);
+      return;
+    }
 
-      if (prev && !next) {
-        const el = document.getElementById(`post-${postState._id}`);
-        if (el) {
-          el.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        }
+    // COLLAPSE
+    const el = document.getElementById(
+      `post-${postState._id}`
+    ) as HTMLElement | null;
+    if (!el) {
+      setExpanded(false);
+      return;
+    }
+
+    const scrollParent = getScrollParent(el);
+
+    // ---- CHECK IF POST TOP IS ALREADY VISIBLE ----
+    const rect = el.getBoundingClientRect();
+    const viewportTop = 0;
+    const threshold = 20; // small margin
+
+    const isTopVisible = rect.top >= viewportTop - threshold;
+
+    if (isTopVisible) {
+      // ⭐ Post top already visible → collapse immediately
+      setExpanded(false);
+      return;
+    }
+
+    // ---- OTHERWISE SCROLL TO TOP FIRST ----
+    const topOffset = 0;
+
+    if (scrollParent.type === "window") {
+      window.scrollTo({
+        top: window.scrollY + rect.top - topOffset,
+      });
+    } else {
+      const parentRect = scrollParent.el.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      const target =
+        scrollParent.el.scrollTop + (elRect.top - parentRect.top) - topOffset;
+
+      scrollParent.el.scrollTo({ top: target });
+    }
+
+    // ---- WAIT UNTIL SCROLL SETTLES, THEN COLLAPSE ----
+    let lastPos = -1;
+    const waitScroll = () => {
+      const current =
+        scrollParent.type === "window"
+          ? window.scrollY
+          : scrollParent.el.scrollTop;
+
+      if (current === lastPos) {
+        setExpanded(false); // collapse now
+        return;
       }
 
-      return next;
-    });
+      lastPos = current;
+      requestAnimationFrame(waitScroll);
+    };
+
+    requestAnimationFrame(waitScroll);
   };
 
   const handleEdit = async () => {
@@ -181,7 +248,7 @@ export default function PostItem({
   };
 
   const handleReport = async () => {
-    if (!userId) return alert("Login required to report.");
+    if (!userId) return alert("Login required.");
     if (userId === String(postState.authorId))
       return alert("You can't report your own post.");
     if (alreadyReported) return alert("Already reported.");
@@ -259,17 +326,14 @@ export default function PostItem({
   }, [userId, postState._id, postState.upvoters, pending, onUpvote]);
 
   const isComment = !!post.parentId;
-  const WrapperTag: any = fullView || isComment ? "div" : "li";
-
-  const randomSpeed = 2 + Math.random() * 2;
-  const randomHue = Math.floor(Math.random() * 360);
+  const WrapperTag: any = isComment ? "div" : "li";
 
   return (
     <>
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
+        transition={{ duration: 0.25 }}
       >
         <WrapperTag
           id={`post-${postState._id}`}
@@ -279,25 +343,19 @@ export default function PostItem({
             border border-gray-200 dark:border-gray-700 
             rounded-xl p-4 shadow-sm hover:shadow-md transition-all
             list-none`}
-          style={{
-            "--speed": `${randomSpeed}s`,
-            "--glow-hue": randomHue,
-            "--glow-base": `hsl(${randomHue}, 100%, 65%)`,
-          }}
+          style={
+            {
+              "--speed": `${speed}s`,
+              "--glow-hue": hue,
+              "--glow-base": `hsl(${hue}, 100%, 65%)`,
+            } as React.CSSProperties
+          }
         >
           {/* HEADER */}
           <div className="flex items-center justify-between mb-3">
             <Link
               href={`/profile/${postState.authorId}`}
               scroll={false}
-              onClick={() => {
-                sessionStorage.setItem("lastPostId", postState._id);
-                sessionStorage.setItem("lastScrollY", String(window.scrollY));
-                sessionStorage.setItem(
-                  "postListVisibleCount",
-                  sessionStorage.getItem("postListVisibleCount") || "5"
-                );
-              }}
               className="flex items-center hover:opacity-80 transition"
             >
               <div className="relative w-8 h-8 rounded-full overflow-hidden border border-gray-300 dark:border-gray-700 mr-3">
@@ -318,23 +376,22 @@ export default function PostItem({
               </div>
 
               <div>
-                <div className="flex gap-3">
+                <div className="flex items-center gap-3">
                   <p className="font-semibold text-gray-800 dark:text-gray-200">
                     {postState.authorName || ""}
                   </p>
-                  <div className="flex items-center">
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {postState.authorUserId ? ("@" + postState.authorUserId) : ""}
-                    </p>
-                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {postState.authorUserId ? "@" + postState.authorUserId : ""}
+                  </p>
                 </div>
+
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {dayjs(postState.createdAt).locale(i18n.language).fromNow()}
                 </p>
               </div>
             </Link>
 
-            {/* ⭐ RESTORED MENU (edit / delete / report) */}
+            {/* MENU */}
             {userId && (
               <div className="relative" ref={menuRef}>
                 <button
@@ -350,20 +407,16 @@ export default function PostItem({
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="
-                        absolute right-0 mt-2 w-44 z-20 
-                        rounded-md overflow-hidden shadow-lg
-                        bg-white dark:bg-neutral-800 
-                        border border-gray-200 dark:border-gray-700"
+                      className="absolute right-0 mt-2 w-44 z-20 
+                      rounded-md overflow-hidden shadow-lg
+                      bg-white dark:bg-neutral-800 
+                      border border-gray-200 dark:border-gray-700"
                     >
                       {userId === String(postState.authorId) ? (
                         <>
                           <button
                             onClick={handleEdit}
-                            className="
-                              flex items-center gap-3 w-full px-4 py-2 text-left
-                              hover:bg-gray-100 dark:hover:bg-neutral-700
-                              text-gray-800 dark:text-gray-200"
+                            className="flex items-center gap-3 w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
                           >
                             <Pencil className="w-4 h-4 text-blue-500" />
                             <span>{t("edit") || "Edit"}</span>
@@ -371,10 +424,7 @@ export default function PostItem({
 
                           <button
                             onClick={handleDelete}
-                            className="
-                              flex items-center gap-3 w-full px-4 py-2 text-left 
-                              text-red-600 
-                              hover:bg-gray-100 dark:hover:bg-neutral-700"
+                            className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
                           >
                             <Trash2 className="w-4 h-4 text-red-500" />
                             <span>{t("delete") || "Delete"}</span>
@@ -384,13 +434,11 @@ export default function PostItem({
                         <button
                           onClick={handleReport}
                           disabled={alreadyReported}
-                          className={`
-                            flex items-center gap-3 w-full px-4 py-2 text-left text-yellow-600
-                            ${
-                              alreadyReported
-                                ? "opacity-50 cursor-not-allowed"
-                                : "hover:bg-gray-100 dark:hover:bg-neutral-700"
-                            }`}
+                          className={`flex items-center gap-3 w-full px-4 py-2 text-yellow-600 ${
+                            alreadyReported
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                          }`}
                         >
                           <Flag className="w-4 h-4 text-yellow-500" />
                           <span>
@@ -414,7 +462,7 @@ export default function PostItem({
             </h2>
           )}
 
-          {/* CATEGORIES (unchanged) */}
+          {/* CATEGORIES */}
           {Array.isArray(postState.categories) &&
             postState.categories.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-2 mb-1">
@@ -424,8 +472,7 @@ export default function PostItem({
                     href={`/category/${encodeURIComponent(cat.name)}`}
                     scroll={false}
                     className="text-xs px-2 py-1 rounded-md bg-blue-100 text-blue-700 
-                      dark:bg-blue-600/50 dark:text-blue-200 
-                      hover:bg-blue-200 dark:hover:bg-blue-800/60 transition"
+                  dark:bg-blue-600/50 dark:text-blue-200"
                   >
                     {i18n.language === "ja"
                       ? cat.jname
@@ -442,7 +489,7 @@ export default function PostItem({
             initial={{ height: 0, opacity: 0 }}
             animate={{
               height:
-                fullView || expanded || !shouldTruncate
+                expanded || !shouldTruncate
                   ? "auto"
                   : LINE_HEIGHT * COLLAPSED_LINES,
               opacity: 1,
@@ -457,7 +504,8 @@ export default function PostItem({
             <MathRenderer html={postState.content ?? ""} />
           </motion.div>
 
-          {!fullView && !isComment && shouldTruncate && (
+          {/* SHOW MORE / LESS */}
+          {!isComment && shouldTruncate && (
             <button
               onClick={toggleExpand}
               className="mt-2 text-blue-600 dark:text-blue-400 hover:underline text-sm"
@@ -483,21 +531,10 @@ export default function PostItem({
                 <ArrowBigUp size={18} /> {postState.upvoteCount ?? 0}
               </button>
 
-              {!fullView && !isComment && (
+              {!isSingle && !isComment && (
                 <Link
                   href={`/posts/${postState._id}#comments`}
                   scroll={false}
-                  onClick={() => {
-                    sessionStorage.setItem("restore-post-id", postState._id);
-                    sessionStorage.setItem(
-                      "restore-scroll-y",
-                      String(window.scrollY)
-                    );
-                    sessionStorage.setItem(
-                      "restore-visible-count",
-                      sessionStorage.getItem("postListVisibleCount") || "5"
-                    );
-                  }}
                   className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
                 >
                   <MessageCircle size={18} />
@@ -514,8 +551,13 @@ export default function PostItem({
                 </button>
               )}
             </div>
-            <div className="">
-              {postState.edited ? `(edited ${dayjs(postState.editedAt).locale(i18n.language).fromNow()})` : ""}
+
+            <div>
+              {postState.edited
+                ? `(edited ${dayjs(postState.editedAt)
+                    .locale(i18n.language)
+                    .fromNow()})`
+                : ""}
             </div>
           </div>
         </WrapperTag>
@@ -528,22 +570,16 @@ export default function PostItem({
         }/posts/${postState._id}`}
         onCancel={() => setShareOpen(false)}
       />
-      {/* ⭐ FULLSCREEN IMAGE VIEWER */}
+
       <FullScreenPortal>
         <AnimatePresence>
           {imageNode && (
             <motion.div
-              key="image-viewer"
+              key="img"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="
-          fixed inset-0 
-          bg-black/70
-          z-[999999999]
-          flex items-center justify-center
-          px-[10vw] py-[10vh]
-          "
+              className="fixed inset-0 bg-black/70 z-[999999] flex justify-center items-center px-[10vw] py-[10vh]"
               onClick={() => setImageNode(null)}
             >
               <div
@@ -553,10 +589,7 @@ export default function PostItem({
                     container.appendChild(imageNode);
                   }
                 }}
-                className="
-            w-full h-full                    /* fill available space */
-            flex items-center justify-center
-          "
+                className="w-full h-full flex items-center justify-center"
               />
             </motion.div>
           )}

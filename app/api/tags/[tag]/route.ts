@@ -35,30 +35,41 @@ async function enrichPost(post: any, usersColl: any) {
 
   let user = null;
 
+  // Find by _id
   if (ObjectId.isValid(uid)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(uid) },
-      { projection: { name: 1, picture: 1 } }
+      { projection: { name: 1, picture: 1, email: 1, admin: 1 } }
     );
   }
 
+  // Find by provider_id fallback
   if (!user) {
     user = await usersColl.findOne(
       { provider_id: uid },
-      { projection: { name: 1, picture: 1 } }
+      { projection: { name: 1, picture: 1, email: 1, admin: 1 } }
     );
   }
 
   const avatarId = user?._id?.toString() ?? uid;
 
+  // ⭐ ADMIN CHECK — SAME AS /api/posts
+  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
+  const isAdminViaEmail = user?.email && adminEmails.includes(user.email.trim());
+  const isAdminViaFlag = user?.admin === true;
+
   return {
     ...post,
     _id: post._id.toString(),
+
     authorId: avatarId,
     authorName: user?.name ?? "Unknown",
     authorAvatar: avatarId
       ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
       : "/default-avatar.png",
+
+    // ⭐ final admin flag
+    isAdmin: isAdminViaFlag || isAdminViaEmail,
   };
 }
 
@@ -85,11 +96,14 @@ export async function GET(
       .sort({ createdAt: -1 })
       .toArray();
 
-    // Enrich everything
+    // ⭐ Enrich
     const enriched = await Promise.all(
       posts.map(async (p) => {
         const enrichedPost = await enrichPost(p, usersColl);
-        const categoryData = await enrichCategories(p.categories ?? [], categoriesColl);
+        const categoryData = await enrichCategories(
+          p.categories ?? [],
+          categoriesColl
+        );
 
         return {
           ...enrichedPost,

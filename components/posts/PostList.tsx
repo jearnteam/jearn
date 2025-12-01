@@ -30,7 +30,7 @@ export default function PostList({
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  /* Load saved visible count */
+  /* Load saved visible count (from scroll restore) */
   useEffect(() => {
     const saved = sessionStorage.getItem("restore-visible-count");
     if (saved) {
@@ -90,15 +90,11 @@ export default function PostList({
     return () => observer.disconnect();
   }, [posts.length, batchLoading]);
 
-  /* 
-  -----------------------------------------
-  FIXED: restore scroll ONLY ONCE
-  -----------------------------------------
-  */
+  /* Restore scroll position only once */
   const restoredOnce = useRef(false);
 
   useEffect(() => {
-    if (restoredOnce.current) return; // prevent running again
+    if (restoredOnce.current) return;
 
     const id = sessionStorage.getItem("restore-post-id");
     if (!id) return;
@@ -106,13 +102,12 @@ export default function PostList({
     const el = document.getElementById(`post-${id}`);
     if (!el) return;
 
-    restoredOnce.current = true; // mark as restored
+    restoredOnce.current = true;
 
     requestAnimationFrame(() => {
       el.scrollIntoView({ behavior: "instant", block: "start" });
     });
 
-    // IMPORTANT: clear so future loads do NOT jump back
     sessionStorage.removeItem("restore-post-id");
     sessionStorage.removeItem("restore-visible-count");
   }, [visiblePosts]);
@@ -122,7 +117,7 @@ export default function PostList({
       initial={{ opacity: 0, filter: "blur(6px)" }}
       animate={{ opacity: 1, filter: "blur(0px)" }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="space-y-3"
+      className="space-y-3 overflow-hidden"
     >
       {visiblePosts.map((post) => (
         <PostItem
@@ -138,7 +133,7 @@ export default function PostList({
         <div className="text-center py-4 text-gray-500">Loading…</div>
       )}
 
-      <div ref={sentinelRef} className="h-10"></div>
+      <div ref={sentinelRef} className="h-10" />
     </motion.div>
   );
 }

@@ -11,12 +11,10 @@
 
 /* ✅ Global Reset & Font Settings */
 
-/* ✅ Hide scrollbar utilities */
-.scrollbar-hide::-webkit-scrollbar {
+.no-scrollbar::-webkit-scrollbar {
   display: none;
 }
-.scrollbar-hide {
-  -ms-overflow-style: none;
+.no-scrollbar {
   scrollbar-width: none;
 }
 

@@ -1,4 +1,3 @@
-// components/posts/FullPostClient.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -47,12 +46,12 @@ export default function FullPostClient({ initialPost }: Props) {
         );
       }
 
-      // Full post update sync (title/content/categories/tags)
+      // Full post update sync
       if (data.type === "update-post" && data.post._id === post._id) {
         setPost((prev) => ({ ...prev, ...data.post }));
       }
 
-      // When deleted, redirect
+      // When deleted
       if (data.type === "delete-post" && data.id === post._id) {
         router.push("/");
       }
@@ -84,12 +83,6 @@ export default function FullPostClient({ initialPost }: Props) {
     setEditOpen(true);
   }, []);
 
-  /**
-   * This function is forward-compatible:
-   *
-   * - Currently:   EditPostModal calls onSave(title, content)
-   * - Later:       It will call onSave(title, content, categories, tags)
-   */
   const handleSavePost = useCallback(
     async (
       title: string,
@@ -97,8 +90,6 @@ export default function FullPostClient({ initialPost }: Props) {
       categories: string[],
       tags: string[]
     ) => {
-      console.log("HANDLE SAVE POST — RECEIVED TAGS:", tags);
-
       if (!post._id) return;
 
       const res = await fetch(`/api/posts`, {
@@ -148,10 +139,10 @@ export default function FullPostClient({ initialPost }: Props) {
    * --------------------------------------------------------- */
   return (
     <>
-      {/* Full-size post view */}
+      {/* FULL POST — use isSingle to hide comment icon */}
       <PostItem
         post={post}
-        fullView
+        isSingle={true}
         onUpvote={handleUpvote}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}

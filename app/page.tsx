@@ -110,7 +110,7 @@ export default function HomePage() {
         onConfirm={confirmDelete}
       />
 
-      {/* Loading */}
+      {/* Loading overlay */}
       {loading && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -128,11 +128,11 @@ export default function HomePage() {
           </div>
         </motion.div>
       )}
-      {/* PAGE SCROLL DISABLED ONLY HERE */}
+
+      {/* Scroll layout */}
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
-        {/* FIXED SIDEBARS + SCROLLING CENTER LAYOUT */}
         <div className="w-full h-screen overflow-hidden bg-white dark:bg-black">
-          {/* LEFT SIDEBAR - FIXED */}
+          {/* LEFT SIDEBAR */}
           <aside
             className="
               hidden xl:flex flex-col
@@ -152,7 +152,7 @@ export default function HomePage() {
             </button>
           </aside>
 
-          {/* RIGHT SIDEBAR - FIXED */}
+          {/* RIGHT SIDEBAR */}
           <aside
             className="
               hidden xl:flex flex-col
@@ -167,7 +167,7 @@ export default function HomePage() {
             <p>Right Content</p>
           </aside>
 
-          {/* CENTER CONTENT — SCROLLABLE */}
+          {/* MAIN CONTENT */}
           <main
             ref={mainRef}
             className="
@@ -175,11 +175,9 @@ export default function HomePage() {
               top-[4.3rem]
               left-0 right-0
               xl:left-[320px] xl:right-[320px]
-
               h-[calc(100vh-4.3rem)]
               overflow-y-auto
-
-              px-3 md:px-6
+              no-scrollbar
               pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
             "
           >

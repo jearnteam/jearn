@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-/* -------------------------------------------------------------------------- */
-/*                         ENRICH CATEGORY OBJECTS (FULL)                      */
-/* -------------------------------------------------------------------------- */
 async function enrichCategories(catIds: any[], categoriesColl: any) {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
@@ -27,9 +24,6 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
   }));
 }
 
-/* -------------------------------------------------------------------------- */
-/*                                GET ROUTE                                    */
-/* -------------------------------------------------------------------------- */
 export async function GET(_req: Request, { params }: any) {
   const { id } = params;
 
@@ -48,28 +42,24 @@ export async function GET(_req: Request, { params }: any) {
     const usersColl = db.collection("users");
     const categoriesColl = db.collection("categories");
 
-    /* ---------------------------------------------------------- */
-    /*                      USER INFO                             */
-    /* ---------------------------------------------------------- */
+    // ⭐ Use email-based admin logic — SAME AS MAIN POSTS ROUTE
     const user = await usersColl.findOne(
       { _id: new ObjectId(id) },
-      { projection: { name: 1, userId: 1 } }
+      { projection: { name: 1, userId: 1, email: 1 } }
     );
+
+    const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
+    const isAdminUser =
+      user?.email && adminEmails.includes(user.email.trim());
 
     const authorName = user?.name ?? "Unknown User";
     const authorUserId = user?.userId;
 
-    /* ---------------------------------------------------------- */
-    /*                     USER POSTS                              */
-    /* ---------------------------------------------------------- */
     const posts = await postsColl
-      .find({ authorId: id, parentId: null }) // only top-level posts
+      .find({ authorId: id, parentId: null })
       .sort({ createdAt: -1 })
       .toArray();
 
-    /* ---------------------------------------------------------- */
-    /*                ENRICH CATEGORIES + FIX FIELDS              */
-    /* ---------------------------------------------------------- */
     const enrichedPosts = await Promise.all(
       posts.map(async (post: any) => {
         const categoryData = await enrichCategories(
@@ -82,14 +72,19 @@ export async function GET(_req: Request, { params }: any) {
           title: post.title,
           content: post.content,
           createdAt: post.createdAt,
+
           authorId: id,
           authorName,
           authorUserId,
           authorAvatar: `/api/user/avatar/${id}?t=${Date.now()}`,
+
           categories: categoryData,
           tags: post.tags ?? [],
           upvoteCount: post.upvoteCount ?? 0,
           commentCount: post.commentCount ?? 0,
+
+          // ⭐ Consistent admin flag
+          isAdmin: isAdminUser,
         };
       })
     );
