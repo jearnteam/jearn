@@ -122,7 +122,9 @@ export default function HomePage() {
             <div className="w-40 h-40">
               <LoadingOwl />
             </div>
-            <p className="text-lg font-medium mt-4">{t("loadingPosts") || "Loading posts"}...</p>
+            <p className="text-lg font-medium mt-4">
+              {t("loadingPosts") || "Loading posts"}...
+            </p>
           </div>
         </motion.div>
       )}

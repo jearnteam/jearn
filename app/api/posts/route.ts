@@ -234,6 +234,7 @@ export async function POST(req: Request) {
       categories: categoryData,
       tags: doc.tags ?? [],
       commentCount: 0,
+      edited: false
     };
 
     const sseType = replyTo
@@ -302,6 +303,9 @@ export async function PUT(req: Request) {
       updateFields.tags = tags;
     }
 
+    updateFields.edited = true;
+    updateFields.editedAt = new Date();
+
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
 
     const updated = await posts.findOne({ _id: new ObjectId(id) });
@@ -317,7 +321,7 @@ export async function PUT(req: Request) {
     const final = {
       ...enrichedPost,
       categories: enrichedCategories,
-      tags: updated.tags ?? [],
+      tags: updated.tags ?? []
     };
 
     const type = existing.replyTo
