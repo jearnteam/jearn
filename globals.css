@@ -146,6 +146,8 @@ html.dark {
   color: #29b935;
   padding: 3px;
   border-radius: 4px;
+  display: inline-block;
+  white-space: pre-wrap;
 }
 .ProseMirror:focus {
   outline: none !important;
@@ -173,9 +175,19 @@ html.dark {
 /*                  INLINE CODE STYLING                       */
 /* ---------------------------------------------------------- */
 code {
-  color: #29b935;
+  color: #29a425;
   padding: 3px;
   border-radius: 4px;
+  display: inline-block;
+  white-space: pre-wrap;
+}
+
+.dark code {
+  color: #39c945;
+  padding: 3px;
+  border-radius: 4px;
+  display: inline-block;
+  white-space: pre-wrap;
 }
 
 /* ---------------------------------------------------------- */
