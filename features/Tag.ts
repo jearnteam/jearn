@@ -1,5 +1,6 @@
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node, mergeAttributes, type CommandProps } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
+import type { EditorView } from "prosemirror-view";
 
 export const tagPluginKey = new PluginKey("tag-handler");
 
@@ -16,7 +17,7 @@ export const Tag = Node.create({
   group: "inline",
   inline: true,
   atom: true,
-  selectable: true,
+  selectable: false, // behaves like a single inline char
 
   addAttributes() {
     return {
@@ -68,43 +69,31 @@ export const Tag = Node.create({
     return {
       insertTag:
         (value: string) =>
-        ({ state, dispatch, view }) => {
+        ({ state, tr, dispatch }) => {
           const clean = value.replace(/[^A-Za-z0-9_]/g, "");
-          const { tr, schema } = state;
-          const { from, to } = state.selection;
-
-          if (from !== to) tr.delete(from, to);
-
-          const pos = tr.selection.from;
+          const { schema } = state;
+          const { from, to } = tr.selection;
 
           const tagNode = schema.nodes.tag.create({ value: clean });
-          const spacer = schema.text("\u200B");
 
-          tr.insert(pos, tagNode);
-          tr.insert(pos + 1, spacer);
+          let next = tr;
+          if (from !== to) next = next.delete(from, to);
 
-          const target = pos + 2;
-          tr.setSelection(TextSelection.create(tr.doc, target));
+          const pos = next.selection.from;
 
-          dispatch?.(tr);
+          // Insert tag
+          next = next.insert(pos, tagNode);
 
-          // ⭐ FIX cursor collapsing inside tag atom
-          setTimeout(() => {
-            if (!view) return;
-            view.focus();
+          // ⭐ Insert an empty text node immediately after
+          const emptyText = schema.text("");
+          next = next.insert(pos + tagNode.nodeSize, emptyText);
 
-            const sel = window.getSelection();
-            const dom = view.domAtPos(target);
+          // Move caret after the empty text node
+          next = next.setSelection(
+            TextSelection.create(next.doc, pos + tagNode.nodeSize)
+          );
 
-            if (sel && dom.node) {
-              sel.removeAllRanges();
-              const range = document.createRange();
-              range.setStart(dom.node, dom.offset ?? 0);
-              range.collapse(true);
-              sel.addRange(range);
-            }
-          }, 0);
-
+          if (dispatch) dispatch(next);
           return true;
         },
     };
@@ -116,85 +105,68 @@ export const Tag = Node.create({
         key: tagPluginKey,
 
         props: {
-          handleClick(view, pos) {
-            const $pos = view.state.doc.resolve(pos);
-            const before = $pos.nodeBefore;
-
-            if (before?.type.name === "tag") {
-              const tr = view.state.tr.insertText("\u200B", pos);
-              tr.setSelection(TextSelection.create(tr.doc, pos + 1));
-              view.dispatch(tr);
-              view.focus();
-              return true;
-            }
-            return false;
-          },
-
-          handleKeyDown(view, event) {
+          // Backspace deletes tag when caret is right after it
+          handleKeyDown(view: EditorView, event: KeyboardEvent) {
             if (event.key !== "Backspace") return false;
 
-            const { $from } = view.state.selection;
-            const nodeBefore = $from.nodeBefore;
+            const { state } = view;
+            const { selection } = state;
+            if (!selection.empty) return false;
 
-            if (nodeBefore?.type.name === "tag") {
+            const { $from } = selection;
+            const before = $from.nodeBefore;
+
+            if (before?.type.name === "tag") {
               event.preventDefault();
-              const tr = view.state.tr.delete(
-                $from.pos - nodeBefore.nodeSize,
+              const tr = state.tr.delete(
+                $from.pos - before.nodeSize,
                 $from.pos
               );
               view.dispatch(tr);
               return true;
             }
+
             return false;
           },
 
-          handleTextInput(view, from, _to, text) {
+          // Autocomplete: "#tag " → tag node
+          handleTextInput(
+            view: EditorView,
+            from: number,
+            _to: number,
+            text: string
+          ) {
             if (text !== " ") return false;
 
             const $from = view.state.doc.resolve(from);
-
-            const before = $from.parent.textBetween(
+            const beforeText = $from.parent.textBetween(
               0,
               $from.parentOffset,
               undefined,
               "\uFFFC"
             );
 
-            const match = before.match(/#([\p{L}\p{N}_]+)$/u);
+            const match = beforeText.match(/#([\p{L}\p{N}_]+)$/u);
             if (!match) return false;
 
             const tagValue = match[1];
             const full = `#${tagValue}`;
             const start = from - full.length;
 
-            const tr = view.state.tr;
-            tr.delete(start, from);
+            const { state } = view;
+            const { tr, schema } = state;
 
-            const tagNode = view.state.schema.nodes.tag.create({
-              value: tagValue,
-            });
-            const spacer = view.state.schema.text("\u200B");
+            const tagNode = schema.nodes.tag.create({ value: tagValue });
 
-            tr.insert(start, tagNode);
-            tr.insert(start + 1, spacer);
+            let nextTr = tr.delete(start, from);
+            nextTr = nextTr.insert(start, tagNode);
+            const after = start + tagNode.nodeSize;
 
-            tr.setSelection(TextSelection.create(tr.doc, start + 2));
+            nextTr = nextTr.setSelection(
+              TextSelection.create(nextTr.doc, after)
+            );
 
-            view.dispatch(tr);
-
-            // ⭐ SAME FIX
-            setTimeout(() => {
-              const sel = window.getSelection();
-              const dom = view.domAtPos(start + 2);
-              if (sel && dom.node) {
-                sel.removeAllRanges();
-                const range = document.createRange();
-                range.setStart(dom.node, dom.offset ?? 0);
-                range.collapse(true);
-                sel.addRange(range);
-              }
-            }, 0);
-
+            view.dispatch(nextTr);
             return true;
           },
         },

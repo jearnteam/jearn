@@ -10,6 +10,36 @@ import {
 import clsx from "clsx";
 import type { Editor } from "@tiptap/react";
 
+function ensureSafeEnding(html: string): string {
+  if (!html) return "<p></p>";
+
+  let clean = html.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+
+  // If content ends with inline atom (math/tag/image/code/etc)
+  if (
+    clean.endsWith("</span>") || // math or tag
+    clean.endsWith("/>") || // images
+    clean.endsWith("</code>") ||
+    clean.endsWith("</strong>") ||
+    clean.endsWith("</em>") ||
+    clean.endsWith("</mark>")
+  ) {
+    clean += "<p></p>";
+  }
+
+  // If there is no ending paragraph at all → force it
+  if (!clean.match(/<p[^>]*>.*<\/p>\s*$/)) {
+    clean += "<p></p>";
+  }
+
+  return clean;
+}
+
+function removeAllZWSP(html: string): string {
+  if (!html) return "<p></p>";
+  return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
+}
+
 export interface PostEditorWrapperRef {
   clearEditor: () => void;
   getHTML: () => string;
@@ -53,26 +83,32 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
 
-      editor.on("create", () => {
-        const dom = editor.view.dom;
+      // Fix ZWSP after tag/latex
+      setTimeout(() => {
+        if (!editor.view) return;
 
-        // ⭐ REAL USER INPUT ONLY — using beforeinput with safe inputTypes
-        dom.addEventListener("beforeinput", (e: InputEvent) => {
-          const type = e.inputType;
+        const { state, dispatch } = editor.view;
+        const tr = state.tr;
+        let changed = false;
 
-          // These ONLY happen during user edits (never on focus)
-          const allowed = [
-            "insertText",
-            "deleteContentBackward",
-            "deleteContentForward",
-            "insertFromPaste",
-            "insertParagraph",
-          ];
+        state.doc.descendants((node, pos) => {
+          if (node.type.name === "tag" || node.type.name === "latex") {
+            const after = pos + node.nodeSize;
+            const next = state.doc.nodeAt(after);
 
-          if (allowed.includes(type)) {
-            onUpdate?.();
+            if (!next || next.text !== "\u200B") {
+              tr.insert(after, state.schema.text("\u200B"));
+              changed = true;
+            }
           }
         });
+
+        if (changed) dispatch(tr);
+      }, 0);
+
+      // 🔥 Reliable event for detecting actual document changes
+      editor.on("update", () => {
+        onUpdate?.();
       });
     };
 
@@ -105,7 +141,7 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
         )}
       >
         <PostEditorInner
-          value={value}
+          value={removeAllZWSP(ensureSafeEnding(value))}
           placeholder={placeholder}
           onReady={handleReady}
         />

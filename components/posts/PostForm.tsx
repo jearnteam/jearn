@@ -68,10 +68,47 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   /*                              CHECK CATEGORIES                              */
   /* -------------------------------------------------------------------------- */
 
+  function extractTextWithMath(html: string): string {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+
+    let text = "";
+
+    function walk(node: Node) {
+      if (!node) return;
+
+      // plain text nodes
+      if (node.nodeType === Node.TEXT_NODE) {
+        text += node.textContent ?? "";
+        return;
+      }
+
+      // math inline node → append latex
+      if (node instanceof HTMLElement && node.dataset.type === "math") {
+        const latex =
+          node.getAttribute("latex") || node.getAttribute("data-latex") || "";
+        if (latex) text += latex + " ";
+        return;
+      }
+
+      // walk children
+      node.childNodes.forEach(walk);
+    }
+
+    walk(div);
+
+    return text.replace(/\s+/g, " ").trim();
+  }
+
   const handleCheckCategories = async () => {
     const html = editorRef.current?.getHTML() ?? "";
-    const text = html.replace(/<[^>]+>/g, "").trim();
-    if (!text) return;
+    const text = extractTextWithMath(html);
+
+    // if no meaningful text or title → skip
+    if (!text.trim() && !title.trim()) {
+      console.log("❌ No content to categorize");
+      return;
+    }
 
     const checkText = `title: ${title}\n${text}`;
 
@@ -93,7 +130,8 @@ export default function PostForm({ onSubmit }: PostFormProps) {
 
       const data: Category[] = await res.json();
 
-      setCategories(data.slice(0));
+      // triggers rerender
+      setCategories([...data]);
       setCategoryReady(true);
     } catch (err) {
       console.error("❌ Category check failed:", err);

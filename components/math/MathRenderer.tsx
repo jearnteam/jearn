@@ -19,17 +19,14 @@ function renderImages(container: HTMLElement) {
 
     const wrapper = document.createElement("div");
     wrapper.className =
-      "  post-image-wrapper w-full max-h-[400px] my-4 flex justify-center items-center rounded-md";
+      "post-image-wrapper w-full max-h-[400px] my-4 flex justify-center items-center rounded-md";
 
     const img = document.createElement("img");
-    img.src = `/api/images/${id}`; // FINAL correct route
+    img.src = `/api/images/${id}`;
     img.className =
       "max-h-[400px] w-auto object-contain rounded-md opacity-0 transition-opacity duration-300";
 
-    img.onload = () => {
-      img.style.opacity = "1";
-    };
-
+    img.onload = () => (img.style.opacity = "1");
     img.onerror = () => {
       wrapper.innerHTML =
         "<div class='text-gray-500 dark:text-gray-300 p-4'>Image not available</div>";
@@ -50,22 +47,50 @@ function MathRendererBase({ html }: { html: string }) {
     const el = ref.current;
     if (!el) return;
 
-    /* --------- RENDER MATH ---------- */
-    const mathNodes = el.querySelectorAll("span[data-type='math']");
-    mathNodes.forEach((span) => {
-      const rawLatex = span.getAttribute("latex") || "";
-      const cleaned = rawLatex.replace(/[\u200B-\u200D\uFEFF]/g, "");
+    /* ================================
+     * FIND BOTH OLD AND NEW MATH NODES
+     * ================================ */
 
-      const mathEl = document.createElement("span");
+    const mathNodes = el.querySelectorAll(
+      "span[data-type='math']"
+    ) as NodeListOf<HTMLSpanElement>;
+
+    mathNodes.forEach((span: HTMLSpanElement) => {
+      /* NEW FORMAT: editor should produce → <span data-latex="..."> */
+      let latex =
+        span.getAttribute("data-latex") ||
+        span.getAttribute("latex") || // fallback (old data)
+        span.textContent || "";
+
+      const cleaned = latex.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+
+      const render = document.createElement("span");
 
       try {
-        katex.render(cleaned, mathEl, { throwOnError: false });
+        katex.render(cleaned, render, { throwOnError: false });
       } catch {
-        mathEl.textContent = cleaned;
+        render.textContent = cleaned;
       }
 
       span.innerHTML = "";
-      span.appendChild(mathEl);
+      span.appendChild(render);
+
+      /* ---------------------------
+       * DOUBLE-CLICK COPY LATEX
+       * --------------------------- */
+      span.addEventListener("dblclick", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        try {
+          await navigator.clipboard.writeText(cleaned);
+
+          span.style.transition = "background 0.25s ease";
+          span.style.background = "#c7d2fe";
+
+          setTimeout(() => (span.style.background = ""), 450);
+        } catch {}
+      });
     });
 
     /* --------- RENDER IMAGES LAST ---------- */

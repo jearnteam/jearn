@@ -16,15 +16,14 @@ export const HeadingPatch = Extension.create({
   addCommands() {
     return {
       setHeadingLevel:
-        (attrs: { level: Level }) =>
-        ({ editor, chain }: CommandProps) => {
+        (attrs) =>
+        ({ editor, chain }) => {
           const isSame = editor.isActive("heading", { level: attrs.level });
 
           if (isSame) {
             return chain().setParagraph().run();
           }
 
-          // Always convert new block to heading
           return chain().setNode("heading", attrs).run();
         },
     };

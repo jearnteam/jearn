@@ -135,14 +135,14 @@ export default function HomePage() {
           {/* LEFT SIDEBAR - FIXED */}
           <aside
             className="
-      hidden xl:flex flex-col
-      fixed top-[4.3rem] left-0
-      w-[320px] h-[calc(100vh-4.3rem)]
-      bg-black text-white px-4 py-4
-      border-r border-neutral-800
-      overflow-y-auto
-      z-30
-    "
+              hidden xl:flex flex-col
+              fixed top-[4.3rem] left-0
+              w-[320px] h-[calc(100vh-4.3rem)]
+              bg-black text-white px-4 py-4
+              border-r border-neutral-800
+              overflow-y-auto
+              z-30
+            "
           >
             <button
               onClick={() => setShowPostBox(true)}
@@ -155,14 +155,14 @@ export default function HomePage() {
           {/* RIGHT SIDEBAR - FIXED */}
           <aside
             className="
-      hidden xl:flex flex-col
-      fixed top-[4.3rem] right-0
-      w-[320px] h-[calc(100vh-4.3rem)]
-      bg-black text-white px-4 py-4
-      border-l border-neutral-800
-      overflow-y-auto
-      z-30
-    "
+              hidden xl:flex flex-col
+              fixed top-[4.3rem] right-0
+              w-[320px] h-[calc(100vh-4.3rem)]
+              bg-black text-white px-4 py-4
+              border-l border-neutral-800
+              overflow-y-auto
+              z-30
+            "
           >
             <p>Right Content</p>
           </aside>
@@ -171,17 +171,17 @@ export default function HomePage() {
           <main
             ref={mainRef}
             className="
-      absolute 
-      top-[4.3rem]
-      left-0 right-0
-      xl:left-[320px] xl:right-[320px]
+              absolute 
+              top-[4.3rem]
+              left-0 right-0
+              xl:left-[320px] xl:right-[320px]
 
-      h-[calc(100vh-4.3rem)]
-      overflow-y-auto
+              h-[calc(100vh-4.3rem)]
+              overflow-y-auto
 
-      px-3 md:px-6
-      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-    "
+              px-3 md:px-6
+              pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+            "
           >
             {isRefreshing && (
               <div className="flex justify-center items-center py-2">

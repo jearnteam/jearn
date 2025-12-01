@@ -22,7 +22,7 @@ export default function FullPostClient({ initialPost }: Props) {
   const { user } = useCurrentUser();
 
   /* ---------------------------------------------------------
-   * SSE Listener — live sync post (including categories)
+   * SSE Listener — live sync post (title, content, categories, tags)
    * --------------------------------------------------------- */
   useEffect(() => {
     const es = new EventSource("/api/stream");
@@ -30,7 +30,7 @@ export default function FullPostClient({ initialPost }: Props) {
     es.onmessage = (event) => {
       const data = JSON.parse(event.data);
 
-      // live upvote sync
+      // Upvote sync
       if (data.type === "upvote-post" && data.postId === post._id) {
         setPost((prev) =>
           prev
@@ -47,12 +47,12 @@ export default function FullPostClient({ initialPost }: Props) {
         );
       }
 
-      // live update sync (title, content, categories)
+      // Full post update sync (title/content/categories/tags)
       if (data.type === "update-post" && data.post._id === post._id) {
         setPost((prev) => ({ ...prev, ...data.post }));
       }
 
-      // deleted
+      // When deleted, redirect
       if (data.type === "delete-post" && data.id === post._id) {
         router.push("/");
       }
@@ -84,8 +84,21 @@ export default function FullPostClient({ initialPost }: Props) {
     setEditOpen(true);
   }, []);
 
+  /**
+   * This function is forward-compatible:
+   *
+   * - Currently:   EditPostModal calls onSave(title, content)
+   * - Later:       It will call onSave(title, content, categories, tags)
+   */
   const handleSavePost = useCallback(
-    async (title: string, content: string, categories?: string[]) => {
+    async (
+      title: string,
+      content: string,
+      categories: string[],
+      tags: string[]
+    ) => {
+      console.log("HANDLE SAVE POST — RECEIVED TAGS:", tags);
+
       if (!post._id) return;
 
       const res = await fetch(`/api/posts`, {
@@ -95,11 +108,15 @@ export default function FullPostClient({ initialPost }: Props) {
           title,
           content,
           categories,
+          tags,
         }),
         headers: { "Content-Type": "application/json" },
       });
 
-      if (!res.ok) throw new Error("❌ Failed to save post");
+      if (!res.ok) {
+        console.error("❌ Failed to save post", await res.text());
+        throw new Error("Failed to save post");
+      }
 
       const { post: updated } = await res.json();
       setPost(updated as Post);
@@ -127,7 +144,7 @@ export default function FullPostClient({ initialPost }: Props) {
   }, [post._id, router]);
 
   /* ---------------------------------------------------------
-   * RENDER
+   * Render
    * --------------------------------------------------------- */
   return (
     <>
@@ -145,7 +162,9 @@ export default function FullPostClient({ initialPost }: Props) {
         <EditPostModal
           post={post}
           onClose={() => setEditOpen(false)}
-          onSave={handleSavePost}
+          onSave={(title, content, categories, tags) =>
+            handleSavePost(title, content, categories, tags)
+          }
         />
       )}
 

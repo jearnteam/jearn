@@ -128,18 +128,44 @@ export function usePosts() {
   /*                                 EDIT POST                                   */
   /* -------------------------------------------------------------------------- */
   const editPost = useCallback(
-    async (id: string, title: string, content: string) => {
+    async (
+      id: string,
+      title: string,
+      content: string,
+      categories?: string[],
+      tags?: string[]
+    ) => {
+      // Optimistic: update title/content immediately
       setPosts((prev) =>
-        prev.map((p) => (p._id === id ? { ...p, title, content } : p))
+        prev.map((p) =>
+          p._id === id
+            ? {
+                ...p,
+                title,
+                content,
+              }
+            : p
+        )
       );
 
       const res = await fetch("/api/posts", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, title, content }),
+        body: JSON.stringify({ id, title, content, categories, tags }),
       });
 
-      if (!res.ok) fetchPosts();
+      // If backend fails, refetch to stay consistent
+      if (!res.ok) {
+        console.error("❌ editPost() failed, refetching posts...");
+        fetchPosts();
+        return;
+      }
+
+      // Optional: merge latest version from server
+      const { post: updated } = await res.json();
+      if (updated) {
+        setPosts((prev) => prev.map((p) => (p._id === id ? updated : p)));
+      }
     },
     [fetchPosts]
   );

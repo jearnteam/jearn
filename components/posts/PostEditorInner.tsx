@@ -8,7 +8,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 
-import { Plugin, PluginKey } from "prosemirror-state";
+import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
 
 import Underline from "@tiptap/extension-underline";
 import Strike from "@tiptap/extension-strike";
@@ -24,30 +24,33 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
-
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
-import { HeadingPatch } from "@/features/HeadingPatch";
-import type { Level } from "@tiptap/extension-heading";
 import { ImagePlaceholder } from "@/features/ImagePlaceholder";
+import { CursorExitFix } from "@/features/CursorExitFix"; // UPDATED SAFE VERSION
+import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
 
 import { Extension } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
+import type { Level } from "@tiptap/extension-heading";
+import { AtomBoundaryFix } from "@/features/AtomBoundaryFix";
 
-/* ----------------------- ZERO WIDTH ----------------------- */
-const removeZeroWidthCharsKey = new PluginKey("remove-zero-width-chars");
-const textLimitPluginKey = new PluginKey("text-limit");
-export const RemoveZeroWidthChars = Extension.create({
-  name: "removeZeroWidthChars",
+/* ----------------------- ZERO WIDTH (PASTE ONLY) ----------------------- */
+
+const zeroWidthCleanupKey = new PluginKey("zero-width-cleanup");
+
+const ZeroWidthCleanup = Extension.create({
+  name: "zeroWidthCleanup",
   addProseMirrorPlugins() {
     return [
       new Plugin({
-        key: removeZeroWidthCharsKey, // ✅ give it a unique key
+        key: zeroWidthCleanupKey,
         props: {
           handlePaste(view, event) {
-            const clean = event.clipboardData
-              ?.getData("text/plain")
-              ?.replace(/[\u200B-\u200D\uFEFF]/g, "");
-            view.dispatch(view.state.tr.insertText(clean || ""));
+            const text = event.clipboardData?.getData("text/plain");
+            if (!text) return false;
+
+            const clean = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
+            view.dispatch(view.state.tr.insertText(clean));
             return true;
           },
           transformPastedHTML(html) {
@@ -60,18 +63,16 @@ export const RemoveZeroWidthChars = Extension.create({
 });
 
 /* ----------------------- CHARACTER LIMIT ----------------------- */
+
 const ZERO_WIDTH_REGEX = /[\u200B-\u200D\uFEFF]/g;
 
 function countCharactersWithMath(doc: any) {
   let count = 0;
-  let paragraphIndex = -1;
 
   doc.descendants((node: any) => {
     if (node.type?.name === "paragraph") {
-      paragraphIndex++;
-      const clean = node.textContent.replace(ZERO_WIDTH_REGEX, "");
-      if (paragraphIndex === 0) return true;
-      if (clean.length === 0) count++;
+      // Count paragraph as 1 (empty or not)
+      count++;
       return true;
     }
 
@@ -81,8 +82,8 @@ function countCharactersWithMath(doc: any) {
     }
 
     if (node.type?.name === "tag") {
-      const val = (node.attrs?.value || "").replace(ZERO_WIDTH_REGEX, "");
-      count += `#${val}`.length;
+      const value = (node.attrs?.value || "").replace(ZERO_WIDTH_REGEX, "");
+      count += 1 + value.length; // ⭐ “#tag” counts as length
       return false;
     }
 
@@ -100,30 +101,19 @@ function countCharactersWithMath(doc: any) {
     return true;
   });
 
-  return count;
+  // ⭐ Subtract 1 ONLY IF there's anything counted
+  return count > 0 ? count - 1 : 0;
 }
 
 const MAX_CHARS = 20000;
 
-/* ⭐ IMPORTANT: NO KEYED PLUGIN */
-export const TextLimitPlugin = new Plugin({
-  key: textLimitPluginKey, // ✅ give it a unique key
-  filterTransaction(tr) {
-    return countCharactersWithMath(tr.doc) <= MAX_CHARS;
-  },
-});
+const textLimitPluginKey = new PluginKey("text-limit");
 
-/* ----------------------- SAFE ENTER FOR HEADINGS ----------------------- */
-const SafeHeadingEnterFix = Extension.create({
-  name: "safeHeadingEnterFix",
-  addKeyboardShortcuts() {
-    return {
-      Enter: ({ editor }) => {
-        const { $from } = editor.state.selection;
-        if ($from.parent.type.name !== "heading") return false;
-        return editor.chain().focus().splitBlock().setNode("paragraph").run();
-      },
-    };
+export const TextLimitPlugin = new Plugin({
+  key: textLimitPluginKey,
+  filterTransaction(tr, state) {
+    const doc = tr.doc || state.doc;
+    return countCharactersWithMath(doc) <= MAX_CHARS;
   },
 });
 
@@ -144,7 +134,8 @@ export default function PostEditorInner({
 
   const finalPlaceholder =
     placeholder ??
-    (t("placeholder") || "Type in what you wanna share with everyone");
+    t("placeholder") ??
+    "Type in what you wanna share with everyone";
 
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
@@ -154,17 +145,15 @@ export default function PostEditorInner({
   const [charCount, setCharCount] = useState(0);
   const [, forceRerender] = useState({});
 
-  /* ------------------------- FIXED EXTENSIONS -------------------------- */
+  /* ------------------------- EXTENSIONS -------------------------- */
   const extensions = useMemo(
     () => [
       Document,
       Paragraph,
       Text,
       Heading.configure({ levels: [1, 2, 3] }),
-      HeadingPatch,
 
       HorizontalRule,
-      SafeHeadingEnterFix,
       HardBreak.configure({ keepMarks: true }),
 
       NoRulesStarterKit,
@@ -177,8 +166,12 @@ export default function PostEditorInner({
 
       Tag,
       ImagePlaceholder,
+      InlineBackspaceFix,
+      AtomBoundaryFix,
       MathExtension,
-      RemoveZeroWidthChars,
+      ZeroWidthCleanup,
+
+      CursorExitFix, // **ONLY cursor logic — safe, minimal**
 
       Placeholder.configure({
         placeholder: finalPlaceholder,
@@ -219,20 +212,33 @@ export default function PostEditorInner({
     if (editor && onReady) onReady(editor);
   }, [editor, onReady]);
 
+  /* INITIAL CHAR COUNT ON LOAD */
+  useEffect(() => {
+    if (!editor) return;
+
+    // Wait until Tiptap fully loads the DOM content
+    requestAnimationFrame(() => {
+      setCharCount(countCharactersWithMath(editor.state.doc));
+    });
+  }, [editor]);
+
   /* Focus handling */
   useEffect(() => {
     if (!editor) return;
+
     const f = () => setIsEditorFocused(true);
     const b = () => setIsEditorFocused(false);
+
     editor.on("focus", f);
     editor.on("blur", b);
+
     return () => {
       editor.off("focus", f);
       editor.off("blur", b);
     };
   }, [editor]);
 
-  /* Selection tracking */
+  /* Track last selection */
   useEffect(() => {
     if (!editor) return;
 
@@ -282,7 +288,6 @@ export default function PostEditorInner({
         getReferenceClientRect: () => range.getBoundingClientRect(),
       });
 
-      instance.setContent(menuRef.current!);
       instance.show();
     };
 
@@ -309,12 +314,15 @@ export default function PostEditorInner({
 
   if (!editor) return null;
 
-  /* Restore selection */
+  /* Restore selection for toolbar actions */
   const withRestore = (fn: (c: any) => any) => {
     let c = editor.chain().focus();
+
     if (lastSelRef.current) {
-      c = c.setTextSelection(lastSelRef.current);
+      const { from, to } = lastSelRef.current;
+      c = c.setTextSelection({ from, to });
     }
+
     fn(c).run();
   };
 
@@ -322,7 +330,7 @@ export default function PostEditorInner({
 
   return (
     <div className="w-full mx-auto">
-      {/* Floating Toolbar */}
+      {/* FLOATING TOOLBAR */}
       <div
         ref={menuRef}
         className="
@@ -337,19 +345,14 @@ export default function PostEditorInner({
         {levels.map((lv) => (
           <button
             key={lv}
-            onClick={() =>
-              withRestore((c) =>
-                c.setHeadingLevel({
-                  level: lv,
-                })
-              )
-            }
+            onClick={() => withRestore((c) => c.toggleHeading({ level: lv }))}
             className={`shrink-0 px-3 py-1.5 rounded-md font-semibold text-sm transition
               ${
                 editor.isActive("heading", { level: lv })
                   ? "bg-black text-white dark:bg-white dark:text-black shadow"
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
+              }
+            `}
           >
             H{lv}
           </button>
@@ -362,7 +365,8 @@ export default function PostEditorInner({
               editor.isActive("bold")
                 ? "bg-black text-white dark:bg-white dark:text-black shadow"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
+            }
+          `}
         >
           B
         </button>
@@ -374,7 +378,8 @@ export default function PostEditorInner({
               editor.isActive("italic")
                 ? "bg-black text-white dark:bg-white dark:text-black shadow"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
+            }
+          `}
         >
           I
         </button>
@@ -386,7 +391,8 @@ export default function PostEditorInner({
               editor.isActive("underline")
                 ? "bg-black text-white dark:bg-white dark:text-black shadow"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
+            }
+          `}
         >
           U
         </button>
@@ -398,7 +404,8 @@ export default function PostEditorInner({
               editor.isActive("strike")
                 ? "bg-black text-white dark:bg-white dark:text-black shadow"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
+            }
+          `}
         >
           S
         </button>
@@ -411,7 +418,8 @@ export default function PostEditorInner({
               editor.isActive("code")
                 ? "bg-black text-white dark:bg-white dark:text-black shadow"
                 : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }`}
+            }
+          `}
         >
           {"</>"}
         </button>
@@ -458,7 +466,7 @@ export default function PostEditorInner({
         </button>
       </div>
 
-      {/* Editor */}
+      {/* EDITOR */}
       <div
         className={`flex flex-col rounded-lg border transition ${
           isEditorFocused
