@@ -15,7 +15,7 @@ async function enrichPost(post: any, usersColl: any) {
   if (post.authorId && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, picture: 1, email: 1 } }
+      { projection: { name: 1, userId: 1, picture: 1, email: 1 } }
     );
   }
 
@@ -23,14 +23,13 @@ async function enrichPost(post: any, usersColl: any) {
   if (!user && post.authorId) {
     user = await usersColl.findOne(
       { provider_id: post.authorId },
-      { projection: { name: 1, picture: 1, email: 1 } }
+      { projection: { name: 1, userId: 1, picture: 1, email: 1 } }
     );
   }
 
   const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
 
-  const isAdmin =
-    user?.email && adminEmails.includes(user.email.trim());
+  const isAdmin = user?.email && adminEmails.includes(user.email.trim());
 
   const avatarId = user?._id
     ? user._id.toString()
@@ -43,11 +42,12 @@ async function enrichPost(post: any, usersColl: any) {
     _id: post._id.toString(),
     authorId: avatarId,
     authorName: user?.name ?? "Unknown",
+    authorUserId: user?.userId ?? "",
     authorAvatar: avatarId
       ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
       : "/default-avatar.png",
 
-    isAdmin, // ⭐ ADD THIS
+    isAdmin,
   };
 }
 
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
       replyTo = null,
       txId = null,
       categories = [],
-      tags = []
+      tags = [],
     } = await req.json();
 
     if (!authorId)
@@ -185,7 +185,10 @@ export async function POST(req: Request) {
     // reply logic
     if (replyTo) {
       if (!ObjectId.isValid(replyTo)) {
-        return NextResponse.json({ error: "Invalid replyTo id" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid replyTo id" },
+          { status: 400 }
+        );
       }
 
       const target = await posts.findOne({ _id: new ObjectId(replyTo) });
@@ -268,12 +271,20 @@ export async function POST(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function PUT(req: Request) {
   try {
-    const { id, title, content, txId = null } = await req.json();
+    const {
+      id,
+      title,
+      content,
+      categories,
+      tags,
+      txId = null,
+    } = await req.json();
 
     const client = await clientPromise;
     const db = client.db("jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");
+    const categoriesColl = db.collection("categories");
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing) return new Response("Post not found", { status: 404 });
@@ -282,10 +293,32 @@ export async function PUT(req: Request) {
     if (title !== undefined) updateFields.title = title;
     if (content !== undefined) updateFields.content = content;
 
+    // ✅ Only update if arrays provided (so comments/replies can still just update content)
+    if (Array.isArray(categories)) {
+      updateFields.categories = categories.map((c: string) => new ObjectId(c));
+    }
+
+    if (Array.isArray(tags)) {
+      updateFields.tags = tags;
+    }
+
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
 
     const updated = await posts.findOne({ _id: new ObjectId(id) });
-    const enriched = await enrichPost(updated, users);
+    if (!updated)
+      return new Response("Post not found after update", { status: 404 });
+
+    const enrichedPost = await enrichPost(updated, users);
+    const enrichedCategories = await enrichCategories(
+      Array.isArray(updated.categories) ? updated.categories : [],
+      categoriesColl
+    );
+
+    const final = {
+      ...enrichedPost,
+      categories: enrichedCategories,
+      tags: updated.tags ?? [],
+    };
 
     const type = existing.replyTo
       ? "update-reply"
@@ -293,9 +326,14 @@ export async function PUT(req: Request) {
       ? "update-comment"
       : "update-post";
 
-    broadcastSSE({ type, txId, postId: enriched._id, post: enriched });
+    broadcastSSE({
+      type,
+      txId,
+      postId: final._id,
+      post: final,
+    });
 
-    return NextResponse.json({ ok: true, post: enriched });
+    return NextResponse.json({ ok: true, post: final });
   } catch (err) {
     console.error("🔥 PUT /api/posts failed:", err);
     return new Response("Internal Server Error", { status: 500 });

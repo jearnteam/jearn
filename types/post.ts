@@ -1,9 +1,9 @@
 // /types/post.ts
 
 export interface CategoryObject {
-  id: string;       // ObjectId as string
-  name: string;     // English category name ("programming")
-  jname: string;    // Japanese name ("プログラミング")
+  id: string; // ObjectId as string
+  name: string; // English category name ("programming")
+  jname: string; // Japanese name ("プログラミング")
   myname?: string;
 }
 
@@ -20,8 +20,9 @@ export interface Post {
 
   createdAt?: string;
 
-  authorId: string;        
-  authorName: string;      
+  authorId: string;
+  authorName: string;
+  authorUserId?: string;
   authorAvatar: string | null;
 
   parentId: string | null;

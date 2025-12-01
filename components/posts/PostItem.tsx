@@ -318,9 +318,16 @@ export default function PostItem({
               </div>
 
               <div>
-                <p className="font-semibold text-gray-800 dark:text-gray-200">
-                  {postState.authorName || ""}
-                </p>
+                <div className="flex gap-3">
+                  <p className="font-semibold text-gray-800 dark:text-gray-200">
+                    {postState.authorName || ""}
+                  </p>
+                  <div className="flex items-center">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {postState.authorUserId ? ("@" + postState.authorUserId) : ""}
+                    </p>
+                  </div>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   {dayjs(postState.createdAt).locale(i18n.language).fromNow()}
                 </p>
