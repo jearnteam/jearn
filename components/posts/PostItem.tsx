@@ -62,7 +62,7 @@ interface PostItemProps {
 
 const LINE_HEIGHT = 20;
 const COLLAPSED_LINES = 5;
-const LINE_THRESHOLD = 10;
+const FULL_LINES_LIMIT = 10;
 
 export default function PostItem({
   post,
@@ -83,23 +83,21 @@ export default function PostItem({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const [ready, setReady] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [height, setHeight] = useState<number | "auto">("auto");
   const [measuredHeight, setMeasuredHeight] = useState<number>(0);
-  const [renderReady, setRenderReady] = useState(false);
-  const [isFirstRender, setIsFirstRender] = useState(true);
-
-  const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [measureDone, setMeasureDone] = useState(false);
+
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const [firstImgHeight, setFirstImgHeight] = useState<number | null>(null);
+  const [firstImageLoaded, setFirstImageLoaded] = useState(false);
+  const [initialAnimationDone, setInitialAnimationDone] = useState(false);
 
   const [shareOpen, setShareOpen] = useState(false);
   const [alreadyReported, setAlreadyReported] = useState(false);
 
   const isAdminAuthor = postState.isAdmin === true;
 
-  // ⭐ Stable glow values (never undefined)
   const [hue] = useState(() => Math.floor(Math.random() * 360));
   const [speed] = useState(() => 2 + Math.random() * 2);
 
@@ -111,7 +109,6 @@ export default function PostItem({
       : `/api/user/avatar/${postState.authorId}`;
 
   const [avatarLoaded, setAvatarLoaded] = useState(false);
-
   const [imageNode, setImageNode] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -121,60 +118,122 @@ export default function PostItem({
     img.onerror = () => setAvatarLoaded(true);
   }, [realAvatarUrl]);
 
-  const LINE_HEIGHT = 20;
-  const COLLAPSED_LINES = 5;
-  const FULL_LINES_LIMIT = 10;
-
+  //
+  // ⭐ STEP 1 — Detect first image and measure its height
+  //
   useLayoutEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const full = el.scrollHeight;
+    const firstImg = el.querySelector("img") as HTMLImageElement | null;
 
-        setMeasuredHeight(full);
-        setContentHeight(full);
+    if (!firstImg) {
+      setFirstImgHeight(null);
+      setFirstImageLoaded(true);
+      return;
+    }
 
-        const collapsedHeight = LINE_HEIGHT * COLLAPSED_LINES;
-        const fullLimit = LINE_HEIGHT * FULL_LINES_LIMIT;
+    const updateHeight = () => {
+      const rect = firstImg.getBoundingClientRect();
+      setFirstImgHeight(rect.height);
+    };
 
-        if (full <= fullLimit) {
-          setHeight("auto");
-        } else {
-          setHeight(collapsedHeight);
-        }
-
-        // ⭐ Now measurement is done — next render is safe to animate
-        setMeasureDone(true);
-
-        // ⭐ Disable future rendering as "first render"
-        setIsFirstRender(false);
-      });
-    });
+    if (!firstImg.complete) {
+      firstImg.onload = updateHeight;
+    } else {
+      updateHeight();
+    }
   }, [postState.content]);
 
+  //
+  // ⭐ STEP 2 — Initial measurement using firstImgHeight
+  //
+  useLayoutEffect(() => {
+    if (!firstImageLoaded) return; // ⭐ DO NOT collapse yet
+
+    const el = contentRef.current;
+    if (!el) return;
+
+    const full = el.scrollHeight;
+    setMeasuredHeight(full);
+
+    const collapsedHeight = (() => {
+      if (firstImgHeight) {
+        return firstImgHeight + LINE_HEIGHT;
+      }
+      return LINE_HEIGHT * COLLAPSED_LINES;
+    })();
+
+    const fullLimit = LINE_HEIGHT * FULL_LINES_LIMIT;
+
+    if (full <= fullLimit) {
+      setHeight("auto");
+    } else {
+      setHeight(collapsedHeight);
+    }
+
+    setMeasureDone(true);
+  }, [firstImageLoaded, firstImgHeight]);
+
+  //
+  // ⭐ STEP 3 — Fullscreen image click handler
+  //
   useEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
-    // re-measure whenever content changes size
+    const handleImageClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== "IMG") return;
+
+      const original = target as HTMLImageElement;
+      const clone = original.cloneNode(true) as HTMLImageElement;
+
+      clone.removeAttribute("width");
+      clone.removeAttribute("height");
+
+      clone.style.width = "100%";
+      clone.style.height = "100%";
+      clone.style.maxWidth = "100%";
+      clone.style.maxHeight = "100%";
+      clone.style.objectFit = "contain";
+      clone.style.display = "block";
+
+      setImageNode(clone);
+    };
+
+    el.addEventListener("click", handleImageClick);
+    return () => el.removeEventListener("click", handleImageClick);
+  }, []);
+
+  //
+  // ⭐ STEP 4 — ResizeObserver collapse logic
+  //
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+
     const observer = new ResizeObserver(() => {
       const full = el.scrollHeight;
       setMeasuredHeight(full);
-      setContentHeight(full);
 
       if (!expanded) {
-        setHeight(LINE_HEIGHT * COLLAPSED_LINES);
+        const collapsedHeight = (() => {
+          if (firstImgHeight) {
+            return firstImgHeight + LINE_HEIGHT;
+          }
+          return LINE_HEIGHT * COLLAPSED_LINES;
+        })();
+
+        setHeight(collapsedHeight);
       } else {
         setHeight("auto");
       }
     });
 
     observer.observe(el);
-
     return () => observer.disconnect();
-  }, [expanded]);
+  }, [expanded, firstImgHeight]);
 
   const shouldTruncate = measuredHeight > LINE_HEIGHT * FULL_LINES_LIMIT;
 
@@ -201,16 +260,13 @@ export default function PostItem({
   }, [post._id, userId]);
 
   const toggleExpand = () => {
-    // If not long enough, do nothing
     if (!shouldTruncate) return;
 
-    // ========= EXPAND =========
     if (!expanded) {
       setExpanded(true);
       return;
     }
 
-    // ========= COLLAPSE =========
     const el = document.getElementById(
       `post-${postState._id}`
     ) as HTMLElement | null;
@@ -220,21 +276,14 @@ export default function PostItem({
     }
 
     const scrollParent = getScrollParent(el);
-
-    // Check if post top is already visible
     const rect = el.getBoundingClientRect();
-    const VIEWPORT_TOP = 0;
-    const THRESHOLD = 20; // small margin
-
-    const isTopVisible = rect.top >= VIEWPORT_TOP - THRESHOLD;
+    const isTopVisible = rect.top >= -20;
 
     if (isTopVisible) {
-      // ⭐ Top already visible → just collapse, no scroll
       setExpanded(false);
       return;
     }
 
-    // ⭐ Top not visible → scroll to top, then collapse
     const OFFSET = 0;
 
     if (scrollParent.type === "window") {
@@ -250,7 +299,6 @@ export default function PostItem({
       scrollParent.el.scrollTo({ top: target });
     }
 
-    // Wait for scroll to settle, then collapse
     let last = -1;
     const waitScroll = () => {
       const current =
@@ -519,9 +567,10 @@ export default function PostItem({
 
           {/* CONTENT */}
           <motion.div
-            animate={isFirstRender ? false : { height }}
-            initial={false} // IMPORTANT: disable initial animation
-            transition={{ duration: isFirstRender ? 0 : 0.25 }}
+            animate={{ height }}
+            initial={{ height: 0 }} // ⭐ Start fully collapsed
+            transition={{ duration: 0.25 }}
+            onAnimationComplete={() => setInitialAnimationDone(true)} // ⭐ Mark animation end
             className="mt-2 overflow-hidden text-gray-900 dark:text-gray-100"
             style={{
               height,
@@ -530,17 +579,17 @@ export default function PostItem({
           >
             <div
               ref={contentRef}
-              className="mt-2"
+              className="mt-2 transition-opacity duration-300"
               style={{
-                opacity: measureDone ? 1 : 0,
-                pointerEvents: measureDone ? "auto" : "none",
+                opacity: initialAnimationDone ? 1 : 0, // ⭐ Fade in AFTER animation
+                pointerEvents: initialAnimationDone ? "auto" : "none",
               }}
             >
               <MathRenderer html={postState.content ?? ""} />
             </div>
           </motion.div>
 
-          {/* SHOW MORE / LESS */}
+          {/* SHOW MORE */}
           {!isComment && shouldTruncate && (
             <button
               onClick={toggleExpand}
