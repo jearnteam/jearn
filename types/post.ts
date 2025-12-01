@@ -35,4 +35,7 @@ export interface Post {
 
   _optimisticTx?: string;
   isAdmin?: boolean;
+
+  edited?: boolean;
+  editedAt?: string;
 }
