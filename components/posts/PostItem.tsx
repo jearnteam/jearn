@@ -87,6 +87,8 @@ export default function PostItem({
   const [expanded, setExpanded] = useState(false);
   const [height, setHeight] = useState<number | "auto">("auto");
   const [measuredHeight, setMeasuredHeight] = useState<number>(0);
+  const [renderReady, setRenderReady] = useState(false);
+  const [isFirstRender, setIsFirstRender] = useState(true);
 
   const [contentHeight, setContentHeight] = useState<number | null>(null);
   const [measureDone, setMeasureDone] = useState(false);
@@ -127,28 +129,30 @@ export default function PostItem({
     const el = contentRef.current;
     if (!el) return;
 
-    // Wait for MathRenderer to finish rendering
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const full = el.scrollHeight;
+
         setMeasuredHeight(full);
-        setMeasureDone(true);
+        setContentHeight(full);
 
-        const tenLinesHeight = LINE_HEIGHT * FULL_LINES_LIMIT;
-        const fiveLinesHeight = LINE_HEIGHT * COLLAPSED_LINES;
+        const collapsedHeight = LINE_HEIGHT * COLLAPSED_LINES;
+        const fullLimit = LINE_HEIGHT * FULL_LINES_LIMIT;
 
-        if (full <= tenLinesHeight) {
-          // short content → show full → no show more
-          setContentHeight(full);
+        if (full <= fullLimit) {
           setHeight("auto");
         } else {
-          // long content → show collapsed / expanded
-          setContentHeight(full);
-          setHeight(expanded ? "auto" : fiveLinesHeight);
+          setHeight(collapsedHeight);
         }
+
+        // ⭐ Now measurement is done — next render is safe to animate
+        setMeasureDone(true);
+
+        // ⭐ Disable future rendering as "first render"
+        setIsFirstRender(false);
       });
     });
-  }, [postState.content, expanded]);
+  }, [postState.content]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -515,17 +519,21 @@ export default function PostItem({
 
           {/* CONTENT */}
           <motion.div
-            animate={{ height }}
-            transition={{ duration: 0.25 }}
+            animate={isFirstRender ? false : { height }}
+            initial={false} // IMPORTANT: disable initial animation
+            transition={{ duration: isFirstRender ? 0 : 0.25 }}
             className="mt-2 overflow-hidden text-gray-900 dark:text-gray-100"
-            style={{ lineHeight: `${LINE_HEIGHT}px` }}
+            style={{
+              height,
+              lineHeight: `${LINE_HEIGHT}px`,
+            }}
           >
             <div
               ref={contentRef}
               className="mt-2"
               style={{
-                lineHeight: `${LINE_HEIGHT}px`,
-                visibility: measureDone ? "visible" : "hidden",
+                opacity: measureDone ? 1 : 0,
+                pointerEvents: measureDone ? "auto" : "none",
               }}
             >
               <MathRenderer html={postState.content ?? ""} />
