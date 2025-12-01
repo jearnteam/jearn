@@ -17,7 +17,7 @@ export async function GET(
 
     const user = await db.collection("users").findOne(
       { _id: new ObjectId(id) },
-      { projection: { name: 1, bio: 1, picture: 1 } }
+      { projection: { name: 1, userId: 1, bio: 1, picture: 1 } }
     );
 
     if (!user)
@@ -28,6 +28,7 @@ export async function GET(
       user: {
         uid: id,
         name: user.name ?? "Anonymous",
+        userId: user.userId,
         bio: user.bio ?? "",
         picture: user.picture ? `/api/user/avatar/${id}` : null,
       },
