@@ -5,7 +5,6 @@ import clientPromise from "@/lib/mongodb";
 
 export async function GET() {
   try {
-    // ✅ MUST pass authOptions
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
@@ -23,6 +22,14 @@ export async function GET() {
       return NextResponse.json({ ok: false, user: null });
     }
 
+    // ---------------------------------------------
+    // ✅ ADMIN CHECK (From ENV)
+    // ---------------------------------------------
+    const adminEmails =
+      process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ?? [];
+
+    const isAdmin = adminEmails.includes(user.email);
+
     return NextResponse.json({
       ok: true,
       user: {
@@ -34,9 +41,12 @@ export async function GET() {
         theme: user.theme ?? "light",
         language: user.language ?? "en",
         hasPicture: !!user.picture,
+
+        // 🔥 Add this:
+        email: user.email,
+        isAdmin, // ← 🔥 now the front-end knows!
       },
     });
-
   } catch (err) {
     console.error("current user error:", err);
     return NextResponse.json({ ok: false, user: null });

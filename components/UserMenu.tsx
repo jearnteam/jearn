@@ -6,13 +6,17 @@ import Avatar from "@/components/Avatar";
 import LangSwitcher from "@/components/LangSwitcher";
 import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface User {
   _id: string;
   name?: string;
+  email?: string;
+  isAdmin: boolean;
 }
 
 export default function UserMenu({ user }: { user: User }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
@@ -85,7 +89,7 @@ export default function UserMenu({ user }: { user: User }) {
             }}
             className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
           >
-            Profile
+            {t("profile") || "Profile"}
           </button>
           {/* THEME */}
           <button
@@ -97,22 +101,24 @@ export default function UserMenu({ user }: { user: User }) {
             ) : (
               <Moon className="w-5 h-5 text-gray-800" />
             )}
-            Toggle Theme
+            {t("toggleTheme") || "Toggle Theme"}
           </button>
           {/* LANGUAGE */}
           <div className="py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700">
             <LangSwitcher />
           </div>
-          {/* DASHBOARD */} {/* TODO: It should shows only admin account */}
-          <button
-            onClick={() => {
-              setOpen(false);
-              router.push("/dashboard");
-            }}
-            className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
-          >
-            Dashboard
-          </button>
+          {/* DASHBOARD (admin only) */}
+          {user.isAdmin && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                router.push("/dashboard");
+              }}
+              className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
+            >
+              {t("dashboard") || "Dashboard"}
+            </button>
+          )}
           {/* LOGOUT */}
           <button
             onClick={() => {
@@ -121,7 +127,7 @@ export default function UserMenu({ user }: { user: User }) {
             }}
             className="px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-left"
           >
-            Logout
+            {t("logout") || "Logout"}
           </button>
         </div>
       </div>

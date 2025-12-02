@@ -57,6 +57,7 @@ export function useCurrentUser() {
       } else {
         setUser({
           ...u,
+          isAdmin: u.isAdmin ?? false,
           picture: u.hasPicture
             ? `/api/user/avatar/${u._id}?v=${Date.now()}`
             : "/default-avatar.png",
