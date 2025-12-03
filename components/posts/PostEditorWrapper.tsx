@@ -83,29 +83,6 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
 
-      // Fix ZWSP after tag/latex
-      setTimeout(() => {
-        if (!editor.view) return;
-
-        const { state, dispatch } = editor.view;
-        const tr = state.tr;
-        let changed = false;
-
-        state.doc.descendants((node, pos) => {
-          if (node.type.name === "tag" || node.type.name === "latex") {
-            const after = pos + node.nodeSize;
-            const next = state.doc.nodeAt(after);
-
-            if (!next || next.text !== "\u200B") {
-              tr.insert(after, state.schema.text("\u200B"));
-              changed = true;
-            }
-          }
-        });
-
-        if (changed) dispatch(tr);
-      }, 0);
-
       // 🔥 Reliable event for detecting actual document changes
       editor.on("update", () => {
         onUpdate?.();

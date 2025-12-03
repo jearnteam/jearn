@@ -15,6 +15,7 @@ import {
   Pencil,
   Trash2,
   Flag,
+  Network,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -28,6 +29,7 @@ import { rememberTx } from "@/lib/recentTx";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import FullScreenPortal from "@/features/FullScreenPortal";
+import GraphView from "@/components/graphview/GraphView";
 
 dayjs.extend(relativeTime);
 
@@ -78,6 +80,7 @@ export default function PostItem({
 
   const [postState, setPostState] = useState(post);
   useEffect(() => setPostState(post), [post]);
+  const [showGraph, setShowGraph] = useState(false);
 
   const hasUpvoted = userId && postState.upvoters?.includes(userId);
 
@@ -139,9 +142,9 @@ export default function PostItem({
       const fullLimit = LINE_HEIGHT * FULL_LINES_LIMIT;
 
       // Find first image and make it "hero preview"
-      const firstImg = container.querySelector("img") as
-        | HTMLImageElement
-        | null;
+      const firstImg = container.querySelector(
+        "img"
+      ) as HTMLImageElement | null;
 
       let previewHeight = LINE_HEIGHT * COLLAPSED_LINES; // fallback when no image
 
@@ -420,14 +423,13 @@ export default function PostItem({
   const WrapperTag: any = isComment ? "div" : "li";
 
   // 🎯 Height logic for Motion wrapper
-  const targetHeight: number | "auto" =
-    !measureDone
-      ? 0
-      : !shouldTruncate
-      ? "auto"
-      : expanded
-      ? "auto"
-      : collapsedHeight ?? 0;
+  const targetHeight: number | "auto" = !measureDone
+    ? 0
+    : !shouldTruncate
+    ? "auto"
+    : expanded
+    ? "auto"
+    : collapsedHeight ?? 0;
 
   return (
     <>
@@ -492,68 +494,82 @@ export default function PostItem({
               </div>
             </Link>
 
-            {/* MENU */}
-            {userId && (
-              <div className="relative" ref={menuRef}>
-                <button
-                  onClick={() => setMenuOpen((v) => !v)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
-                >
-                  <MoreVertical size={20} />
-                </button>
+            <div className="flex items-center gap-1">
+              {/* GRAPH BUTTON */}
+              <button
+                onClick={() => setShowGraph((prev) => !prev)}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
+                title="Graph View"
+              >
+                <Network
+                  size={20}
+                  className={showGraph ? "text-green-500" : "text-blue-500"}
+                />
+              </button>
 
-                <AnimatePresence>
-                  {menuOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -5 }}
-                      className="absolute right-0 mt-2 w-44 z-20 
-                      rounded-md overflow-hidden shadow-lg
-                      bg-white dark:bg-neutral-800 
-                      border border-gray-200 dark:border-gray-700"
-                    >
-                      {userId === String(postState.authorId) ? (
-                        <>
-                          <button
-                            onClick={handleEdit}
-                            className="flex items-center gap-3 w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
-                          >
-                            <Pencil className="w-4 h-4 text-blue-500" />
-                            <span>{t("edit") || "Edit"}</span>
-                          </button>
+              {/* MENU */}
+              {userId && (
+                <div className="relative" ref={menuRef}>
+                  <button
+                    onClick={() => setMenuOpen((v) => !v)}
+                    className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
+                  >
+                    <MoreVertical size={20} />
+                  </button>
 
+                  <AnimatePresence>
+                    {menuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        className="absolute right-0 mt-2 w-44 z-20 
+              rounded-md overflow-hidden shadow-lg
+              bg-white dark:bg-neutral-800 
+              border border-gray-200 dark:border-gray-700"
+                      >
+                        {userId === String(postState.authorId) ? (
+                          <>
+                            <button
+                              onClick={handleEdit}
+                              className="flex items-center gap-3 w-full px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                            >
+                              <Pencil className="w-4 h-4 text-blue-500" />
+                              <span>{t("edit") || "Edit"}</span>
+                            </button>
+
+                            <button
+                              onClick={handleDelete}
+                              className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                              <span>{t("delete") || "Delete"}</span>
+                            </button>
+                          </>
+                        ) : (
                           <button
-                            onClick={handleDelete}
-                            className="flex items-center gap-3 w-full px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                            onClick={handleReport}
+                            disabled={alreadyReported}
+                            className={`flex items-center gap-3 w-full px-4 py-2 text-yellow-600 ${
+                              alreadyReported
+                                ? "opacity-50 cursor-not-allowed"
+                                : "hover:bg-gray-100 dark:hover:bg-neutral-700"
+                            }`}
                           >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                            <span>{t("delete") || "Delete"}</span>
+                            <Flag className="w-4 h-4 text-yellow-500" />
+                            <span>
+                              {alreadyReported
+                                ? t("reported") || "Reported"
+                                : t("report") || "Report"}
+                            </span>
                           </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={handleReport}
-                          disabled={alreadyReported}
-                          className={`flex items-center gap-3 w-full px-4 py-2 text-yellow-600 ${
-                            alreadyReported
-                              ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-gray-100 dark:hover:bg-neutral-700"
-                          }`}
-                        >
-                          <Flag className="w-4 h-4 text-yellow-500" />
-                          <span>
-                            {alreadyReported
-                              ? t("reported") || "Reported"
-                              : t("report") || "Report"}
-                          </span>
-                        </button>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* TITLE */}
@@ -695,6 +711,39 @@ export default function PostItem({
             </motion.div>
           )}
         </AnimatePresence>
+      </FullScreenPortal>
+
+      <FullScreenPortal>
+        {showGraph && (
+          <div
+            className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-6"
+            onClick={() => setShowGraph(false)}
+          >
+            <div
+              className="relative max-w-4xl w-full h-[80vh] rounded-lg shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* レーザー光のオーバーレイ */}
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="laser-ring"></div>
+              </div>
+
+              {/* ×ボタン */}
+              <button
+                onClick={() => setShowGraph(false)}
+                className="absolute top-3 right-3 z-[10] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl font-bold hover:bg-black/90 transition"
+                title="Close"
+              >
+                ×
+              </button>
+
+              {/* モーダル本体 */}
+              <div className="relative bg-black text-green-400 font-mono rounded-lg w-full h-full border border-blue-500 p-4 overflow-auto">
+                <GraphView post={postState} />
+              </div>
+            </div>
+          </div>
+        )}
       </FullScreenPortal>
     </>
   );

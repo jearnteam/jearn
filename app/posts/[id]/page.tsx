@@ -4,10 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, notFound } from "next/navigation";
 import FullPostClient from "@/components/posts/FullPostClient";
 import CommentClientSection from "@/components/comments/CommentClientSection";
-import LoadingOwl from "@/components/LoadingOwl";
-import type { Post } from "@/types/post";
-import { useTranslation } from "react-i18next";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
+import { useTranslation } from "react-i18next";
+import type { Post } from "@/types/post";
 
 export default function PostPage() {
   const { t } = useTranslation();
@@ -40,19 +39,14 @@ export default function PostPage() {
     fetchData();
   }, [id]);
 
-  if (loading) {
-    return (
-      <FullScreenLoader text={t("loadingUser")} />
-    );
-  }
-
+  if (loading) return <FullScreenLoader text={t("loadingUser")} />;
   if (!post) return notFound();
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
-      <div className="w-full h-screen overflow-hidden bg-white dark:bg-black">
+      <div className="w-full h-screen overflow-hidden">
 
-        {/* LEFT SIDEBAR (exact size/position as HomePage) */}
+        {/* LEFT SIDEBAR */}
         <aside
           className="
             hidden xl:flex flex-col
@@ -82,7 +76,7 @@ export default function PostPage() {
           <p>Related</p>
         </aside>
 
-        {/* MAIN CONTENT — SCROLLABLE AREA (same as HomePage) */}
+        {/* MAIN CONTENT */}
         <main
           ref={mainRef}
           className="
@@ -98,8 +92,13 @@ export default function PostPage() {
           "
         >
           <div className="max-w-2xl mx-auto py-6 space-y-10">
+            
+            {/* FULL POST */}
             <FullPostClient initialPost={post} />
+
+            {/* COMMENTS */}
             <CommentClientSection comments={comments} postId={post._id} />
+
           </div>
         </main>
 

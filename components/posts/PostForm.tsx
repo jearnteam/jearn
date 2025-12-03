@@ -27,7 +27,14 @@ interface Category {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                              TAG EXTRACTION                                */
+/*                       REMOVE ZERO-WIDTH-SPACE (ZWSP)                       */
+/* -------------------------------------------------------------------------- */
+function removeZWSP(html: string): string {
+  return html.replace(/\u200B/g, "");
+}
+
+/* -------------------------------------------------------------------------- */
+/*                              TAG EXTRACTION                                 */
 /* -------------------------------------------------------------------------- */
 function extractTagsFromHTML(html: string): string[] {
   const div = document.createElement("div");
@@ -77,13 +84,11 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     function walk(node: Node) {
       if (!node) return;
 
-      // plain text nodes
       if (node.nodeType === Node.TEXT_NODE) {
         text += node.textContent ?? "";
         return;
       }
 
-      // math inline node → append latex
       if (node instanceof HTMLElement && node.dataset.type === "math") {
         const latex =
           node.getAttribute("latex") || node.getAttribute("data-latex") || "";
@@ -91,7 +96,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
         return;
       }
 
-      // walk children
       node.childNodes.forEach(walk);
     }
 
@@ -101,10 +105,13 @@ export default function PostForm({ onSubmit }: PostFormProps) {
   }
 
   const handleCheckCategories = async () => {
-    const html = editorRef.current?.getHTML() ?? "";
+    let html = editorRef.current?.getHTML() ?? "";
+
+    // ⭐ Remove ZWSP (Important)
+    html = removeZWSP(html);
+
     const text = extractTextWithMath(html);
 
-    // if no meaningful text or title → skip
     if (!text.trim() && !title.trim()) {
       console.log("❌ No content to categorize");
       return;
@@ -130,7 +137,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
 
       const data: Category[] = await res.json();
 
-      // triggers rerender
       setCategories([...data]);
       setCategoryReady(true);
     } catch (err) {
@@ -171,9 +177,12 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     if (!title.trim()) return;
     if (selected.length === 0) return alert("Choose a category.");
 
-    const html = editorRef.current?.getHTML() ?? "";
+    let html = editorRef.current?.getHTML() ?? "";
 
-    // 🔥 Extract tags from the rendered HTML
+    // ⭐ Remove ZWSP before saving
+    html = removeZWSP(html);
+
+    // Extract tags from clean HTML
     const tags = extractTagsFromHTML(html);
     console.log("Extracted tags:", tags);
 
@@ -181,7 +190,6 @@ export default function PostForm({ onSubmit }: PostFormProps) {
     try {
       await onSubmit(title, html, authorId, selected, tags);
 
-      // Reset
       editorRef.current?.clearEditor();
       setCategories([]);
       setSelected([]);
