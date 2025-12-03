@@ -32,7 +32,12 @@ const relativeTime: any = {
   h: "၁ နာရီက",
   hh: (n: number) => `${toBurmeseDigits(n)} နာရီက`,
   d: "၁ ရက်က",
-  dd: (n: number) => `${toBurmeseDigits(n)} ရက်က`,
+  dd: (n: number) => {
+    if (n === 20) {
+      return "ရက်၂၀က";
+    }
+    return `${toBurmeseDigits(n)} ရက်က`;
+  },
   M: "၁ လက",
   MM: (n: number) => `${toBurmeseDigits(n)} လက`,
   y: "၁ နှစ်က",
