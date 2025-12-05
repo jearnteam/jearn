@@ -12,11 +12,17 @@ export default function FullScreenLoader({ text }: { text?: string }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="
-        fixed inset-0 z-50 
-        flex flex-col items-center justify-center
-        bg-white/80 dark:bg-neutral-900/80
-      "
+      className={`
+  flex flex-col items-center justify-center
+  bg-white/80 dark:bg-neutral-900/80
+  z-50
+  ${
+    typeof window !== "undefined" &&
+    document.querySelector(".graph-loader-container")
+      ? "absolute inset-0 pointer-events-none"
+      : "fixed inset-0"
+  }
+  `}
     >
       <div className="w-40 h-40">
         <LoadingOwl />

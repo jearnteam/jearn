@@ -11,8 +11,6 @@ import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
 import PostFormBox from "@/components/posts/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
-import LoadingOwl from "@/components/LoadingOwl";
-import { motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 

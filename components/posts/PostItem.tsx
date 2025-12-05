@@ -81,6 +81,7 @@ export default function PostItem({
   const [postState, setPostState] = useState(post);
   useEffect(() => setPostState(post), [post]);
   const [showGraph, setShowGraph] = useState(false);
+  const [graphKey, setGraphKey] = useState(0);
 
   const hasUpvoted = userId && postState.upvoters?.includes(userId);
 
@@ -497,7 +498,13 @@ export default function PostItem({
             <div className="flex items-center gap-1">
               {/* GRAPH BUTTON */}
               <button
-                onClick={() => setShowGraph((prev) => !prev)}
+                onClick={() => {
+                  if (!showGraph) {
+                    // opening graph → reset key
+                    setGraphKey(Date.now());
+                  }
+                  setShowGraph(!showGraph);
+                }}
                 className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800"
                 title="Graph View"
               >
@@ -715,31 +722,23 @@ export default function PostItem({
 
       <FullScreenPortal>
         {showGraph && (
-          <div
-            className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-6"
-            onClick={() => setShowGraph(false)}
-          >
+          <div className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-6">
             <div
               className="relative max-w-4xl w-full h-[80vh] rounded-lg shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()} // prevent closing on click inside
             >
-              {/* レーザー光のオーバーレイ */}
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="laser-ring"></div>
-              </div>
-
-              {/* ×ボタン */}
+              {/* Close button */}
               <button
                 onClick={() => setShowGraph(false)}
-                className="absolute top-3 right-3 z-[10] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl font-bold hover:bg-black/90 transition"
+                className="absolute top-3 right-3 z-[50] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl font-bold hover:bg-black/90 transition"
                 title="Close"
               >
                 ×
               </button>
 
-              {/* モーダル本体 */}
-              <div className="relative bg-black text-green-400 font-mono rounded-lg w-full h-full border border-blue-500 p-4 overflow-auto">
-                <GraphView post={postState} />
+              {/* Graph container */}
+              <div className="relative text-green-400 font-mono rounded-lg w-full h-full border border-blue-500 overflow-auto">
+                <GraphView key={graphKey} post={postState} />
               </div>
             </div>
           </div>

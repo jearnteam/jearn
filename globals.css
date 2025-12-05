@@ -219,39 +219,6 @@ code {
 }
 
 /* ---------------------------------------------------------- */
-/*                       GRAPH VIEW                           */
-/* ---------------------------------------------------------- */
-@keyframes spin-laser {
-  0% {
-    transform: rotate(0deg);
-    filter: hue-rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-    filter: hue-rotate(360deg);
-  }
-}
-
-.laser-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 1rem;
-  background: conic-gradient(
-    from 0deg at 50% 50%,
-    rgba(0, 200, 255, 0) 0deg,
-    rgba(0, 200, 255, 0.8) 5deg,
-    rgba(0, 200, 255, 0) 15deg
-  );
-  animation: spin-laser 4s linear infinite;
-  mask-image: radial-gradient(circle 85% at center, rgba(255,255,255,1), rgba(255,255,255,0) 100%);
-  -webkit-mask-image: radial-gradient(circle 85% at center, rgba(255,255,255,1), rgba(255,255,255,0) 100%);
-}
-
-
-
-
-
-/* ---------------------------------------------------------- */
 /*                       CUSTOM SCROLLBARS                     */
 /* ---------------------------------------------------------- */
 .tiptap::-webkit-scrollbar,
@@ -280,6 +247,11 @@ code {
 }
 .hashtag-tag:hover {
   text-decoration: underline;
+}
+
+.graph-loader-override > div {
+  position: absolute !important;
+  inset: 0 !important;
 }
 
 /* ---------------------------------------------------------- */

@@ -25,6 +25,7 @@ export async function POST(
 
     const _id = new ObjectId(postId);
     const post = await posts.findOne({ _id });
+
     if (!post) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
@@ -33,6 +34,7 @@ export async function POST(
       Array.isArray(post.upvoters) && post.upvoters.includes(userId);
     const action: "added" | "removed" = already ? "removed" : "added";
 
+    // Apply update
     await posts.updateOne(
       { _id },
       already
@@ -40,11 +42,11 @@ export async function POST(
         : { $addToSet: { upvoters: userId }, $inc: { upvoteCount: 1 } }
     );
 
+    // Get updated doc
     const updated = await posts.findOne({ _id });
 
     /* --------------------------------------------------------
-       ✅ Broadcast SSE to all connected clients
-       Includes both legacy "upvote" and new contextual types
+       🔊 Broadcast SSE
     --------------------------------------------------------- */
     const payload = {
       postId,
@@ -55,10 +57,8 @@ export async function POST(
       replyTo: updated?.replyTo ?? null,
     };
 
-    // legacy (for current useComments)
     broadcastSSE({ type: "upvote", ...payload });
 
-    // new contextual event (optional future use)
     const type = updated?.replyTo
       ? "upvote-reply"
       : updated?.parentId
@@ -67,7 +67,23 @@ export async function POST(
 
     broadcastSSE({ type, ...payload });
 
-    return NextResponse.json({ ok: true, action, txId: txId ?? null });
+    /* --------------------------------------------------------
+       ✅ RETURN UPDATED COMMENT OBJECT TO FRONTEND
+       (This is what GraphView needs!)
+    --------------------------------------------------------- */
+    return NextResponse.json({
+      ok: true,
+      action,
+      txId: txId ?? null,
+      comment: {
+        _id: updated!._id.toString(),
+        content: updated!.content ?? "",
+        authorName: updated!.authorName ?? "",
+        createdAt: updated!.createdAt ?? "",
+        upvoteCount: updated!.upvoteCount ?? 0,
+        upvoters: updated!.upvoters ?? [],
+      },
+    });
   } catch (err) {
     console.error("❌ Upvote error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
