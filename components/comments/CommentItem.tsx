@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import dayjs from "dayjs";
+import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import i18n from "@/lib/i18n";
 import { MoreVertical, ArrowBigUp, Reply } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
@@ -190,45 +191,51 @@ export default function CommentItem({
     <>
       <div
         ref={commentRef}
-        className={`bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-gray-700 
-          rounded-lg p-4 shadow-sm ${isReply ? "ml-1" : ""}`}
+        className={`
+    group relative rounded-xl border 
+    bg-white dark:bg-neutral-900 
+    border-gray-200 dark:border-neutral-700 
+    shadow-sm px-4 py-3 transition-all 
+    hover:shadow-md hover:border-gray-300 dark:hover:border-neutral-600
+    ${isReply ? "ml-4" : ""}
+  `}
       >
         {/* Header */}
-        <div className="flex justify-between items-start gap-3">
-          <div className="flex items-center gap-2">
-            <div className="relative w-7 h-7 rounded-full overflow-hidden border border-gray-300 dark:border-gray-600">
-              <img
-                src={avatarUrl}
-                alt={comment.authorName || "User avatar"}
-                className="w-full h-full object-cover"
-              />
-            </div>
+        <div className="flex justify-between items-start">
+          <div className="flex items-start gap-3">
+            {/* Avatar */}
+            <img
+              src={avatarUrl}
+              alt=""
+              className="w-9 h-9 rounded-full border border-gray-300 dark:border-neutral-600 object-cover"
+            />
 
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="flex gap-3">
-                <p className="text-sm font-medium text-gray-800 dark:text-gray-100">
+            {/* Name + timestamp */}
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {comment.authorName || "Anonymous"}
                 </p>
-                <div className="flex items-center">
+
+                {comment.authorUserId && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {comment.authorUserId ? "@" + comment.authorUserId : ""}
+                    @{comment.authorUserId}
                   </p>
-                </div>
+                )}
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {dayjs(comment.createdAt).fromNow()}
+
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                {dayjs(comment.createdAt).locale(i18n.language).fromNow()}
               </p>
-            </motion.div>
+            </div>
           </div>
 
+          {/* Menu */}
           {userId === comment.authorId && (
-            <div className="relative" ref={menuRef}>
+            <div ref={menuRef} className="relative">
               <button
                 onClick={() => setMenuOpen((v) => !v)}
-                className="p-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-neutral-700"
+                className="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700"
               >
                 <MoreVertical size={18} />
               </button>
@@ -239,7 +246,11 @@ export default function CommentItem({
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -5 }}
-                    className="absolute right-0 mt-1 w-36 rounded-md shadow-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-gray-700 z-20"
+                    className="
+              absolute right-0 mt-1 w-36 rounded-md shadow-lg 
+              bg-white dark:bg-neutral-800 
+              border border-gray-200 dark:border-neutral-700 z-20
+            "
                   >
                     <button
                       onClick={() => {
@@ -250,9 +261,13 @@ export default function CommentItem({
                     >
                       ✏️ {t("edit") || "Edit"}
                     </button>
+
                     <button
                       onClick={() => setShowDeleteModal(true)}
-                      className="w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
+                      className="
+                w-full text-left px-4 py-2 text-red-600 
+                hover:bg-gray-100 dark:hover:bg-neutral-700
+              "
                     >
                       🗑 {t("delete") || "Delete"}
                     </button>
@@ -268,14 +283,22 @@ export default function CommentItem({
           <motion.div
             animate={{ height }}
             transition={{ duration: 0.25 }}
-            className="relative overflow-hidden text-sm text-gray-800 dark:text-gray-200"
+            className="relative overflow-hidden text-[15px] leading-relaxed text-gray-800 dark:text-gray-200 mt-2"
           >
-            <div ref={contentRef} className="break-words whitespace-pre-wrap">
+            <div
+              ref={contentRef}
+              className="prose prose-sm dark:prose-invert max-w-none 
+              break-words whitespace-pre-wrap"
+            >
               <MathRenderer html={comment.content} />
             </div>
 
             {!expanded && measuredHeight > COLLAPSED_HEIGHT && (
-              <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-gray-50 dark:from-neutral-800 to-transparent pointer-events-none" />
+              <div
+                className="absolute bottom-0 left-0 w-full h-10 
+                    bg-gradient-to-t from-white dark:from-neutral-900 
+                    to-transparent pointer-events-none"
+              />
             )}
           </motion.div>
         ) : null}
@@ -283,44 +306,44 @@ export default function CommentItem({
         {canExpand && isReady && (
           <button
             onClick={toggleExpand}
-            className="text-xs text-blue-600 dark:text-blue-400 hover:underline mt-1"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 
+             hover:underline mt-1"
           >
             {expanded ? "Show Less ▲" : "Show More ▼"}
           </button>
         )}
 
         {/* Footer */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center gap-4 text-xs text-gray-600 dark:text-gray-400">
+        <div className="mt-3 flex items-center gap-5 text-xs">
+          {/* Upvote */}
+          <button
+            onClick={handleUpvote}
+            disabled={pending}
+            className={`flex items-center gap-1 transition-colors ${
+              pending
+                ? "opacity-50 cursor-not-allowed"
+                : hasUpvoted
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+            }`}
+          >
+            <ArrowBigUp size={16} />
+            {comment.upvoteCount ?? 0}
+          </button>
+
+          {/* Reply */}
+          {onReply && (
             <button
-              onClick={handleUpvote}
-              disabled={pending}
-              className={`flex items-center gap-1 transition-colors ${
-                pending
-                  ? "opacity-60 cursor-not-allowed"
-                  : hasUpvoted
-                  ? "text-blue-600 dark:text-blue-400"
-                  : "hover:text-blue-600 dark:hover:text-blue-400"
-              }`}
+              onClick={() => onReply(comment._id, comment.content ?? "")}
+              className="flex items-center gap-1 text-gray-500 dark:text-gray-400 
+                 hover:text-blue-600 dark:hover:text-blue-400"
             >
-              <ArrowBigUp size={15} /> <span>{comment.upvoteCount ?? 0}</span>
+              <Reply size={12} />
+              <span className="text-xs">{t("reply") || "reply"}</span>
             </button>
-          </div>
+          )}
         </div>
       </div>
-
-      {/* Reply button */}
-      {onReply && (
-        <button
-          onClick={() => onReply(comment._id, comment.content ?? "")}
-          className={`flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors pt-2 ${
-            isReply ? "ml-6" : ""
-          }`}
-        >
-          <Reply size={12} strokeWidth={2} />
-          <span className="text-sm">{t("reply") || "reply"}</span>
-        </button>
-      )}
 
       {/* Edit Modal */}
       <AnimatePresence>
