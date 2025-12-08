@@ -14,7 +14,6 @@ export default function TagPageClient({ tag, posts }: Props) {
   return (
     <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
       <div className="w-full h-screen overflow-hidden bg-white dark:bg-black">
-        
         {/* LEFT SIDEBAR */}
         <aside
           className="
@@ -62,6 +61,7 @@ export default function TagPageClient({ tag, posts }: Props) {
           <div className="max-w-2xl mx-auto py-6 space-y-10">
             <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400">
               #{tag}
+              <span className="opacity-70 ml-2 text-lg">({posts.length})</span>
             </h1>
 
             <CategoryPostListClient posts={posts} />

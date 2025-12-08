@@ -4,44 +4,25 @@ import { ObjectId } from "mongodb";
 
 export async function POST(req: Request) {
   try {
-    const { categories } = await req.json();
+    const { categoryIds } = await req.json();
 
-    if (!Array.isArray(categories) || categories.length === 0) {
+    // Expect ObjectId strings
+    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
       return NextResponse.json({ usage: {} });
     }
+
+    const ids = categoryIds.map((id) => new ObjectId(id));
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    /* 1️⃣ Find category documents from names */
-    const categoryDocs = await db
-      .collection("categories")
-      .find({ name: { $in: categories } })
-      .project({ _id: 1, name: 1 })
-      .toArray();
-
-    if (categoryDocs.length === 0) {
-      return NextResponse.json({ usage: {} });
-    }
-
-    /* Map names to ObjectId */
-    const idMap = Object.fromEntries(
-      categoryDocs.map((c) => [c._id.toString(), c.name])
-    );
-
-    const categoryIds = categoryDocs.map((c) => c._id);
-
-    /* 2️⃣ Count usage inside posts */
+    // Count matching categories inside posts
     const results = await db
       .collection("posts")
       .aggregate([
-        {
-          $match: { categories: { $in: categoryIds } }
-        },
+        { $match: { categories: { $in: ids } } },
         { $unwind: "$categories" },
-        {
-          $match: { categories: { $in: categoryIds } }
-        },
+        { $match: { categories: { $in: ids } } },
         {
           $group: {
             _id: "$categories",
@@ -51,11 +32,10 @@ export async function POST(req: Request) {
       ])
       .toArray();
 
-    /* 3️⃣ Convert ObjectId → category name */
+    // Build usage object EXACTLY as page expects
     const usage: Record<string, number> = {};
     results.forEach((r) => {
-      const name = idMap[r._id.toString()];
-      if (name) usage[name] = r.count;
+      usage[r._id.toString()] = r.count;
     });
 
     return NextResponse.json({ usage });

@@ -13,9 +13,10 @@ interface Props {
     myname: string;
   };
   posts: Post[];
+  count: number;
 }
 
-export default function CategoryPageClient({ category, posts }: Props) {
+export default function CategoryPageClient({ category, posts, count }: Props) {
   const { i18n } = useTranslation();
   const mainRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,7 +60,7 @@ export default function CategoryPageClient({ category, posts }: Props) {
           <p>Related</p>
         </aside>
 
-        {/* MAIN SCROLL AREA (same as HomePage) */}
+        {/* MAIN */}
         <main
           ref={mainRef}
           className="
@@ -76,7 +77,10 @@ export default function CategoryPageClient({ category, posts }: Props) {
         >
           <div className="max-w-2xl mx-auto py-6 space-y-10">
             <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {title}
+              {title}{" "}
+              <span className="opacity-60 text-lg">
+                ({count})
+              </span>
             </h1>
 
             <CategoryPostListClient posts={posts} />
