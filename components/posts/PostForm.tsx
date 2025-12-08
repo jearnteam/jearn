@@ -17,6 +17,7 @@ export interface PostFormProps {
     categories: string[],
     tags: string[]
   ) => Promise<void>;
+  mode?: "post" | "question";
 }
 
 interface Category {
@@ -47,7 +48,7 @@ function extractTagsFromHTML(html: string): string[] {
   return Array.from(new Set(tags)); // unique tags
 }
 
-export default function PostForm({ onSubmit }: PostFormProps) {
+export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [resetKey, setResetKey] = useState(0);
 
@@ -241,7 +242,9 @@ export default function PostForm({ onSubmit }: PostFormProps) {
       >
         <input
           type="text"
-          placeholder={t("title") || "Title"}
+          placeholder={
+            mode === "question" ? "質問を入力" : t("title") || "Title"
+          }
           value={title}
           maxLength={200}
           onChange={(e) => {
@@ -267,6 +270,11 @@ export default function PostForm({ onSubmit }: PostFormProps) {
           ref={editorRef}
           value=""
           onUpdate={handleEditorUpdate}
+          placeholder={
+            mode === "question"
+              ? "質問内容を詳しく書いてください"
+              : "みんなと共有したいことを入力してください"
+          }
         />
       </div>
 
@@ -404,9 +412,21 @@ export default function PostForm({ onSubmit }: PostFormProps) {
                 whileHover={{ scale: 1.05 }}
                 type="submit"
                 disabled={submitting || loading || selected.length === 0}
-                className="px-6 py-2 rounded-lg bg-blue-600 text-white disabled:bg-gray-400 transition"
+                className={`px-6 py-2 rounded-lg text-white disabled:bg-gray-400 transition
+    ${
+      mode === "question"
+        ? "bg-orange-500 hover:bg-orange-600"
+        : "bg-blue-600 hover:bg-blue-700"
+    }
+  `}
               >
-                {submitting ? "Submitting..." : t("submit") || "Submit"}
+                {submitting
+                  ? mode === "question"
+                    ? "Submitting Question..."
+                    : "Submitting..."
+                  : mode === "question"
+                  ? "Ask Question"
+                  : t("submit") || "Submit"}
               </motion.button>
             )}
           </div>

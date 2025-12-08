@@ -675,7 +675,7 @@ export default function PostItem({
                 </button>
               )}
             </div>
-
+              
             <div>
               {postState.edited
                 ? `(edited ${dayjs(postState.editedAt)
