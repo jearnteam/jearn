@@ -143,19 +143,21 @@ export default function GraphView({ post }: { post: any }) {
       },
       borderWidth: 1,
       shapeProperties: { borderRadius: 10 },
-      mass: 7,
+      mass: 6,
+      physics: true,
     });
 
     /* USER NODE */
     const userNodeId = `user-${post.authorId}`;
-    nodesRef.current.add(
-      makeBox(
+    nodesRef.current.add({
+      ...makeBox(
         userNodeId,
         `👤 ${post.authorName}`,
         "#2196F3",
         `/profile/${post.authorId}`
-      )
-    );
+      ),
+      mass: 2,
+    });
 
     edgesRef.current.add({
       from: post._id,
@@ -170,17 +172,22 @@ export default function GraphView({ post }: { post: any }) {
     const hasComments = comments.length > 0;
 
     if (hasCategories)
-      nodesRef.current.add(
-        makeBox("group-categories", "📂 Categories", "#795548", null)
-      );
+      nodesRef.current.add({
+        ...makeBox("group-categories", "📂 Categories", "#795548", null),
+        mass: 2,
+      });
 
     if (hasTags)
-      nodesRef.current.add(makeBox("group-tags", "🏷 Tags", "#6A1B9A", null));
+      nodesRef.current.add({
+        ...makeBox("group-tags", "🏷 Tags", "#6A1B9A", null),
+        mass: 2,
+      });
 
     if (hasComments)
-      nodesRef.current.add(
-        makeBox("group-comments", "💬 Comments", "#00838F", null)
-      );
+      nodesRef.current.add({
+        ...makeBox("group-comments", "💬 Comments", "#00838F", null),
+        mass: 2,
+      });
 
     if (hasCategories)
       edgesRef.current.add({
@@ -218,6 +225,7 @@ export default function GraphView({ post }: { post: any }) {
           font: { color: "#111", size: 14, multi: true, bold: true },
           color: { background: "#FFC107", border: "#111" },
           size: 20 + u * 2,
+          mass: 1,
         });
 
         edgesRef.current.add({
@@ -252,6 +260,7 @@ export default function GraphView({ post }: { post: any }) {
           font: { color: "#fff", size: 14, multi: true, bold: true },
           color: { background: "#9C27B0", border: "#111" },
           size: 20 + u * 2,
+          mass: 1,
         });
 
         edgesRef.current.add({
@@ -273,6 +282,7 @@ export default function GraphView({ post }: { post: any }) {
           margin: 10,
           font: { color: "#fff", size: 14, multi: true },
           color: { background: "#00BCD4", border: "#006872" },
+          mass: 1,
         });
 
         edgesRef.current.add({
@@ -291,14 +301,42 @@ export default function GraphView({ post }: { post: any }) {
       {
         physics: {
           enabled: true,
-          solver: "repulsion",
-          minVelocity: 0.01,
-          repulsion: {
-            nodeDistance: 120,
-            springLength: 40,
-            springConstant: 0.002,
-            centralGravity: 0.2,
+          stabilization: {
+            enabled: true,
+            iterations: 1000,
+            updateInterval: 25,
+            onlyDynamicEdges: false,
+            fit: true,
           },
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: {
+            gravitationalConstant: -50,
+            centralGravity: 0.005,
+            springLength: 100,
+            springConstant: 0.08,
+            damping: 0.4,
+            avoidOverlap: 0,
+          },
+          // solver: "forceAtlas2Based",
+          // forceAtlas2Based: {
+          //   gravitationalConstant: -120,
+          //   centralGravity: 0.015,
+          //   springLength: 120,
+          //   springConstant: 0.2,
+          //   damping: 0.6,
+          //   avoidOverlap: 0.5,
+          // },
+          // solver: "repulsion",
+          // repulsion: {
+          //   nodeDistance: 120,
+          //   springLength: 40,
+          //   springConstant: 0.002,
+          //   centralGravity: 0.2,
+          //   damping : 0.05,
+          // },
+          maxVelocity: 80,
+          minVelocity: 0.75,
+          timestep: 0.5,
         },
         interaction: {
           dragView: true,
@@ -306,7 +344,18 @@ export default function GraphView({ post }: { post: any }) {
           zoomView: true,
           hover: true,
         },
-        edges: { smooth: false },
+        edges: {
+          smooth: {
+            type: "continuous",
+            forceDirection: "none",
+            roundness: 0.5,
+          },
+        },
+        // configure: {
+        //   enabled: true,
+        //   showButton: true,
+        //   // filter: 'physics, nodes',
+        // },
       }
     );
 
