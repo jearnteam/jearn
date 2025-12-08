@@ -438,7 +438,9 @@ export default function EditPostModal({
                   <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 rounded-full animate-pulse" />
                 )}
                 <span>
-                  Editing as <strong>{user?.name}</strong>
+                  {t("postingAsBefore") || "Editing as"}
+                  <strong>{user?.name}</strong>
+                  {t("postingAsAfter") || ""}
                 </span>
               </div>
 
