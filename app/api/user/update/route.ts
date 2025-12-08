@@ -28,9 +28,16 @@ export async function POST(req: NextRequest) {
     const client = await clientPromise;
     const db = client.db("jearn");
 
-// -------------------------------------------------
+    // -------------------------------------------------
     // 🔥 VALIDATE & CHECK UNIQUE USERID
     // -------------------------------------------------
+    if (name.length < 4 || name.length > 32) {
+      return NextResponse.json(
+        { ok: false, error: "Name must be between 4 and 32 characters" },
+        { status: 400 }
+      );
+    }
+
     let userIdUpdate: any = {};
     if (userId) {
       // 文字数制限チェック (3文字以上32文字以下)
@@ -77,7 +84,7 @@ export async function POST(req: NextRequest) {
           processed = await sharpImg
             .resize(512, 512, {
               fit: "contain",
-              background: { r: 0, g: 0, b: 0, alpha: 0 } // keep alpha
+              background: { r: 0, g: 0, b: 0, alpha: 0 }, // keep alpha
             })
             .png({ compressionLevel: 9 })
             .toBuffer();
@@ -120,10 +127,9 @@ export async function POST(req: NextRequest) {
       ...pictureUpdate,
     };
 
-    const result = await db.collection("users").updateOne(
-      { _id: new ObjectId(user_id) },
-      { $set: updateData }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne({ _id: new ObjectId(user_id) }, { $set: updateData });
 
     if (!result.matchedCount) {
       return NextResponse.json(
@@ -133,7 +139,6 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true });
-
   } catch (err) {
     console.error("🛑 /api/user/update unexpected error:", err);
     return NextResponse.json(
