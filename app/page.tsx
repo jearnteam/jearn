@@ -13,6 +13,7 @@ import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import { useTranslation } from "react-i18next";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
+import MobileNavbar from "@/components/MobileNavbar";
 
 function useShowLoginOnNewTab() {
   const router = useRouter();
@@ -177,6 +178,7 @@ export default function HomePage() {
               onUpvote={upvotePost}
             />
           </main>
+          <MobileNavbar onCreatePost={() => setShowPostBox(true)} />
         </div>
       </div>
     </>
