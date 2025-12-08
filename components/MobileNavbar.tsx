@@ -1,5 +1,5 @@
 // components/MobileNavbar.tsx
-import { Plus, Home, Users, Bell } from "lucide-react";
+import { Plus, Home, Users, Bell, Banana } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 interface MobileNavbarProps {
@@ -51,6 +51,7 @@ export default function MobileNavbar({ onCreatePost }: MobileNavbarProps) {
         onClick={onCreatePost}
         className="
           w-12 h-12
+          mx-2
           bg-blue-600 hover:bg-blue-700
           text-white
           rounded-full
@@ -85,7 +86,7 @@ export default function MobileNavbar({ onCreatePost }: MobileNavbarProps) {
           active:scale-95
         "
       >
-        ?
+        <Banana size={24} strokeWidth={2} />
       </button>
     </div>
   );
