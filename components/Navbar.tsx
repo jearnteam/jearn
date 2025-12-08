@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import UserMenu from "@/components/UserMenu";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 
 const ThreeBall = dynamic(() => import("./3d_spinner"), {
   ssr: false,
@@ -23,7 +24,6 @@ export default function Navbar() {
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white dark:bg-neutral-900 border-b shadow-sm">
       <div className="max-w-5xl mx-auto flex justify-between items-center px-4 h-16">
-
         {/* Logo */}
         <div
           className="flex items-center gap-3 cursor-pointer"
@@ -39,6 +39,22 @@ export default function Navbar() {
           >
             {t("jearn") || "JEARN"}
           </h1>
+        </div>
+
+        <div className="flex items-center w-full max-w-md mx-auto">
+          <label htmlFor="search-input" className="sr-only">
+            Search
+          </label>
+          <div
+            className="flex items-center w-full px-4 py-2 bg-white border border-gray-300 rounded-full shadow-sm focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition duration-150 ease-in-out"
+          >
+            <Search className="w-5 h-5 text-gray-400 mr-3" />
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-full text-gray-700 placeholder-gray-500 focus:outline-none bg-transparent"
+            />
+          </div>
         </div>
 
         {/* Right side */}
