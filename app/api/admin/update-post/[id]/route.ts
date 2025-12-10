@@ -14,12 +14,15 @@ export async function PUT(
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const updateData: any = {
+    // 全てを受け入れる
+    const updateData: any = body;
+    delete updateData["_id"];
+    /*const updateData: any = {
       title: body.title,
       content: body.content,
       categories: body.categories ?? [],
       updatedAt: new Date(),
-    };
+    };*/
 
     Object.keys(updateData).forEach((key) => {
       if (updateData[key] === undefined) delete updateData[key];

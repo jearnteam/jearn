@@ -222,7 +222,6 @@ export default function DatabasePanel() {
               <tr>
                 <th className="px-3 py-2">Post ID</th>
                 <th className="px-3 py-2">Title</th>
-                <th className="px-3 py-2">Author</th>
                 <th className="px-3 py-2">Category</th>
                 <th className="px-3 py-2">Created</th>
                 <th className="px-3 py-2 text-right">Actions</th>
@@ -237,7 +236,6 @@ export default function DatabasePanel() {
                 >
                   <td className="px-3 py-2 text-xs text-gray-500">{p._id}</td>
                   <td className="px-3 py-2">{p.title ?? "(no title)"}</td>
-                  <td className="px-3 py-2">{p.authorName}</td>
                   <td className="px-3 py-2">
                     {Array.isArray(p.categories)
                       ? p.categories.join(", ")
