@@ -1,3 +1,4 @@
+// components/posts/PostEditorInner.tsx
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +9,7 @@ import Placeholder from "@tiptap/extension-placeholder";
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 
-import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
+import { Plugin, PluginKey } from "prosemirror-state";
 
 import Underline from "@tiptap/extension-underline";
 import Strike from "@tiptap/extension-strike";
@@ -24,9 +25,11 @@ import HorizontalRule from "@tiptap/extension-horizontal-rule";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
+import { Mention } from "@/features/Mention";
+import { MentionSuggestion } from "@/features/MentionSuggestion";
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 import { ImagePlaceholder } from "@/features/ImagePlaceholder";
-import { CursorExitFix } from "@/features/CursorExitFix"; // UPDATED SAFE VERSION
+import { CursorExitFix } from "@/features/CursorExitFix";
 import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
 
 import { Extension } from "@tiptap/core";
@@ -62,7 +65,7 @@ const ZeroWidthCleanup = Extension.create({
   },
 });
 
-/* ----------------------- CHARACTER LIMIT ----------------------- */
+/* ----------------------- CHARACTER COUNT (NO HARD LIMIT) ----------------------- */
 
 const ZERO_WIDTH_REGEX = /[\u200B-\u200D\uFEFF]/g;
 
@@ -83,7 +86,7 @@ function countCharactersWithMath(doc: any) {
 
     if (node.type?.name === "tag") {
       const value = (node.attrs?.value || "").replace(ZERO_WIDTH_REGEX, "");
-      count += 1 + value.length; // ⭐ “#tag” counts as length
+      count += 1 + value.length; // “#tag” counts as length
       return false;
     }
 
@@ -101,17 +104,20 @@ function countCharactersWithMath(doc: any) {
     return true;
   });
 
-  // ⭐ Subtract 1 ONLY IF there's anything counted
+  // Subtract 1 ONLY IF there's anything counted
   return count > 0 ? count - 1 : 0;
 }
 
 const MAX_CHARS = 20000;
 
+// NOTE: TextLimitPlugin is **not** used anymore to avoid the infinite recursion.
+// If you want to re-enable a hard limit later, we can do it differently.
 const textLimitPluginKey = new PluginKey("text-limit");
 
 export const TextLimitPlugin = new Plugin({
   key: textLimitPluginKey,
   filterTransaction(tr, state) {
+    // not used in extensions[] currently
     const doc = tr.doc || state.doc;
     return countCharactersWithMath(doc) <= MAX_CHARS;
   },
@@ -165,24 +171,22 @@ export default function PostEditorInner({
       Code,
 
       Tag,
+      Mention,
+      MentionSuggestion,
       ImagePlaceholder,
       InlineBackspaceFix,
       AtomBoundaryFix,
       MathExtension,
       ZeroWidthCleanup,
 
-      CursorExitFix, // **ONLY cursor logic — safe, minimal**
+      CursorExitFix,
 
       Placeholder.configure({
         placeholder: finalPlaceholder,
       }),
 
-      Extension.create({
-        name: "limitPlugin",
-        addProseMirrorPlugins() {
-          return [TextLimitPlugin];
-        },
-      }),
+      // ❌ we do NOT inject TextLimitPlugin here to avoid stack overflow
+      // If you want to enforce MAX_CHARS later, we'll do a safer approach.
     ],
     [finalPlaceholder]
   );
@@ -216,7 +220,6 @@ export default function PostEditorInner({
   useEffect(() => {
     if (!editor) return;
 
-    // Wait until Tiptap fully loads the DOM content
     requestAnimationFrame(() => {
       setCharCount(countCharactersWithMath(editor.state.doc));
     });
