@@ -23,7 +23,7 @@ export default function Navbar() {
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 bg-white dark:bg-neutral-900 border-b shadow-sm">
-      <div className="max-w-5xl mx-auto flex justify-between items-center px-4 h-16">
+      <div className="mx-auto flex gap-4 justify-around items-center px-4 h-16">
         {/* Logo */}
         <div
           className="flex items-center gap-3 cursor-pointer"
@@ -41,11 +41,12 @@ export default function Navbar() {
           </h1>
         </div>
 
-        <div className="flex items-center w-full max-w-md mx-auto">
+        <div className="flex items-center w-full max-w-md">
           <label htmlFor="search-input" className="sr-only">
             Search
           </label>
           <div
+            id="search-input"
             className="
               flex items-center
               w-full px-4 py-2
@@ -71,7 +72,7 @@ export default function Navbar() {
         </div>
 
         {/* Right side */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-shrink-0 items-center gap-3">
           {!hydrated ? (
             <div className="w-8 h-8" />
           ) : loading ? (
