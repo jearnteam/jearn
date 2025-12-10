@@ -119,9 +119,9 @@ export default function HomePage() {
           {/* LEFT SIDEBAR */}
           <aside
             className="
-              hidden xl:flex flex-col
+              hidden lg:flex flex-col
               fixed top-[4.3rem] left-0
-              w-[320px] h-[calc(100vh-4.3rem)]
+              w-[280px] h-[calc(100vh-4.3rem)]
               bg-black text-white px-4 py-4
               border-r border-neutral-800
               overflow-y-auto
@@ -139,9 +139,9 @@ export default function HomePage() {
           {/* RIGHT SIDEBAR */}
           <aside
             className="
-              hidden xl:flex flex-col
+              hidden lg:flex flex-col
               fixed top-[4.3rem] right-0
-              w-[320px] h-[calc(100vh-4.3rem)]
+              w-[280px] h-[calc(100vh-4.3rem)]
               bg-black text-white px-4 py-4
               border-l border-neutral-800
               overflow-y-auto
@@ -158,7 +158,7 @@ export default function HomePage() {
               absolute 
               top-[4.3rem]
               left-0 right-0
-              xl:left-[320px] xl:right-[320px]
+              lg:left-[280px] lg:right-[280px]
               h-[calc(100vh-4.3rem)]
               overflow-y-auto
               no-scrollbar

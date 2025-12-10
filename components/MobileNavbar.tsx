@@ -11,7 +11,7 @@ export default function MobileNavbar({ onCreatePost }: MobileNavbarProps) {
   return (
     <div
       className="
-        xl:hidden
+        lg:hidden
         fixed bottom-0 left-0 right-0
         h-20
         bg-white dark:bg-black
