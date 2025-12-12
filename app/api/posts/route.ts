@@ -3,6 +3,8 @@ import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
@@ -12,42 +14,38 @@ export const runtime = "nodejs";
 async function enrichPost(post: any, usersColl: any) {
   let user = null;
 
-  if (post.authorId && ObjectId.isValid(post.authorId)) {
+  // 1) If authorId is a valid ObjectId → lookup by _id
+  if (ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, userId: 1, picture: 1, email: 1 } }
+      { projection: { name: 1, userId: 1, email: 1, avatarUpdatedAt: 1 } }
     );
   }
 
-  // Also check provider_id users
-  if (!user && post.authorId) {
+  // 2) Fallback: lookup by provider_id (old users)
+  if (!user) {
     user = await usersColl.findOne(
       { provider_id: post.authorId },
-      { projection: { name: 1, userId: 1, picture: 1, email: 1 } }
+      { projection: { name: 1, userId: 1, email: 1, avatarUpdatedAt: 1 } }
     );
   }
 
-  const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
+  // 3) If STILL not found → anonymous placeholder
+  const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
 
-  const isAdmin = user?.email && adminEmails.includes(user.email.trim());
-
-  const avatarId = user?._id
-    ? user._id.toString()
-    : ObjectId.isValid(post.authorId)
-    ? post.authorId
-    : null;
+  const avatarId = user?._id?.toString() ?? post.authorId;
+  const timestamp = user?.avatarUpdatedAt
+    ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
+    : "";
 
   return {
     ...post,
     _id: post._id.toString(),
-    authorId: avatarId,
+    authorId: user?._id?.toString() ?? post.authorId,
     authorName: user?.name ?? "Unknown",
     authorUserId: user?.userId ?? "",
-    authorAvatar: avatarId
-      ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
-      : "/default-avatar.png",
-
-    isAdmin,
+    authorAvatarUpdatedAt: user?.avatarUpdatedAt ?? null,
+    authorAvatar: `${CDN}/avatars/${avatarId}.webp${timestamp}`,
   };
 }
 
@@ -141,6 +139,11 @@ export async function GET(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const {
       title,
       content,
@@ -234,7 +237,7 @@ export async function POST(req: Request) {
       categories: categoryData,
       tags: doc.tags ?? [],
       commentCount: 0,
-      edited: false
+      edited: false,
     };
 
     const sseType = replyTo
@@ -272,6 +275,11 @@ export async function POST(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function PUT(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const {
       id,
       title,
@@ -289,6 +297,9 @@ export async function PUT(req: Request) {
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing) return new Response("Post not found", { status: 404 });
+
+    if (existing.authorId !== session.user.uid)
+      return new Response("Forbidden", { status: 403 });
 
     const updateFields: any = {};
     if (title !== undefined) updateFields.title = title;
@@ -321,7 +332,7 @@ export async function PUT(req: Request) {
     const final = {
       ...enrichedPost,
       categories: enrichedCategories,
-      tags: updated.tags ?? []
+      tags: updated.tags ?? [],
     };
 
     const type = existing.replyTo
@@ -349,6 +360,11 @@ export async function PUT(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function DELETE(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const { id } = await req.json();
 
     const client = await clientPromise;
@@ -357,6 +373,9 @@ export async function DELETE(req: Request) {
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing) return new Response("Deleted", { status: 200 });
+
+    if (existing.authorId !== session.user.uid)
+      return new Response("Forbidden", { status: 403 });
 
     await posts.deleteOne({ _id: new ObjectId(id) });
 

@@ -3,6 +3,8 @@ import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
@@ -110,6 +112,11 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const id = params.id;
     if (!id || !ObjectId.isValid(id))
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -126,6 +133,9 @@ export async function PUT(
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing)
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+
+    if (existing.authorId !== session.user.uid)
+      return new Response("Forbidden", { status: 403 });
 
     const updateFields: any = {};
 
