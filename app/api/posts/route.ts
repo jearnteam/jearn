@@ -157,6 +157,8 @@ export async function POST(req: Request) {
 
     if (!authorId)
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
+    if (authorId !== session.user.uid)
+      return NextResponse.json({ error: "Incorrect authorId" }, { status: 400 });
 
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });

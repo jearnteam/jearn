@@ -22,6 +22,9 @@ export async function POST(
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
+    if (userId !== session.user.uid) {
+      return NextResponse.json({ error: "Incorrect userId" }, { status: 400 });
+    }
     if (!ObjectId.isValid(postId)) {
       return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
     }
