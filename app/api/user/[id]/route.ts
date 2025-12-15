@@ -46,10 +46,10 @@ export async function GET(
 
     if (user.avatarR2Key) {
       // If you store the R2 key directly in DB
-      avatarUrl = `${process.env.R2_PUBLIC_URL}/${user.avatarR2Key}`;
+      avatarUrl = `${process.env.R2_PUBLIC_URL}/${user.avatarR2Key}?t=${new Date().getTime()}`;
     } else {
       // Fallback: predictable R2 path
-      avatarUrl = `${process.env.R2_PUBLIC_URL}/avatars/${id}.webp`;
+      avatarUrl = `${process.env.R2_PUBLIC_URL}/avatars/${id}.webp?t=${new Date().getTime()}`;
     }
 
     return NextResponse.json({

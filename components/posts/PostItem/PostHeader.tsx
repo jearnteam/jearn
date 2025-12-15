@@ -26,7 +26,7 @@ export default function PostHeader({
       <Link href={`/profile/${post.authorId}`} scroll={false}>
         <div className="flex items-center gap-3">
           <img
-            src={post.authorAvatar || "/default-avatar.png"}
+            src={`https://cdn.jearn.site/avatars/${post.authorId}.webp?t=${new Date().getTime()}` || "/default-avatar.png"}
             className="w-8 h-8 rounded-full"
           />
           <div>

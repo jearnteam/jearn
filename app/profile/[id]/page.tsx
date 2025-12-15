@@ -62,7 +62,7 @@ export default function UserPage({ params }: any) {
 
       setUser({
         ...uData.user,
-        picture: `/api/user/avatar/${id}?v=${Date.now()}`,
+        picture: `https://cdn.jearn.site/avatars/${id}?t=${new Date().getTime()}`,
       });
 
       // Fetch posts

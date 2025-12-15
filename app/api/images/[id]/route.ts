@@ -6,6 +6,8 @@ export const runtime = "nodejs";
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
+    return new Response("Outdated image", { status: 503 });
+    /*
     const { id } = params;
 
     if (!id || id === "undefined") {
@@ -33,6 +35,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
+    */
   } catch (err) {
     console.error("🔥 GET image error:", err);
     return new Response("Server error", { status: 500 });

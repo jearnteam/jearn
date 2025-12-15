@@ -411,7 +411,7 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
                   const form = new FormData();
                   form.append("file", file);
 
-                  const res = await fetch("/api/images/uploadImage", {
+                  const res = await fetch("//uplapi/imagesoadImage", {
                     method: "POST",
                     body: form,
                   });

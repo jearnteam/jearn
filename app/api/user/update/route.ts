@@ -92,18 +92,20 @@ export async function POST(req: NextRequest) {
       try {
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        const processed = await sharp(buffer)
+        const processed = await sharp(buffer, { animated: true }) // ⭐ IMPORTANT
           .resize(256, 256, {
             fit: "cover",
             position: "center",
           })
-          .webp({ quality: 80 })
+          .webp({
+            quality: 80,
+            effort: 4, // good compression
+            loop: 0, // infinite loop for animated webp
+          })
           .toBuffer();
 
-        // FINAL FILE NAME
         const avatarKey = `avatars/${user_id}.webp`;
 
-        // Upload to R2
         await r2.send(
           new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME!,
@@ -113,7 +115,6 @@ export async function POST(req: NextRequest) {
           })
         );
 
-        // CDN URL
         const cdnBase = process.env.R2_PUBLIC_URL!.replace(/\/+$/, "");
         pictureUpdate.avatarUrl = `${cdnBase}/${avatarKey}`;
         pictureUpdate.avatarUpdatedAt = new Date();

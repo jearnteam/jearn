@@ -119,7 +119,14 @@ export function usePosts() {
       await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postType, title, content, authorId, categories, tags }),
+        body: JSON.stringify({
+          postType,
+          title,
+          content,
+          authorId,
+          categories,
+          tags,
+        }),
       }).catch((e) => console.error("🔥 addPost error:", e));
     },
     []
@@ -144,6 +151,8 @@ export function usePosts() {
                 ...p,
                 title,
                 content,
+                edited: true,
+                editedAt: new Date().toISOString(),
               }
             : p
         )

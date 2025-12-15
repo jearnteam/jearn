@@ -63,7 +63,7 @@ export default function ProfilePage() {
       setUserId(user.userId || "");
       setBio(user.bio || "");
 
-      setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
+      setPreview(`https://cdn.jearn.site/avatars/${user._id}?t=${new Date().getTime()}`);
     }
   }, [user, loading]);
 
@@ -132,7 +132,7 @@ export default function ProfilePage() {
       if (!res.ok || !data.ok) throw new Error(data.error || "Update failed");
 
       await update();
-      setPreview(`/api/user/avatar/${user._id}?v=${Date.now()}`);
+      setPreview(`https://cdn.jearn.site/avatars/${user._id}?t=${new Date().getTime()}`);
       alert("Profile updated!");
     } catch (err: any) {
       alert(err.message);

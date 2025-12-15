@@ -29,16 +29,16 @@ async function resolveAuthor(users: any, authorId?: string | null) {
     );
   }
 
-  const avatarId = user?._id ? String(user._id) : null;
-  const avatar = avatarId
-    ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
-    : null;
+  // const avatarId = user?._id ? String(user._id) : null;
+  // const avatar = avatarId
+  //   ? `https://cdn.jearn.site/avatars/${avatarId}?t=${new Date().getTime()}`
+  //   : null;
 
   return {
     name: user?.name ?? "Anonymous",
     userId: user?.userId ?? null,
-    avatar,
-    avatarId,
+    // avatar,
+    // avatarId,
   };
 }
 

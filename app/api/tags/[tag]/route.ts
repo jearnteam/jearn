@@ -64,9 +64,6 @@ async function enrichPost(post: any, usersColl: any) {
 
     authorId: avatarId,
     authorName: user?.name ?? "Unknown",
-    authorAvatar: avatarId
-      ? `/api/user/avatar/${avatarId}?t=${Date.now()}`
-      : "/default-avatar.png",
 
     // ⭐ final admin flag
     isAdmin: isAdminViaFlag || isAdminViaEmail,

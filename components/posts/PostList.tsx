@@ -61,7 +61,7 @@ export default function PostList({
     if (!posts.length) return;
 
     const slice = posts.slice(0, visibleCount);
-    const avatarURLs = slice.map((p) => `/api/user/avatar/${p.authorId}`);
+    const avatarURLs = slice.map((p) => `https://cdn.jearn.site/avatars/${p.authorId}?t=${new Date().getTime()}`);
 
     setBatchLoading(true);
 
