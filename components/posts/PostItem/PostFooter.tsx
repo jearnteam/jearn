@@ -1,14 +1,10 @@
 "use client";
 
-import {
-  ArrowBigUp,
-  MessageCircle,
-  Share2,
-} from "lucide-react";
+import { ArrowBigUp, MessageCircle, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { usePostUpvote } from "./usePostUpvote";
-import type { Post } from "@/types/post";
+import { PostTypes, type Post } from "@/types/post";
 import clsx from "clsx";
 import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -56,16 +52,18 @@ export default function PostFooter({
           </button>
 
           {/* COMMENTS */}
-          {!isSingle && !post.parentId && (
-            <Link
-              href={`/posts/${post._id}#comments`}
-              scroll={false}
-              className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <MessageCircle size={18} />
-              <span>{post.commentCount ?? 0}</span>
-            </Link>
-          )}
+          {!isSingle &&
+            !post.parentId &&
+            post.postType !== PostTypes.QUESTION && (
+              <Link
+                href={`/posts/${post._id}#comments`}
+                scroll={false}
+                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              >
+                <MessageCircle size={18} />
+                <span>{post.commentCount ?? 0}</span>
+              </Link>
+            )}
 
           {/* SHARE */}
           {!post.parentId && (
@@ -82,8 +80,7 @@ export default function PostFooter({
         {/* RIGHT: EDITED */}
         {post.edited && post.editedAt && (
           <span className="text-xs text-gray-500 dark:text-gray-500">
-            (edited{" "}
-            {dayjs(post.editedAt).locale(i18n.language).fromNow()})
+            (edited {dayjs(post.editedAt).locale(i18n.language).fromNow()})
           </span>
         )}
       </div>
