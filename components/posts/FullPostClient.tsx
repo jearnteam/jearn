@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import type { Post } from "@/types/post";
-import PostItem from "@/components/posts/PostItem";
+import PostItem from "@/components/posts/PostItem/PostItem";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import EditPostModal from "@/components/posts/EditPostModal";

@@ -94,11 +94,18 @@ export default function PostFormBox({
                     }}
                   />
                 ) : (
-                  <QuestionForm
+                  // <QuestionForm
+                  //   onSubmit={async (...args) => {
+                  //     await onSubmit(...args);
+                  //     onClose();
+                  //   }}
+                  // />
+                  <PostForm
                     onSubmit={async (...args) => {
                       await onSubmit(...args);
                       onClose();
                     }}
+                    mode="question"
                   />
                 )}
               </section>

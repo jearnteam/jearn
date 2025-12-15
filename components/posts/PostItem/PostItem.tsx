@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PostTypes, type Post } from "@/types/post";
 import PostHeader from "./PostHeader";
 import PostContent from "./PostContent";
 import PostFooter from "./PostFooter";
+import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
-import FullScreenPortal from "@/features/FullScreenPortal";
-import GraphView from "@/components/graphview/GraphView";
-import { CircleQuestionMark } from "lucide-react";
+import Link from "next/link";
 
 export default function PostItem({
   post,
@@ -25,33 +24,55 @@ export default function PostItem({
   isSingle?: boolean;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  const [postState, setPostState] = useState(post);
   const [shareOpen, setShareOpen] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
-  const [graphKey, setGraphKey] = useState(0);
 
   return (
     <>
-      <div id={`post-${post._id}`} className="mb-3">
-        <div className="bg-white dark:bg-neutral-900 border rounded-xl p-4">
-          {/* Question Icon */}
-          {post.postType === PostTypes.QUESTION ? <CircleQuestionMark /> : ""}
-
+      <div ref={wrapperRef} className="mb-3">
+        <div
+          id={`post-${postState._id}`}
+          className="relative bg-white dark:bg-neutral-900 border rounded-xl p-4"
+        >
           <PostHeader
-            post={post}
+            post={postState}
             onEdit={onEdit}
             onDelete={onDelete}
-            onToggleGraph={() => {
-              setGraphKey(Date.now());
-              setShowGraph(true);
-            }}
+            onToggleGraph={() => setShowGraph((v) => !v)}
+          />
+          {/* TITLE */}
+          <Link href={`/posts/${post._id}`} scroll={false}>
+            {post.title && (
+              <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
+                {post.postType === PostTypes.QUESTION ? (
+                  <span className="text-red-500">{"Q. "}</span>
+                ) : (
+                  ""
+                )}
+                {post.title}
+              </h2>
+            )}
+          </Link>
+
+          <PostContent
+            post={postState}
+            scrollContainerRef={scrollContainerRef}
+            wrapperRef={wrapperRef}
           />
 
-          <PostContent post={post} scrollContainerRef={scrollContainerRef} />
+          {post.postType === PostTypes.QUESTION && (
+            // TODO: 回答ボタン
+            <></>
+          )}
 
           <PostFooter
-            post={post}
-            isSingle={isSingle}
+            post={postState}
+            setPost={setPostState}
             onUpvote={onUpvote}
+            isSingle={isSingle}
             onShare={() => setShareOpen(true)}
           />
         </div>
@@ -59,17 +80,15 @@ export default function PostItem({
 
       <SharePostModal
         open={shareOpen}
-        postUrl={`${location.origin}/posts/${post._id}`}
+        postUrl={`/posts/${postState._id}`}
         onCancel={() => setShareOpen(false)}
       />
 
-      <FullScreenPortal>
-        {showGraph && (
-          <div className="fixed inset-0 bg-black/70 p-6">
-            <GraphView key={graphKey} post={post} />
-          </div>
-        )}
-      </FullScreenPortal>
+      <PostGraphModal
+        open={showGraph}
+        post={postState}
+        onClose={() => setShowGraph(false)}
+      />
     </>
   );
 }

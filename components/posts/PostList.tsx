@@ -1,7 +1,7 @@
 "use client";
 
 import type { Post } from "@/types/post";
-import PostItem from "./PostItem";
+import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 

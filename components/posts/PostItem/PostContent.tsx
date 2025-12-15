@@ -1,48 +1,42 @@
+import type { Post } from "@/types/post";
+import React from "react";
 import { motion } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse } from "./usePostCollapse";
-import { PostTypes } from "@/types/post";
-import Link from "next/link";
 
 export default function PostContent({
   post,
   scrollContainerRef,
+  wrapperRef,
 }: {
-  post: any;
+  post: Post;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  wrapperRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const {
-    contentRef,
+    ref,
     expanded,
-    toggle,
-    targetHeight,
-    measureDone,
+    setExpanded,
+    collapsedHeight,
     shouldTruncate,
-  } = usePostCollapse(post.content, scrollContainerRef);
+  } = usePostCollapse(post.content ?? "");
 
   return (
     <>
-      <Link href={`/posts/${post._id}`} scroll={false}>
-        {post.title && (
-          <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
-            {post.postType === PostTypes.QUESTION ? <span className="text-red-500">{"Q. "}</span> : ""}
-            {post.title}
-          </h2>
-        )}
-      </Link>
-
       <motion.div
-        animate={{ height: targetHeight }}
-        transition={{ duration: measureDone ? 0.25 : 0 }}
-        className="mt-2 overflow-hidden"
+        animate={{ height: expanded ? "auto" : collapsedHeight ?? "auto" }}
+        className="overflow-hidden mt-2"
       >
-        <div ref={contentRef}>
-          <MathRenderer html={post.content} />
+        <div ref={ref}>
+          <MathRenderer html={post.content ?? ""} />
         </div>
       </motion.div>
 
       {shouldTruncate && (
-        <button onClick={toggle} className="text-blue-500 text-sm mt-2">
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-2 text-blue-600 text-sm"
+        >
           {expanded ? "Show Less ▲" : "Show More ▼"}
         </button>
       )}
