@@ -255,6 +255,7 @@ export default function UserPage({ params }: any) {
                 onEdit={(p) => setEditingPost(p)}
                 onDelete={(id) => Promise.resolve(requestDelete(id))}
                 onUpvote={upvotePost}
+                scrollContainerRef={mainRef}
               />
 
               {isRefreshing && (
