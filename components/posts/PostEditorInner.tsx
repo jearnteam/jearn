@@ -438,37 +438,6 @@ export default function PostEditorInner({
         >
           ∑
         </button>
-
-        <button
-          onClick={async () => {
-            const input = document.createElement("input");
-            input.type = "file";
-            input.accept = "image/*";
-
-            input.onchange = async () => {
-              const file = input.files?.[0];
-              if (!file) return;
-
-              const form = new FormData();
-              form.append("file", file);
-
-              const res = await fetch("/api/images/uploadImage", {
-                method: "POST",
-                body: form,
-              });
-
-              const { id, ext, width, height } = await res.json();
-              withRestore((c) =>
-                c.insertImagePlaceholder(id, ext, width, height)
-              );
-            };
-
-            input.click();
-          }}
-          className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-        >
-          🖼️
-        </button>
       </div>
 
       {/* EDITOR */}

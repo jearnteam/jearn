@@ -14,7 +14,7 @@ export const ImagePlaceholder = Node.create({
     return {
       id: { default: null },
       // optional fields kept for future compatibility
-      ext: { default: null },
+      url: { default: null },
       width: { default: null },
       height: { default: null },
     };
@@ -26,7 +26,7 @@ export const ImagePlaceholder = Node.create({
         tag: "img[data-type='image-placeholder']",
         getAttrs: (node: any) => ({
           id: node.getAttribute("data-id"),
-          ext: node.getAttribute("data-ext"),
+          url: node.getAttribute("src"),
           width: node.getAttribute("data-width")
             ? Number(node.getAttribute("data-width"))
             : null,
@@ -39,21 +39,17 @@ export const ImagePlaceholder = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { id, ext, width, height } = HTMLAttributes;
+    const { id, url, width, height } = HTMLAttributes;
 
     // --- ADJUST THIS if your backend/CDN requires different URL shape ---
     // prefer absolute CDN if available, otherwise local API route:
-    const src = ext
-      ? `/api/images/${id}.${ext}`   // if you provide ext later
-      : `/api/images/${id}`;        // fallback: use id-only route
 
     return [
       "img",
       mergeAttributes({
-        src,
+        src: url,
         "data-type": "image-placeholder",
         "data-id": id,
-        "data-ext": ext,
         "data-width": width,
         "data-height": height,
         style:
@@ -67,12 +63,12 @@ export const ImagePlaceholder = Node.create({
     return {
       // keep single-arg API (id) to match your current upload handler
       insertImagePlaceholder:
-        (id: string, ext?: string, width?: number, height?: number) =>
+        (id: string, url?: string, width?: number, height?: number) =>
         ({ chain }: { chain: any }) => {
           return chain()
             .insertContent({
               type: this.name,
-              attrs: { id, ext, width, height },
+              attrs: { id, url, width, height },
             })
             .run();
         },
