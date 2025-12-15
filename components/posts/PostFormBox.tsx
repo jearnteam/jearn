@@ -4,7 +4,6 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
-import QuestionForm from "./QuestionForm"; // ← 質問フォームを作成
 import { useTranslation } from "react-i18next";
 
 interface PostFormBoxProps {
@@ -94,12 +93,6 @@ export default function PostFormBox({
                     }}
                   />
                 ) : (
-                  // <QuestionForm
-                  //   onSubmit={async (...args) => {
-                  //     await onSubmit(...args);
-                  //     onClose();
-                  //   }}
-                  // />
                   <PostForm
                     onSubmit={async (...args) => {
                       await onSubmit(...args);
