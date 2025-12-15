@@ -182,6 +182,7 @@ export default function HomePage() {
             className="
     hidden lg:flex flex-col
     w-[280px]
+    border-r border-neutral-800
     px-4 py-4
     gap-4
   "
