@@ -15,6 +15,14 @@ import { useTranslation } from "react-i18next";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import MobileNavbar from "@/components/MobileNavbar";
 
+/* ---------------------------------------------
+ * VIEW TYPE
+ * ------------------------------------------- */
+type HomeView = "home" | "notify" | "users" | "banana";
+
+/* ---------------------------------------------
+ * LOGIN REDIRECT (UNCHANGED)
+ * ------------------------------------------- */
 function useShowLoginOnNewTab() {
   const router = useRouter();
   useEffect(() => {
@@ -29,9 +37,17 @@ export default function HomePage() {
   useShowLoginOnNewTab();
 
   const { t } = useTranslation();
-
-  const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
   const mainRef = useRef<HTMLDivElement | null>(null);
+
+  /* ---------------------------------------------
+   * VIEW STATE (KEY PART)
+   * ------------------------------------------- */
+  const [activeView, setActiveView] = useState<HomeView>("home");
+
+  /* ---------------------------------------------
+   * POSTS LOGIC
+   * ------------------------------------------- */
+  const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
 
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -40,6 +56,9 @@ export default function HomePage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  /* ---------------------------------------------
+   * PULL TO REFRESH
+   * ------------------------------------------- */
   usePullToRefresh(mainRef, async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -50,6 +69,9 @@ export default function HomePage() {
     }
   });
 
+  /* ---------------------------------------------
+   * HELPERS
+   * ------------------------------------------- */
   function requestDelete(id: string) {
     setDeletePostId(id);
     setConfirmDeleteOpen(true);
@@ -67,21 +89,58 @@ export default function HomePage() {
     }
   }
 
-  async function upvotePost(id: string, userId: string) {
-    const res = await fetch(`/api/posts/${id}/upvote`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-    const data = await res.json();
-    return res.ok
-      ? { ok: true, action: data.action }
-      : { ok: false, error: data.error || "Upvote failed" };
+  async function upvotePost(
+    id: string,
+    userId: string
+  ): Promise<{
+    ok: boolean;
+    action?: "added" | "removed";
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`/api/posts/${id}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return {
+          ok: false,
+          error: data?.error || "Upvote failed",
+        };
+      }
+
+      // 🔑 ADAPT API → UI CONTRACT
+      return {
+        ok: true,
+        action:
+          data.action === "upvoted"
+            ? "added"
+            : data.action === "unvoted"
+            ? "removed"
+            : undefined,
+      };
+    } catch {
+      return {
+        ok: false,
+        error: "Network error",
+      };
+    }
   }
+
+  /* ---------------------------------------------
+   * RESET SCROLL WHEN VIEW CHANGES
+   * ------------------------------------------- */
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [activeView]);
 
   return (
     <>
-      {/* Modals */}
+      {/* ───── MODALS ───── */}
       <PostFormBox
         open={showPostBox}
         onClose={() => setShowPostBox(false)}
@@ -112,75 +171,142 @@ export default function HomePage() {
 
       {loading && <FullScreenLoader text={t("loadingUser")} />}
 
-      {/* ─────────────────────────────────────────────── */}
-      {/* NEW FIXED LAYOUT (NO overflow-hidden trap)     */}
-      {/* ─────────────────────────────────────────────── */}
+      {/* ───── LAYOUT ───── */}
       <div className="fixed inset-0 flex flex-col bg-white dark:bg-black">
+        {/* HEADER SPACE */}
+        <header className="h-[4.3rem]" />
 
-        {/* Top Header (already exists in your layout globally) */}
-        <header className="h-[4.3rem] w-full"></header>
-
-        {/* Main layout row */}
         <div className="flex flex-row flex-1 overflow-hidden">
-
           {/* LEFT SIDEBAR */}
           <aside
             className="
-              hidden lg:flex flex-col
-              w-[280px]
-              bg-black text-white px-4 py-4
-              border-r border-neutral-800
-              overflow-y-auto
-            "
+    hidden lg:flex flex-col
+    w-[280px]
+    border-r border-neutral-800
+    px-4 py-4
+    gap-4
+  "
           >
+            {/* CREATE POST */}
             <button
               onClick={() => setShowPostBox(true)}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg transition"
             >
               + {t("createPost") || "Create Post"}
             </button>
+
+            {/* NAVIGATION */}
+            <nav className="mt-6 flex flex-col gap-1">
+              <SidebarItem
+                label="Home"
+                active={activeView === "home"}
+                onClick={() => setActiveView("home")}
+              />
+
+              <SidebarItem
+                label="Users"
+                active={activeView === "users"}
+                onClick={() => setActiveView("users")}
+              />
+
+              <SidebarItem
+                label="Notifications"
+                active={activeView === "notify"}
+                onClick={() => setActiveView("notify")}
+              />
+
+              <SidebarItem
+                label="Banana"
+                active={activeView === "banana"}
+                onClick={() => setActiveView("banana")}
+              />
+            </nav>
           </aside>
 
           {/* MAIN SCROLL AREA */}
           <main
             ref={mainRef}
-            className="
-              flex-1
-              overflow-y-auto no-scrollbar
-              pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-            "
+            className="flex-1 overflow-y-auto no-scrollbar
+                       pb-[calc(env(safe-area-inset-bottom,0px)+72px)]"
           >
             {isRefreshing && (
-              <div className="flex justify-center items-center py-2">
-                <div className="animate-spin w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full"></div>
+              <div className="flex justify-center py-2">
+                <div className="animate-spin w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full" />
               </div>
             )}
 
-            <PostList
-              posts={posts}
-              onEdit={(p) => setEditingPost(p)}
-              onDelete={async (id) => requestDelete(id)}
-              onUpvote={upvotePost}
-              scrollContainerRef={mainRef}
-            />
+            {/* ───── VIEW SWITCH ───── */}
+            {activeView === "home" && (
+              <PostList
+                posts={posts}
+                onEdit={setEditingPost}
+                onDelete={async (id) => {
+                  requestDelete(id);
+                }}
+                onUpvote={upvotePost}
+                scrollContainerRef={mainRef}
+              />
+            )}
+
+            {activeView === "notify" && (
+              <div className="p-4 text-center text-gray-500">
+                🔔 Notifications (placeholder)
+              </div>
+            )}
+
+            {activeView === "users" && (
+              <div className="p-4 text-center text-gray-500">
+                👥 Users (placeholder)
+              </div>
+            )}
+
+            {activeView === "banana" && (
+              <div className="p-4 text-center text-gray-500">
+                🍌 Banana Zone
+              </div>
+            )}
           </main>
 
           {/* RIGHT SIDEBAR */}
-          <aside
-            className="
-              hidden lg:flex flex-col
-              w-[280px]
-              bg-black text-white px-4 py-4
-              border-l border-neutral-800
-              overflow-y-auto
-            "
-          >
-            <p>Right Content</p>
+          <aside className="hidden lg:flex w-[280px] p-4">
+            Right Content
           </aside>
         </div>
 
-        <MobileNavbar onCreatePost={() => setShowPostBox(true)} />
+        {/* MOBILE NAVBAR */}
+        <MobileNavbar
+          activeView={activeView}
+          onChangeView={setActiveView}
+          onCreatePost={() => setShowPostBox(true)}
+        />
       </div>
     </>
+  );
+}
+
+function SidebarItem({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        w-full text-left px-4 py-2 rounded-lg
+        transition
+        ${
+          active
+            ? "bg-blue-600 text-white"
+            : "text-gray-700 dark:text-gray-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        }
+      `}
+    >
+      {label}
+    </button>
   );
 }

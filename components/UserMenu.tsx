@@ -130,6 +130,7 @@ export default function UserMenu({ user }: { user: User }) {
               {t("dashboard") || "Dashboard"}
             </button>
           )}
+          
 
           {/* LOGOUT */}
           <button

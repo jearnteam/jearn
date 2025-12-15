@@ -1,93 +1,95 @@
-// components/MobileNavbar.tsx
+"use client";
+
 import { Plus, Home, Users, Bell, Banana } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+
+type HomeView = "home" | "notify" | "users" | "banana";
 
 interface MobileNavbarProps {
+  activeView: HomeView;
+  onChangeView: (view: HomeView) => void;
   onCreatePost: () => void;
 }
 
-export default function MobileNavbar({ onCreatePost }: MobileNavbarProps) {
-  const router = useRouter();
+export default function MobileNavbar({
+  activeView,
+  onChangeView,
+  onCreatePost,
+}: MobileNavbarProps) {
+  function NavButton({ tab, icon }: { tab: HomeView; icon: React.ReactNode }) {
+    const isActive = activeView === tab;
+
+    return (
+      <button
+        onClick={() => onChangeView(tab)}
+        className="relative w-16 h-12 flex items-center justify-center"
+      >
+        <div className="relative w-6 h-6 flex items-center justify-center">
+          <motion.div
+            animate={{
+              scale: isActive ? 1.2 : 1,
+              y: isActive ? -2 : 0,
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 26 }}
+            className={
+              isActive
+                ? "text-blue-600 dark:text-blue-400"
+                : "text-gray-600 dark:text-gray-400"
+            }
+          >
+            {icon}
+          </motion.div>
+
+          {isActive && (
+            <motion.div
+              layoutId="nav-indicator"
+              className="
+                absolute
+                top-full mt-1
+                inset-x-0 mx-auto
+                h-[2px] w-6
+                rounded-full
+                bg-blue-600 dark:bg-blue-400
+              "
+              animate={{
+                scaleX: [1, 1.35, 1],
+                scaleY: [1, 0.8, 1],
+              }}
+              transition={{
+                layout: { type: "spring", stiffness: 420, damping: 30 },
+                duration: 0.35,
+              }}
+            />
+          )}
+        </div>
+      </button>
+    );
+  }
+
   return (
     <div
       className="
-        lg:hidden
-        fixed bottom-0 left-0 right-0
-        h-20
-        bg-white dark:bg-black
-        border-t border-neutral-200 dark:border-neutral-800
-        flex items-center justify-evenly
-        z-40
-        pt-1
-        pb-3
-        px-[5vw]
-      "
+      lg:hidden fixed bottom-0 left-0 right-0
+      h-20 bg-white dark:bg-black
+      border-t border-neutral-200 dark:border-neutral-800
+      flex items-center justify-evenly
+      z-40 pt-1 pb-3 px-[5vw]
+    "
     >
-      <button
-        onClick={() => router.push("/")}
-        className="
-          w-16 h-12
-          flex items-center justify-center
-          transition
-          active:scale-95
-        "
-      >
-        <Home size={24} strokeWidth={2} />
-      </button>
-      <div className="w-[2px] h-12 bg-gray-200 dark:bg-gray-700" />
-      <button
-        onClick={() => {}}
-        className="
-          w-16 h-12
-          flex items-center justify-center
-          transition
-          active:scale-95
-        "
-      >
-        <Users size={24} strokeWidth={2} />
-      </button>
-      <div className="w-[2px] h-12 bg-gray-200 dark:bg-gray-700" />
+      <NavButton tab="home" icon={<Home size={24} />} />
+      <NavButton tab="users" icon={<Users size={24} />} />
+
+      {/* CREATE */}
       <button
         onClick={onCreatePost}
-        className="
-          w-12 h-12
-          mx-2
-          bg-blue-600 hover:bg-blue-700
-          text-white
-          rounded-full
-          flex items-center justify-center
-          shadow-lg
-          transition
-          active:scale-95
-        "
-        aria-label="Create Post"
+        className="w-12 h-12 bg-blue-600 rounded-full text-white
+                   flex items-center justify-center shadow-lg"
       >
-        <Plus size={28} strokeWidth={2.5} />
+        <Plus size={28} />
       </button>
-      <div className="w-[2px] h-12 bg-gray-200 dark:bg-gray-700" />
-      <button
-        onClick={() => {}}
-        className="
-          w-16 h-12
-          flex items-center justify-center
-          transition
-          active:scale-95
-        "
-      >
-        <Bell size={24} strokeWidth={2} />
-      </button>
-      <div className="w-[2px] h-12 bg-gray-200 dark:bg-gray-700" />
-      <button
-        onClick={() => {}}
-        className="
-          w-16 h-12
-          flex items-center justify-center
-          transition
-          active:scale-95
-        "
-      >
-        <Banana size={24} strokeWidth={2} />
-      </button>
+
+      <NavButton tab="notify" icon={<Bell size={24} />} />
+      <NavButton tab="banana" icon={<Banana size={24} />} />
     </div>
   );
 }
