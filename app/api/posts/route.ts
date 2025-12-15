@@ -168,10 +168,11 @@ export async function POST(req: Request) {
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
-    const isTopLevel = !parentId && !replyTo && postType !== PostTypes.COMMENT;
-
     // Title exist check
-    if (isTopLevel && postType !== PostTypes.ANSWER && !title?.trim()) {
+    if (
+      [PostTypes.POST, PostTypes.QUESTION].includes(postType) &&
+      !title?.trim()
+    ) {
       return NextResponse.json(
         { error: "Title required for Post or Question" },
         { status: 400 }
@@ -180,8 +181,7 @@ export async function POST(req: Request) {
 
     // Category count check
     if (
-      isTopLevel &&
-      postType !== PostTypes.ANSWER &&
+      [PostTypes.POST, PostTypes.QUESTION].includes(postType) &&
       (!Array.isArray(categories) || categories.length === 0)
     ) {
       return NextResponse.json(
@@ -190,10 +190,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Comment
-    if (parentId && postType !== PostTypes.COMMENT) {
+    // Comment, Answer
+    if (parentId && [PostTypes.COMMENT, PostTypes.ANSWER].includes(postType)) {
       return NextResponse.json(
-        { error: "parentId exists only for Comment" },
+        { error: "parentId exists only for Comment or Answer" },
         { status: 400 }
       );
     }
@@ -244,11 +244,12 @@ export async function POST(req: Request) {
       upvoters: [],
     };
 
-    if (isTopLevel) {
+    if ([PostTypes.POST, PostTypes.QUESTION].includes(postType)) {
       doc.title = title;
       doc.categories = categories.map((id: string) => new ObjectId(id));
-      doc.tags = tags;
     }
+
+    doc.tags = tags;
 
     const result = await posts.insertOne(doc);
 
@@ -258,7 +259,10 @@ export async function POST(req: Request) {
     );
 
     let categoryData = [];
-    if (isTopLevel && Array.isArray(doc.categories)) {
+    if (
+      [PostTypes.POST, PostTypes.QUESTION].includes(postType) &&
+      Array.isArray(doc.categories)
+    ) {
       categoryData = await enrichCategories(doc.categories, categoriesColl);
     }
 

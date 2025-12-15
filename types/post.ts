@@ -21,7 +21,7 @@ export interface Post {
   txId: any;
   _id: string;
 
-  postType?: PostType;
+  postType: PostType;
 
   title?: string;
   content?: string;
