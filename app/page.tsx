@@ -110,22 +110,27 @@ export default function HomePage() {
         onConfirm={confirmDelete}
       />
 
-      {/* Loading overlay */}
       {loading && <FullScreenLoader text={t("loadingUser")} />}
 
-      {/* Scroll layout */}
-      <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
-        <div className="w-full h-screen overflow-hidden bg-white dark:bg-black">
+      {/* ─────────────────────────────────────────────── */}
+      {/* NEW FIXED LAYOUT (NO overflow-hidden trap)     */}
+      {/* ─────────────────────────────────────────────── */}
+      <div className="fixed inset-0 flex flex-col bg-white dark:bg-black">
+
+        {/* Top Header (already exists in your layout globally) */}
+        <header className="h-[4.3rem] w-full"></header>
+
+        {/* Main layout row */}
+        <div className="flex flex-row flex-1 overflow-hidden">
+
           {/* LEFT SIDEBAR */}
           <aside
             className="
               hidden lg:flex flex-col
-              fixed top-[4.3rem] left-0
-              w-[280px] h-[calc(100vh-4.3rem)]
+              w-[280px]
               bg-black text-white px-4 py-4
               border-r border-neutral-800
               overflow-y-auto
-              z-30
             "
           >
             <button
@@ -136,32 +141,12 @@ export default function HomePage() {
             </button>
           </aside>
 
-          {/* RIGHT SIDEBAR */}
-          <aside
-            className="
-              hidden lg:flex flex-col
-              fixed top-[4.3rem] right-0
-              w-[280px] h-[calc(100vh-4.3rem)]
-              bg-black text-white px-4 py-4
-              border-l border-neutral-800
-              overflow-y-auto
-              z-30
-            "
-          >
-            <p>Right Content</p>
-          </aside>
-
-          {/* MAIN CONTENT */}
+          {/* MAIN SCROLL AREA */}
           <main
             ref={mainRef}
             className="
-              absolute 
-              top-[4.3rem]
-              left-0 right-0
-              lg:left-[280px] lg:right-[280px]
-              h-[calc(100vh-4.3rem)]
-              overflow-y-auto
-              no-scrollbar
+              flex-1
+              overflow-y-auto no-scrollbar
               pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
             "
           >
@@ -176,10 +161,25 @@ export default function HomePage() {
               onEdit={(p) => setEditingPost(p)}
               onDelete={async (id) => requestDelete(id)}
               onUpvote={upvotePost}
+              scrollContainerRef={mainRef}
             />
           </main>
-          <MobileNavbar onCreatePost={() => setShowPostBox(true)} />
+
+          {/* RIGHT SIDEBAR */}
+          <aside
+            className="
+              hidden lg:flex flex-col
+              w-[280px]
+              bg-black text-white px-4 py-4
+              border-l border-neutral-800
+              overflow-y-auto
+            "
+          >
+            <p>Right Content</p>
+          </aside>
         </div>
+
+        <MobileNavbar onCreatePost={() => setShowPostBox(true)} />
       </div>
     </>
   );

@@ -49,8 +49,7 @@ export async function GET(_req: Request, { params }: any) {
     );
 
     const adminEmails = process.env.ADMIN_EMAILS?.split(",") || [];
-    const isAdminUser =
-      user?.email && adminEmails.includes(user.email.trim());
+    const isAdminUser = user?.email && adminEmails.includes(user.email.trim());
 
     const authorName = user?.name ?? "Unknown User";
     const authorUserId = user?.userId;
@@ -59,6 +58,11 @@ export async function GET(_req: Request, { params }: any) {
       .find({ authorId: id, parentId: null })
       .sort({ createdAt: -1 })
       .toArray();
+
+    const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+    const timestamp = user?.avatarUpdatedAt
+      ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
+      : "";
 
     const enrichedPosts = await Promise.all(
       posts.map(async (post: any) => {
@@ -76,7 +80,8 @@ export async function GET(_req: Request, { params }: any) {
           authorId: id,
           authorName,
           authorUserId,
-          authorAvatar: `/api/user/avatar/${id}?t=${Date.now()}`,
+          authorAvatar: `${CDN}/avatars/${id}.webp${timestamp}`,
+          authorAvatarUpdatedAt: user?.avatarUpdatedAt ?? null,
 
           categories: categoryData,
           tags: post.tags ?? [],

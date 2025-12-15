@@ -1,65 +1,129 @@
+// app/api/images/uploadImage/route.ts
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { GridFSBucket } from "mongodb";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import sharp from "sharp";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
-export const config = {
-  api: {
-    bodyParser: false,
-    sizeLimit: "100mb", // Cloudflare max anyway
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
-};
+});
 
 export async function POST(req: Request) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const form = await req.formData();
     const file = form.get("file") as File | null;
 
     if (!file) {
       return NextResponse.json(
-        { ok: false, error: "No file uploaded" },
+        { ok: false, error: "Missing file" },
         { status: 400 }
       );
     }
 
-    // Read file into a Buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Convert file to real Node.js Buffer
+    const ab = await file.arrayBuffer();
+    const buffer = Buffer.from(ab as ArrayBuffer);
+    const input = buffer as unknown as Buffer;
 
-    // MongoDB client
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "jearn");
+    const mime = file.type; // image/png, image/jpeg, image/gif, etc.
+    const originalExt = mime.split("/")[1]; // png, jpeg, gif, webp
 
-    // GridFS bucket
-    const bucket = new GridFSBucket(db, {
-      bucketName: "images",
-    });
+    let outputBuffer = input;
+    let outputMime = mime;
 
-    // Create upload stream
-    const uploadStream = bucket.openUploadStream(file.name || "upload", {
-      contentType: file.type || "application/octet-stream",
-    });
+    const isGIF = mime === "image/gif";
+    const isSVG = mime === "image/svg+xml";
 
-    // Write the buffer to the stream
-    uploadStream.end(buffer);
+    /* ---------------------------------------------------------
+     * 🔵 Resize/optimize all images EXCEPT GIF + SVG
+     * --------------------------------------------------------- */
+    if (!isGIF && !isSVG) {
+      try {
+        outputBuffer = await sharp(input)
+          .rotate()
+          .resize(2000, 2000, { fit: "inside" })
+          .toBuffer();
+      } catch (err) {
+        outputBuffer = input; // fallback to original
+      }
+    }
 
-    // Wait until upload completes
-    await new Promise((resolve, reject) => {
-      uploadStream.on("finish", resolve);
-      uploadStream.on("error", reject);
-    });
+    /* ---------------------------------------------------------
+     * 🔵 HEIC/HEIF → convert to JPEG (required)
+     * --------------------------------------------------------- */
+    if (mime.includes("heic") || mime.includes("heif")) {
+      outputBuffer = await sharp(input).jpeg({ quality: 90 }).toBuffer();
+      outputMime = "image/jpeg";
+    }
 
-    // The file ID
-    const fileId = uploadStream.id.toString();
+    /* ---------------------------------------------------------
+     * 🔵 Determine correct extension
+     * --------------------------------------------------------- */
+    const ext =
+      outputMime === "image/jpeg"
+        ? "jpg"
+        : outputMime === "image/png"
+        ? "png"
+        : outputMime === "image/webp"
+        ? "webp"
+        : outputMime === "image/gif"
+        ? "gif"
+        : originalExt || "png";
+
+    const id = crypto.randomUUID();
+    const key = `posts/${id}.${ext}`;
+
+    /* ---------------------------------------------------------
+     * 🔵 Upload to R2
+     * --------------------------------------------------------- */
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: key,
+        Body: outputBuffer,
+        ContentType: outputMime,
+      })
+    );
+
+    const CDN = process.env.R2_PUBLIC_URL!;
+    const url = `${CDN}/${key}`;
+
+    /* ---------------------------------------------------------
+     * 🔵 Get metadata (width/height)
+     * --------------------------------------------------------- */
+    let meta: any = {};
+
+    if (!isGIF && !isSVG) {
+      try {
+        const m = await sharp(outputBuffer as unknown as Buffer).metadata();
+        meta = { width: m.width, height: m.height };
+      } catch {}
+    }
 
     return NextResponse.json({
       ok: true,
-      id: fileId, // send to frontend
+      id,
+      ext,
+      url,
+      ...meta,
     });
   } catch (err) {
-    console.error("🔥 GridFS upload error:", err);
+    console.error("R2 upload error:", err);
     return NextResponse.json(
-      { ok: false, error: "Server error" },
+      { ok: false, error: "Upload failed" },
       { status: 500 }
     );
   }

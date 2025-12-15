@@ -1,19 +1,12 @@
-// app/api/user/by-user-id/[userId]/route.ts
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { userId: string } }
-) {
+export async function GET(_req: Request, { params }: { params: { userId: string } }) {
   try {
     const raw = params.userId?.trim();
     if (!raw) {
-      return NextResponse.json(
-        { ok: false, error: "Missing userId" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "Missing userId" }, { status: 400 });
     }
 
     const client = await clientPromise;
@@ -21,9 +14,7 @@ export async function GET(
 
     let user = null;
 
-    /* ----------------------------------------
-     * 1) Try lookup by userId
-     * ---------------------------------------- */
+    // 1) lookup by username
     user = await db.collection("users").findOne(
       { userId: raw },
       {
@@ -32,14 +23,13 @@ export async function GET(
           name: 1,
           userId: 1,
           bio: 1,
-          picture: 1,
+          avatarUrl: 1,
+          avatarUpdatedAt: 1,
         },
       }
     );
 
-    /* ----------------------------------------
-     * 2) If not found, try lookup by _id (UID)
-     * ---------------------------------------- */
+    // 2) fallback to ObjectId lookup
     if (!user) {
       try {
         user = await db.collection("users").findOne(
@@ -50,24 +40,21 @@ export async function GET(
               name: 1,
               userId: 1,
               bio: 1,
-              picture: 1,
+              avatarUrl: 1,
+              avatarUpdatedAt: 1,
             },
           }
         );
-      } catch {
-        // raw wasn't a valid ObjectId → ignore
-      }
+      } catch {}
     }
 
-    /* ----------------------------------------
-     * 3) Still not found?
-     * ---------------------------------------- */
     if (!user) {
-      return NextResponse.json(
-        { ok: false, error: "User not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
     }
+
+    const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+    const avatarUrl = user.avatarUrl ?? `${CDN}/avatars/${user._id}.webp`;
+    const updatedAt = user.avatarUpdatedAt ?? null;
 
     return NextResponse.json({
       ok: true,
@@ -76,16 +63,12 @@ export async function GET(
         name: user.name ?? "Unknown User",
         userId: user.userId ?? null,
         bio: user.bio ?? "",
-        picture: user.picture
-          ? `/api/user/avatar/${user._id.toString()}`
-          : null,
+        picture: avatarUrl,
+        avatarUpdatedAt: updatedAt, // 🔥 very important
       },
     });
   } catch (err) {
     console.error("Error in /api/user/by-user-id:", err);
-    return NextResponse.json(
-      { ok: false, error: "Server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
   }
 }

@@ -6,7 +6,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get("q")?.trim() ?? "";
 
-    // only block when empty string — NOT when 1 character
+    // allow 1-character search, block only when empty string
     if (q.length === 0) {
       return NextResponse.json({ ok: true, users: [] });
     }
@@ -14,7 +14,6 @@ export async function GET(req: Request) {
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    // escape for regex safety
     const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(safe, "i");
 
@@ -22,11 +21,12 @@ export async function GET(req: Request) {
       .collection("users")
       .find(
         { $or: [{ userId: regex }, { name: regex }] },
-        { projection: { _id: 1, userId: 1, name: 1, picture: 1 } }
+        { projection: { _id: 1, userId: 1, name: 1 } }
       )
       .limit(20)
       .toArray();
 
+    // ranking
     users = users
       .map((u) => {
         const qLower = q.toLowerCase();
@@ -44,14 +44,15 @@ export async function GET(req: Request) {
       .sort((a, b) => b.score - a.score)
       .slice(0, 5);
 
+    const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+
     return NextResponse.json({
       ok: true,
       users: users.map((u) => ({
-        _id: u._id,
+        _id: u._id.toString(),
         userId: u.userId ?? null,
         name: u.name,
-
-        picture: u.picture ? `/api/user/avatar/${u._id}` : null,
+        picture: `${CDN}/avatars/${u._id.toString()}.webp`,
       })),
     });
   } catch (e) {

@@ -36,6 +36,7 @@ import { Extension } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
 import type { Level } from "@tiptap/extension-heading";
 import { AtomBoundaryFix } from "@/features/AtomBoundaryFix";
+import { buildImagePlaceholderHTML } from "@/lib/insertImageHtml";
 
 /* ----------------------- ZERO WIDTH (PASTE ONLY) ----------------------- */
 
@@ -456,9 +457,10 @@ export default function PostEditorInner({
                 body: form,
               });
 
-              const { id } = await res.json();
-
-              withRestore((c) => c.insertImagePlaceholder(id));
+              const { id, ext, width, height } = await res.json();
+              withRestore((c) =>
+                c.insertImagePlaceholder(id, ext, width, height)
+              );
             };
 
             input.click();

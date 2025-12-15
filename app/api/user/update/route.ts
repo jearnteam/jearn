@@ -1,19 +1,37 @@
 // app/api/user/update/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId, Binary } from "mongodb";
+import { ObjectId } from "mongodb";
 import sharp from "sharp";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getServerSession } from "next-auth";
+import { authOptions } from "../../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
+// -------------------------------------------------
+// Cloudflare R2 client
+// -------------------------------------------------
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
     const form = await req.formData();
 
-    /** _id (ObjectId) */
     const user_id = form.get("user_id") as string | null;
     const name = (form.get("name") as string | null) ?? "";
-    /** userId (@userId) */
     const userId = (form.get("userId") as string | null) ?? "";
     const bio = (form.get("bio") as string | null) ?? "";
     const file = form.get("picture") as File | null;
@@ -24,39 +42,40 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (user_id !== session.user.uid) {
+      return NextResponse.json({ error: "Incorrect user_id" }, { status: 400 });
+    }
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
     // -------------------------------------------------
-    // 🔥 VALIDATE & CHECK UNIQUE USERID
+    // Name & UserID validation
     // -------------------------------------------------
     if (name.length < 4 || name.length > 32) {
       return NextResponse.json(
-        { ok: false, error: "Name must be between 4 and 32 characters" },
+        { ok: false, error: "Name must be 4–32 characters" },
         { status: 400 }
       );
     }
 
     let userIdUpdate: any = {};
     if (userId) {
-      // 文字数制限チェック (3文字以上32文字以下)
       if (userId.length < 3 || userId.length > 32) {
         return NextResponse.json(
-          { ok: false, error: "UserID must be between 3 and 32 characters" },
+          { ok: false, error: "UserID must be 3–32 characters" },
           { status: 400 }
         );
       }
 
-      // 重複チェック (自分自身以外のユーザーで同じuserIdを持つものがいるか)
-      const existingUser = await db.collection("users").findOne({
-        userId: userId,
+      const exists = await db.collection("users").findOne({
+        userId,
         _id: { $ne: new ObjectId(user_id) },
       });
 
-      if (existingUser) {
+      if (exists) {
         return NextResponse.json(
-          { ok: false, error: "UserID is already taken" },
+          { ok: false, error: "UserID already taken" },
           { status: 400 }
         );
       }
@@ -64,62 +83,49 @@ export async function POST(req: NextRequest) {
       userIdUpdate.userId = userId;
     }
 
+    // -------------------------------------------------
+    // Avatar upload → ALWAYS convert to WEBP
+    // -------------------------------------------------
     let pictureUpdate: any = {};
 
-    // -------------------------------------------------
-    // 🔥 PROCESS IMAGE (preserve PNG transparency)
-    // -------------------------------------------------
     if (file && file.size > 0) {
       try {
-        const inputBuffer = Buffer.from(await file.arrayBuffer());
-        const mime = file.type;
+        const buffer = Buffer.from(await file.arrayBuffer());
 
-        let processed: Buffer;
-        let outputMime = mime; // keep original type unless JPEG
+        const processed = await sharp(buffer)
+          .resize(256, 256, {
+            fit: "cover",
+            position: "center",
+          })
+          .webp({ quality: 80 })
+          .toBuffer();
 
-        const sharpImg = sharp(inputBuffer).trim();
+        // FINAL FILE NAME
+        const avatarKey = `avatars/${user_id}.webp`;
 
-        // Transparent PNG → KEEP PNG
-        if (mime === "image/png") {
-          processed = await sharpImg
-            .resize(512, 512, {
-              fit: "contain",
-              background: { r: 0, g: 0, b: 0, alpha: 0 }, // keep alpha
-            })
-            .png({ compressionLevel: 9 })
-            .toBuffer();
-        }
+        // Upload to R2
+        await r2.send(
+          new PutObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME!,
+            Key: avatarKey,
+            Body: processed,
+            ContentType: "image/webp",
+          })
+        );
 
-        // JPEG → process normally
-        else {
-          processed = await sharpImg
-            .resize(512, 512, {
-              fit: "cover",
-              position: "center",
-            })
-            .jpeg({
-              quality: 90,
-              mozjpeg: true,
-            })
-            .toBuffer();
-
-          outputMime = "image/jpeg";
-        }
-
-        pictureUpdate.picture = {
-          data: new Binary(processed),
-          contentType: outputMime,
-          updatedAt: new Date(),
-        };
-      } catch (e) {
-        console.error("🛑 sharp avatar error:", e);
+        // CDN URL
+        const cdnBase = process.env.R2_PUBLIC_URL!.replace(/\/+$/, "");
+        pictureUpdate.avatarUrl = `${cdnBase}/${avatarKey}`;
+        pictureUpdate.avatarUpdatedAt = new Date();
+      } catch (err) {
+        console.error("Avatar upload error:", err);
       }
     }
 
     // -------------------------------------------------
-    // 🔥 UPDATE USER
+    // Update DB
     // -------------------------------------------------
-    const updateData: any = {
+    const updateData = {
       name,
       bio,
       updatedAt: new Date(),
@@ -127,23 +133,13 @@ export async function POST(req: NextRequest) {
       ...pictureUpdate,
     };
 
-    const result = await db
+    await db
       .collection("users")
       .updateOne({ _id: new ObjectId(user_id) }, { $set: updateData });
 
-    if (!result.matchedCount) {
-      return NextResponse.json(
-        { ok: false, error: "User not found" },
-        { status: 404 }
-      );
-    }
-
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("🛑 /api/user/update unexpected error:", err);
-    return NextResponse.json(
-      { ok: false, error: "Unexpected server error" },
-      { status: 500 }
-    );
+    console.error("update error:", err);
+    return NextResponse.json({ ok: false, error: "Server error" });
   }
 }

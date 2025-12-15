@@ -1,11 +1,8 @@
+// hooks/useCurrentUser.ts
 "use client";
 
 import { useState, useEffect } from "react";
 
-//
-// -------------------------------------------------------
-//  GLOBAL CACHE — shared across ALL components / hooks
-// -------------------------------------------------------
 let cachedUser: any = null;
 let fetchPromise: Promise<any> | null = null;
 
@@ -21,7 +18,6 @@ async function fetchUser() {
 
 async function getUserOnce() {
   if (cachedUser) return cachedUser;
-
   if (fetchPromise) return fetchPromise;
 
   fetchPromise = fetchUser()
@@ -38,31 +34,35 @@ async function getUserOnce() {
   return fetchPromise;
 }
 
-//
-// -------------------------------------------------------
-//  MAIN HOOK
-// -------------------------------------------------------
 export function useCurrentUser() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const decorateUser = (u: any) => {
+    if (!u) return null;
+
+    const ts = u.avatarUpdatedAt
+      ? `?t=${new Date(u.avatarUpdatedAt).getTime()}`
+      : "";
+
+    const picture =
+      u.avatarUrl && typeof u.avatarUrl === "string"
+        ? `${u.avatarUrl}${ts}`
+        : "/default-avatar.png";
+
+    return {
+      ...u,
+      isAdmin: u.isAdmin ?? false,
+      picture,
+    };
+  };
 
   useEffect(() => {
     let active = true;
 
     getUserOnce().then((u) => {
       if (!active) return;
-
-      if (!u) {
-        setUser(null);
-      } else {
-        setUser({
-          ...u,
-          isAdmin: u.isAdmin ?? false,
-          picture: u.hasPicture
-            ? `/api/user/avatar/${u._id}?v=${Date.now()}`
-            : "/default-avatar.png",
-        });
-      }
+      setUser(decorateUser(u));
       setLoading(false);
     });
 
@@ -71,21 +71,10 @@ export function useCurrentUser() {
     };
   }, []);
 
-  // IMPORTANT: re-fetch user and update global + local state
   const update = async () => {
     const newUser = await fetchUser();
     cachedUser = newUser;
-
-    setUser(
-      !newUser
-        ? null
-        : {
-            ...newUser,
-            picture: newUser.hasPicture
-              ? `/api/user/avatar/${newUser._id}?v=${Date.now()}`
-              : "/default-avatar.png",
-          }
-    );
+    setUser(decorateUser(newUser));
   };
 
   return { user, loading, update };

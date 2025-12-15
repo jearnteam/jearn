@@ -145,6 +145,7 @@ export async function POST(req: Request) {
     }
 
     const {
+      postType = "Post",
       title,
       content,
       authorId,
@@ -163,7 +164,7 @@ export async function POST(req: Request) {
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
-    const isTopLevel = !parentId && !replyTo;
+    const isTopLevel = !parentId && !replyTo ;
 
     if (isTopLevel && !title?.trim()) {
       return NextResponse.json(
@@ -187,7 +188,7 @@ export async function POST(req: Request) {
 
     let safeParentId = parentId;
 
-    // reply logic
+    // reply logic (Reply Comment)
     if (replyTo) {
       if (!ObjectId.isValid(replyTo)) {
         return NextResponse.json(

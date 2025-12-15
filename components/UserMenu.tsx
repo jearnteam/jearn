@@ -13,6 +13,8 @@ interface User {
   name?: string;
   email?: string;
   isAdmin: boolean;
+  avatarUrl?: string;
+  avatarUpdatedAt?: string | Date;
 }
 
 export default function UserMenu({ user }: { user: User }) {
@@ -21,22 +23,24 @@ export default function UserMenu({ user }: { user: User }) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
 
-  // THEME LOGIC (inside dropdown, always mounted)
+  // THEME LOGIC
   const { theme, setTheme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
 
   const toggleTheme = async () => {
-    setTheme(currentTheme === "dark" ? "light" : "dark");
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+
     await fetch("/api/user/update-theme", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: theme === "light" ? "dark" : "light" }),
+      body: JSON.stringify({ theme: nextTheme }),
     });
   };
 
   const handleLogout = () => router.push("/logout");
 
-  // close on outside click
+  // CLOSE ON OUTSIDE CLICK
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -52,15 +56,18 @@ export default function UserMenu({ user }: { user: User }) {
 
   return (
     <div className="relative" ref={dropdownRef}>
+      {/* BUTTON TO OPEN MENU */}
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2"
       >
         <Avatar
           id={user._id}
+          url={user.avatarUrl}
+          updatedAt={user.avatarUpdatedAt}
           size={36}
-          className="border border-gray-300 dark:border-gray-700"
         />
+
         {user.name && (
           <span className="hidden sm:block text-sm font-medium truncate max-w-[120px]">
             {user.name}
@@ -68,11 +75,12 @@ export default function UserMenu({ user }: { user: User }) {
         )}
       </button>
 
+      {/* DROPDOWN MENU */}
       <div
         className={`
           absolute right-0 mt-2 w-48 rounded-xl shadow-lg border
           bg-white dark:bg-neutral-800 dark:border-neutral-700
-          transition-all duration-200 origin-top-right
+          transition-all duration-200 origin-top-right z-50
           ${
             open
               ? "scale-100 opacity-100"
@@ -91,7 +99,8 @@ export default function UserMenu({ user }: { user: User }) {
           >
             {t("profile") || "Profile"}
           </button>
-          {/* THEME */}
+
+          {/* THEME TOGGLE */}
           <button
             onClick={toggleTheme}
             className="px-3 py-2 flex items-center gap-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
@@ -103,11 +112,13 @@ export default function UserMenu({ user }: { user: User }) {
             )}
             {t("toggleTheme") || "Toggle Theme"}
           </button>
-          {/* LANGUAGE */}
+
+          {/* LANGUAGE SWITCH */}
           <div className="py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700">
             <LangSwitcher />
           </div>
-          {/* DASHBOARD (admin only) */}
+
+          {/* ADMIN DASHBOARD */}
           {user.isAdmin && (
             <button
               onClick={() => {
@@ -119,11 +130,12 @@ export default function UserMenu({ user }: { user: User }) {
               {t("dashboard") || "Dashboard"}
             </button>
           )}
+
           {/* LOGOUT */}
           <button
             onClick={() => {
               setOpen(false);
-              handleLogout;
+              handleLogout();
             }}
             className="px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-left"
           >

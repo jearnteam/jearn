@@ -30,28 +30,32 @@ export async function GET(req: NextRequest) {
       const pipeline = [
         { $match: { "documentKey._id": new ObjectId(user_id) } },
       ];
+
       const changeStream = users.watch(pipeline, {
         fullDocument: "updateLookup",
       });
 
-      // ✅ Send keepalive every 15 seconds
+      // 🔥 Keepalive ping every 15 seconds
       const keepAlive = setInterval(() => {
         controller.enqueue(`: ping\n\n`);
       }, 15_000);
 
-      // ✅ Send updated profile fields
+      // 🔥 Avatar CDN URL (no more MongoDB avatar)
+      const CDN_URL = process.env.R2_PUBLIC_URL; // e.g., https://cdn.jearn.site
+
       changeStream.on("change", (change: any) => {
         const doc = change.fullDocument;
         if (!doc) return;
 
-        controller.enqueue(
-          `data: ${JSON.stringify({
-            name: doc.name,
-            userId: doc.userId,
-            bio: doc.bio,
-            picture: `/api/user/avatar/${user_id}?t=${Date.now()}`,
-          })}\n\n`
-        );
+        const payload = {
+          name: doc.name,
+          userId: doc.userId,
+          bio: doc.bio,
+          // 🔥 CDN avatar with cache-busting query
+          avatar: `${CDN_URL}/avatars/${user_id}.webp?t=${Date.now()}`,
+        };
+
+        controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`);
       });
 
       req.signal.addEventListener("abort", () => {

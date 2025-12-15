@@ -44,6 +44,7 @@ export interface PostEditorWrapperRef {
   clearEditor: () => void;
   getHTML: () => string;
   focus: () => void;
+  editor: Editor | null;
 }
 
 interface Props {
@@ -78,6 +79,7 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
           editorRef.current?.commands.focus("end");
         });
       },
+      editor: editorRef.current,
     }));
 
     const handleReady = (editor: Editor) => {

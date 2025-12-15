@@ -1,3 +1,4 @@
+// app/api/user/current/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -18,33 +19,27 @@ export async function GET() {
       email: session.user.email,
     });
 
-    if (!user) {
-      return NextResponse.json({ ok: false, user: null });
-    }
+    if (!user) return NextResponse.json({ ok: false, user: null });
 
-    // ---------------------------------------------
-    // ✅ ADMIN CHECK (From ENV)
-    // ---------------------------------------------
-    const adminEmails =
-      process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) ?? [];
+    const cdnBase = process.env.R2_PUBLIC_URL!.replace(/\/+$/, "");
 
-    const isAdmin = adminEmails.includes(user.email);
+    const avatarUrl =
+      user.avatarUrl ??
+      `${cdnBase}/avatars/${user._id.toString()}.webp`;
 
     return NextResponse.json({
       ok: true,
       user: {
         _id: user._id.toString(),
-        uid: user.provider_id || null,
         name: user.name ?? "",
-        userId: user.userId || undefined,
+        userId: user.userId ?? "",
         bio: user.bio ?? "",
+        email: user.email,
         theme: user.theme ?? "light",
         language: user.language ?? "en",
-        hasPicture: !!user.picture,
-
-        // 🔥 Add this:
-        email: user.email,
-        isAdmin, // ← 🔥 now the front-end knows!
+        isAdmin: false,
+        avatarUrl,
+        avatarUpdatedAt: user.avatarUpdatedAt ?? null,
       },
     });
   } catch (err) {

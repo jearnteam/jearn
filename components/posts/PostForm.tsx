@@ -243,7 +243,9 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
         <input
           type="text"
           placeholder={
-            mode === "question" ? "質問を入力" : t("title") || "Title"
+            mode === "question"
+              ? t("questionEnter") || "Question"
+              : t("title") || "Title"
           }
           value={title}
           maxLength={200}
@@ -273,7 +275,7 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
           placeholder={
             mode === "question"
               ? "質問内容を詳しく書いてください"
-              : "みんなと共有したいことを入力してください"
+              : t("placeholder") || "Placeholder"
           }
         />
       </div>
@@ -393,6 +395,42 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
           </div>
 
           <div className="flex gap-3 items-center">
+            <button
+              type="button"
+              onClick={async () => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "image/*";
+
+                input.onchange = async () => {
+                  const file = input.files?.[0];
+                  if (!file) return;
+
+                  const form = new FormData();
+                  form.append("file", file);
+
+                  const res = await fetch("/api/images/uploadImage", {
+                    method: "POST",
+                    body: form,
+                  });
+
+                  const { id, ext, width, height } = await res.json();
+
+                  // ⭐ editor に画像挿入
+                  editorRef.current?.editor
+                    ?.chain()
+                    .focus()
+                    .insertImagePlaceholder(id, ext, width, height)
+                    .run();
+                };
+
+                input.click();
+              }}
+              className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+            >
+              🖼️
+            </button>
+
             {categories.length === 0 || contentChanged ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}

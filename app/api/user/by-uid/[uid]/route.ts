@@ -22,17 +22,20 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
             name: 1,
             userId: 1,
             bio: 1,
-            picture: 1,
+            avatarUrl: 1,
+            avatarUpdatedAt: 1,
           },
         }
       );
-    } catch {
-      // invalid ObjectId → not found
-    }
+    } catch {}
 
     if (!user) {
       return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
     }
+
+    const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+    const avatarUrl = user.avatarUrl ?? `${CDN}/avatars/${user._id}.webp`;
+    const updatedAt = user.avatarUpdatedAt ?? null;
 
     return NextResponse.json({
       ok: true,
@@ -41,7 +44,8 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
         name: user.name ?? "Unknown",
         userId: user.userId ?? null,
         bio: user.bio ?? "",
-        picture: user.picture ? `/api/user/avatar/${user._id}` : null,
+        picture: avatarUrl,
+        avatarUpdatedAt: updatedAt, // 🔥 critical
       },
     });
   } catch (err) {

@@ -16,6 +16,7 @@ interface Props {
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
   onUpvote: (id: string, userId: string) => Promise<UpvoteResponse>;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>; // fixed type
 }
 
 export default function PostList({
@@ -23,6 +24,7 @@ export default function PostList({
   onEdit,
   onDelete,
   onUpvote,
+  scrollContainerRef,
 }: Props) {
   const [visibleCount, setVisibleCount] = useState(5);
   const [visiblePosts, setVisiblePosts] = useState<Post[]>([]);
@@ -30,7 +32,6 @@ export default function PostList({
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  /* Load saved visible count (from scroll restore) */
   useEffect(() => {
     const saved = sessionStorage.getItem("restore-visible-count");
     if (saved) {
@@ -39,12 +40,10 @@ export default function PostList({
     }
   }, []);
 
-  /* Always store visible count */
   useEffect(() => {
     sessionStorage.setItem("postListVisibleCount", String(visibleCount));
   }, [visibleCount]);
 
-  /* Preload avatars */
   async function preloadImages(urls: string[]) {
     const tasks = urls.map(
       (url) =>
@@ -58,7 +57,6 @@ export default function PostList({
     await Promise.all(tasks);
   }
 
-  /* Update visible posts */
   useEffect(() => {
     if (!posts.length) return;
 
@@ -73,7 +71,6 @@ export default function PostList({
     });
   }, [visibleCount, posts]);
 
-  /* Infinite scroll observer */
   useEffect(() => {
     if (!posts.length) return;
 
@@ -90,7 +87,6 @@ export default function PostList({
     return () => observer.disconnect();
   }, [posts.length, batchLoading]);
 
-  /* Restore scroll position only once */
   const restoredOnce = useRef(false);
 
   useEffect(() => {
@@ -114,9 +110,9 @@ export default function PostList({
 
   return (
     <motion.div
-      initial={{ opacity: 0, filter: "blur(6px)" }}
-      animate={{ opacity: 1, filter: "blur(0px)" }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.4 }}
       className="space-y-3 overflow-hidden"
     >
       {visiblePosts.map((post) => (
@@ -126,6 +122,7 @@ export default function PostList({
           onEdit={() => onEdit(post)}
           onDelete={onDelete}
           onUpvote={onUpvote}
+          scrollContainerRef={scrollContainerRef}
         />
       ))}
 

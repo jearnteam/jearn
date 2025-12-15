@@ -1,40 +1,40 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId, GridFSBucket } from "mongodb";
+import { GridFSBucket, ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 
-export async function GET(_req: Request, { params }: any) {
-  const { id } = params;
-
-  if (!ObjectId.isValid(id)) {
-    return new NextResponse("Invalid image ID", { status: 400 });
-  }
-
+export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "jearn");
+    const { id } = params;
 
-    const bucket = new GridFSBucket(db, { bucketName: "images" });
-
-    const objectId = new ObjectId(id);
-
-    // We need to fetch metadata for contentType
-    const fileDoc = await db.collection("images.files").findOne({ _id: objectId });
-    if (!fileDoc) {
-      return new NextResponse("Not found", { status: 404 });
+    if (!id || id === "undefined") {
+      return new Response("Invalid ID", { status: 400 });
     }
 
-    const stream = bucket.openDownloadStream(objectId);
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "jearn");
+    const bucket = new GridFSBucket(db, { bucketName: "images" });
+
+    const _id = new ObjectId(id);
+
+    const file = await db.collection("images.files").findOne({ _id });
+
+    if (!file) {
+      return new Response("Not found", { status: 404 });
+    }
+
+    const stream = bucket.openDownloadStream(_id);
 
     return new Response(stream as any, {
+      status: 200,
       headers: {
-        "Content-Type": fileDoc.contentType || "application/octet-stream",
+        "Content-Type": file.contentType || "image/jpeg",
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch (err) {
-    console.error("🔥 Error in /api/image/[id]:", err);
-    return new NextResponse("Server error", { status: 500 });
+    console.error("🔥 GET image error:", err);
+    return new Response("Server error", { status: 500 });
   }
 }

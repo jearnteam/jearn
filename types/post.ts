@@ -1,9 +1,9 @@
 // /types/post.ts
 
 export interface CategoryObject {
-  id: string; // ObjectId as string
-  name: string; // English category name ("programming")
-  jname: string; // Japanese name ("プログラミング")
+  id: string;          // ObjectId as string
+  name: string;        // English ("programming")
+  jname: string;       // Japanese ("プログラミング")
   myname?: string;
 }
 
@@ -14,7 +14,6 @@ export interface Post {
   title?: string;
   content?: string;
 
-  // ⭐ UPDATED: categories are now objects, not strings
   categories?: CategoryObject[];
   tags?: string[];
 
@@ -23,7 +22,12 @@ export interface Post {
   authorId: string;
   authorName: string;
   authorUserId?: string;
+
+  // 🔥 EXISTING FIELD (avatar URL)
   authorAvatar: string | null;
+
+  // 🔥 NEW FIELD (critical for cache busting)
+  authorAvatarUpdatedAt?: string | null;
 
   parentId: string | null;
   replyTo?: string | null;
