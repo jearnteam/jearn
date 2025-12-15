@@ -22,7 +22,7 @@ export default function PostItem({
   onDelete?: (id: string) => Promise<void> | void;
   onUpvote?: (id: string, userId: string, txId?: string) => Promise<any>;
   isSingle?: boolean;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
 

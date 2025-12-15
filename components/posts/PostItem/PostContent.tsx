@@ -10,7 +10,7 @@ export default function PostContent({
   wrapperRef,
 }: {
   post: Post;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const {

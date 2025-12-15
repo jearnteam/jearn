@@ -16,7 +16,7 @@ interface Props {
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
   onUpvote: (id: string, userId: string) => Promise<UpvoteResponse>;
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>; // fixed type
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>; // fixed type
 }
 
 export default function PostList({
