@@ -8,9 +8,11 @@ import PostEditorWrapper, {
 } from "@/components/posts/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n";
+import { PostType, PostTypes } from "@/types/post";
 
 export interface PostFormProps {
   onSubmit: (
+    postType: PostType,
     title: string,
     content: string,
     authorId: string | null,
@@ -189,7 +191,14 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
 
     setSubmitting(true);
     try {
-      await onSubmit(title, html, authorId, selected, tags);
+      await onSubmit(
+        mode === "question" ? PostTypes.QUESTION : PostTypes.POST,
+        title,
+        html,
+        authorId,
+        selected,
+        tags
+      );
 
       editorRef.current?.clearEditor();
       setCategories([]);

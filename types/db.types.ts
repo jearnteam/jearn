@@ -1,5 +1,6 @@
 /* ここに定義するのは、将来的な理想形のスキーマです。 */
 import type { Binary, Document, ObjectId } from "mongodb";
+import { PostType } from "./post";
 
 /** relationships種別 */
 export type RelationshipsType =
@@ -20,9 +21,6 @@ export interface RelationshipsDoc extends Document {
   /** 関連時の日時 */
   time?: Date;
 }
-
-/** 投稿種別 */
-export type PostType = "post" | "question" | "answer" | "comment";
 
 /** postsコレクション内のスキーマ */
 export interface PostDoc extends Document {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Post } from "@/types/post";
+import { PostTypes, type Post } from "@/types/post";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { getSSE } from "../sse";
 
@@ -97,6 +97,7 @@ export function useComments(initialComments: Post[], postId: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          postType: PostTypes.COMMENT,
           authorId: user._id,
           content,
           parentId: postId,
@@ -114,6 +115,7 @@ export function useComments(initialComments: Post[], postId: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          postType: PostTypes.COMMENT,
           authorId: user._id,
           content,
           parentId,

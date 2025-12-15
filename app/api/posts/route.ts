@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { PostTypes } from "@/types/post";
 
 export const runtime = "nodejs";
 
@@ -145,7 +146,7 @@ export async function POST(req: Request) {
     }
 
     const {
-      postType = "Post",
+      postType = PostTypes.POST,
       title,
       content,
       authorId,
@@ -159,23 +160,48 @@ export async function POST(req: Request) {
     if (!authorId)
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
     if (authorId !== session.user.uid)
-      return NextResponse.json({ error: "Incorrect authorId" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Incorrect authorId" },
+        { status: 400 }
+      );
 
     if (!content?.trim())
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
-    const isTopLevel = !parentId && !replyTo ;
+    const isTopLevel = !parentId && !replyTo && postType !== PostTypes.COMMENT;
 
-    if (isTopLevel && !title?.trim()) {
+    // Title exist check
+    if (isTopLevel && postType !== PostTypes.ANSWER && !title?.trim()) {
       return NextResponse.json(
-        { error: "Title required for top-level post" },
+        { error: "Title required for Post or Question" },
         { status: 400 }
       );
     }
 
-    if (isTopLevel && (!Array.isArray(categories) || categories.length === 0)) {
+    // Category count check
+    if (
+      isTopLevel &&
+      postType !== PostTypes.ANSWER &&
+      (!Array.isArray(categories) || categories.length === 0)
+    ) {
       return NextResponse.json(
         { error: "At least one category required" },
+        { status: 400 }
+      );
+    }
+
+    // Comment
+    if (parentId && postType !== PostTypes.COMMENT) {
+      return NextResponse.json(
+        { error: "parentId exists only for Comment" },
+        { status: 400 }
+      );
+    }
+
+    // reply
+    if (replyTo && postType !== PostTypes.COMMENT) {
+      return NextResponse.json(
+        { error: "replyTo exists only for Comment" },
         { status: 400 }
       );
     }
@@ -208,6 +234,7 @@ export async function POST(req: Request) {
     }
 
     const doc: any = {
+      postType: postType,
       content,
       authorId,
       parentId: safeParentId,

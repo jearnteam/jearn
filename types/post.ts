@@ -7,7 +7,15 @@ export interface CategoryObject {
   myname?: string;
 }
 
-export type PostType = "Post" | "Question" | "Answer" | "Comment";
+/** Object */
+export const PostTypes = {
+  POST: "Post",
+  QUESTION: "Question",
+  ANSWER: "Answer",
+  COMMENT: "Comment"
+} as const;
+/** Union */
+export type PostType = typeof PostTypes[keyof typeof PostTypes];
 
 export interface Post {
   txId: any;

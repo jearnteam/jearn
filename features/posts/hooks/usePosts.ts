@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Post } from "@/types/post";
+import type { Post, PostType } from "@/types/post";
 import { isRecentTx } from "@/lib/recentTx";
 
 export function usePosts() {
@@ -107,6 +107,7 @@ export function usePosts() {
   /* -------------------------------------------------------------------------- */
   const addPost = useCallback(
     async (
+      postType: PostType,
       title: string,
       content: string,
       authorId: string | null,
@@ -118,7 +119,7 @@ export function usePosts() {
       await fetch("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, content, authorId, categories, tags }),
+        body: JSON.stringify({ postType, title, content, authorId, categories, tags }),
       }).catch((e) => console.error("🔥 addPost error:", e));
     },
     []
