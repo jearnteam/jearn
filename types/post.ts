@@ -7,9 +7,13 @@ export interface CategoryObject {
   myname?: string;
 }
 
+export type PostType = "Post" | "Question" | "Answer" | "Comment";
+
 export interface Post {
   txId: any;
   _id: string;
+
+  postType?: PostType;
 
   title?: string;
   content?: string;
