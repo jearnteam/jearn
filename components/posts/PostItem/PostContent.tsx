@@ -20,10 +20,16 @@ export default function PostContent({
 
   return (
     <>
+      {post.title && (
+        <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100">
+          {post.title}
+        </h2>
+      )}
+
       <motion.div
         animate={{ height: targetHeight }}
         transition={{ duration: measureDone ? 0.25 : 0 }}
-        className="overflow-hidden"
+        className="mt-2 overflow-hidden"
       >
         <div ref={contentRef}>
           <MathRenderer html={post.content} />

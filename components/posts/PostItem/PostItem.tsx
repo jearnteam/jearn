@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { Post } from "@/types/post";
+import { PostTypes, type Post } from "@/types/post";
 import PostHeader from "./PostHeader";
 import PostContent from "./PostContent";
 import PostFooter from "./PostFooter";
 import SharePostModal from "@/components/common/SharePostModal";
 import FullScreenPortal from "@/features/FullScreenPortal";
 import GraphView from "@/components/graphview/GraphView";
+import { CircleQuestionMark } from "lucide-react";
 
 export default function PostItem({
   post,
@@ -32,6 +33,9 @@ export default function PostItem({
     <>
       <div id={`post-${post._id}`} className="mb-3">
         <div className="bg-white dark:bg-neutral-900 border rounded-xl p-4">
+          {/* Question Icon */}
+          {post.postType === PostTypes.QUESTION ? <CircleQuestionMark /> : ""}
+
           <PostHeader
             post={post}
             onEdit={onEdit}
@@ -42,10 +46,7 @@ export default function PostItem({
             }}
           />
 
-          <PostContent
-            post={post}
-            scrollContainerRef={scrollContainerRef}
-          />
+          <PostContent post={post} scrollContainerRef={scrollContainerRef} />
 
           <PostFooter
             post={post}
