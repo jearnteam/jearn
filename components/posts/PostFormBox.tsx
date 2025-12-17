@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
@@ -21,6 +21,13 @@ export default function PostFormBox({
 
   // ⭐ タブ状態
   const [activeTab, setActiveTab] = useState<"post" | "question">("post");
+
+  /* ⭐ モーダルが開かれたら必ず post に戻す */
+  useEffect(() => {
+    if (open) {
+      setActiveTab("post");
+    }
+  }, [open]);
 
   return (
     <Portal>

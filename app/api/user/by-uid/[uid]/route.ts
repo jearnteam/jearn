@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 
 export async function GET(_req: Request, { params }: { params: { uid: string } }) {
   try {
-    const raw = params.uid?.trim();
+    const raw = await params.uid?.trim();
     if (!raw) {
       return NextResponse.json({ ok: false, error: "Missing uid" }, { status: 400 });
     }

@@ -18,7 +18,7 @@ export async function POST(
     }
 
     const { userId, txId } = await req.json();
-    const postId = params.id;
+    const postId = await params.id;
 
     if (!userId) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });

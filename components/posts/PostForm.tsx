@@ -191,7 +191,14 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
 
     setSubmitting(true);
     try {
-      await onSubmit(mode === "question" ? PostTypes.QUESTION : PostTypes.POST, title, html, authorId, selected, tags);
+      await onSubmit(
+        mode === "question" ? PostTypes.QUESTION : PostTypes.POST,
+        title,
+        html,
+        authorId,
+        selected,
+        tags
+      );
 
       editorRef.current?.clearEditor();
       setCategories([]);
@@ -270,7 +277,7 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
       {/* ------------------------------ Editor ------------------------------ */}
       <div className="flex-1 overflow-y-auto rounded-md">
         <PostEditorWrapper
-          key={resetKey}
+          key={`${resetKey}-${mode}`} // ⭐ mode を含める
           ref={editorRef}
           value=""
           onUpdate={handleEditorUpdate}

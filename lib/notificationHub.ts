@@ -3,6 +3,7 @@ type NotificationPayload = {
   postId?: string;
   actorId?: string;
   unreadDelta?: number;
+  notificationId?: string;
 };
 
 const clients = new Map<string, Set<WritableStreamDefaultWriter>>();
@@ -18,14 +19,25 @@ export function unsubscribe(
   userId: string,
   writer: WritableStreamDefaultWriter
 ) {
-  clients.get(userId)?.delete(writer);
+  const set = clients.get(userId);
+  if (!set) return;
+
+  set.delete(writer);
+  if (set.size === 0) {
+    clients.delete(userId);
+  }
 }
 
 export function emitNotification(userId: string, payload: NotificationPayload) {
   const writers = clients.get(userId);
+
+  // 🔍 DEBUG LOG (ADD THIS)
+  console.log("🔔 emit →", userId, payload);
+
   if (!writers) return;
 
   for (const writer of writers) {
-    writer.write(`event: notification\ndata: ${JSON.stringify(payload)}\n\n`);
+    writer.write(`data: ${JSON.stringify(payload)}\n\n`);
   }
 }
+

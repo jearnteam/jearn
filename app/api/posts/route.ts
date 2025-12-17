@@ -6,6 +6,7 @@ import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { PostTypes } from "@/types/post";
+import { emitNotification } from "@/lib/notificationHub";
 
 export const runtime = "nodejs";
 
@@ -274,6 +275,65 @@ export async function POST(req: Request) {
       edited: false,
     };
 
+    /* ----------------------------------------------------------
+     * 🔔 MENTION NOTIFICATIONS (CREATE-ONCE)
+     * -------------------------------------------------------- */
+
+    const mentionedUserIds = extractMentionUserIds(content);
+
+    console.log("MENTION CONTENT HTML:", content);
+    console.log("MENTION IDS EXTRACTED:", mentionedUserIds);
+    const usersColl = db.collection("users");
+    const notifications = db.collection("notifications");
+    const now = new Date();
+
+    for (const uid of mentionedUserIds) {
+      if (uid === session.user.uid) continue;
+
+      const or: any[] = [{ userId: uid }, { provider_id: uid }];
+
+      if (ObjectId.isValid(uid)) {
+        or.push({ _id: new ObjectId(uid) });
+      }
+
+      const user = await usersColl.findOne({ $or: or });
+
+      if (!user?._id) continue;
+
+      const exists = await notifications.findOne({
+        userId: user._id,
+        type: "mention",
+        postId: result.insertedId,
+      });
+      console.log("MENTIONS RAW:", extractMentionUserIds(content));
+      console.log("MENTIONS OR QUERY:", or);
+      console.log("MENTION USER:", user?._id?.toString());
+
+      if (exists) continue; // ✅ create-once
+
+      await notifications.insertOne({
+        userId: user._id,
+        type: "mention",
+        postId: result.insertedId,
+        groupKey: `mention:${result.insertedId}`,
+        read: false,
+        createdAt: now,
+
+        count: 1,
+        actors: [new ObjectId(session.user.uid)],
+        lastActorId: new ObjectId(session.user.uid),
+        lastActorName: session.user.name ?? "Someone",
+        lastActorAvatar: `${process.env.R2_PUBLIC_URL}/avatars/${session.user.uid}.webp`,
+        postPreview: (title ?? content).slice(0, 80).replace(/\n/g, " "),
+      });
+
+      emitNotification(user._id.toString(), {
+        type: "mention",
+        postId: result.insertedId.toString(),
+        unreadDelta: 1,
+      });
+    }
+
     const sseType = replyTo
       ? "new-reply"
       : safeParentId
@@ -299,8 +359,14 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, post: finalPost });
   } catch (err) {
-    console.error("❌ POST /api/posts error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("❌ POST /api/posts error FULL:", err);
+    console.error("❌ POST /api/posts error STRING:", String(err));
+    console.error(
+      "❌ POST /api/posts error STACK:",
+      err instanceof Error ? err.stack : err
+    );
+
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
 
@@ -451,4 +517,16 @@ export async function DELETE(req: Request) {
     console.error("🔥 DELETE /api/posts failed:", err);
     return new Response("Internal Server Error", { status: 500 });
   }
+}
+
+function extractMentionUserIds(html: string): string[] {
+  const regex = /data-uid="([^"]+)"/g;
+  const ids = new Set<string>();
+
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    ids.add(match[1]);
+  }
+
+  return Array.from(ids);
 }
