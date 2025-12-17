@@ -41,11 +41,19 @@ export default function HomePage() {
 
   const { t } = useTranslation();
   const mainRef = useRef<HTMLDivElement | null>(null);
+  const [navbarVisible, setNavbarVisible] = useState(true);
+  const lastScrollTop = useRef(0);
 
   /* ---------------------------------------------
    * VIEW STATE (KEY PART)
    * ------------------------------------------- */
-  const [activeView, setActiveView] = useState<HomeView>("home");
+  const HOME_VIEW_KEY = "home_active_view";
+
+  const [activeView, setActiveView] = useState<HomeView>(() => {
+    if (typeof window === "undefined") return "home";
+    const saved = sessionStorage.getItem(HOME_VIEW_KEY) as HomeView | null;
+    return saved ?? "home";
+  });
 
   /* ---------------------------------------------
    * POSTS LOGIC
@@ -64,15 +72,18 @@ export default function HomePage() {
   /* ---------------------------------------------
    * PULL TO REFRESH
    * ------------------------------------------- */
-  usePullToRefresh(mainRef, async () => {
-    if (isRefreshing) return;
-    setIsRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 600);
+  usePullToRefresh(
+    typeof window !== "undefined" ? { current: document.body } : mainRef,
+    async () => {
+      if (isRefreshing) return;
+      setIsRefreshing(true);
+      try {
+        await refetch();
+      } finally {
+        setTimeout(() => setIsRefreshing(false), 600);
+      }
     }
-  });
+  );
 
   /* ---------------------------------------------
    * HELPERS
@@ -151,6 +162,10 @@ export default function HomePage() {
     }
   }
 
+  useEffect(() => {
+    sessionStorage.setItem(HOME_VIEW_KEY, activeView);
+  }, [activeView]);
+
   return (
     <>
       {/* ───── MODALS ───── */}
@@ -210,36 +225,56 @@ export default function HomePage() {
             {/* NAVIGATION */}
             <nav className="mt-6 flex flex-col gap-1">
               <SidebarItem
-                label="Home"
+                label={t("home") || "Home"}
                 active={activeView === "home"}
-                onClick={() => setActiveView("home")}
+                onClick={() => changeView("home")}
               />
 
               <SidebarItem
-                label="Users"
+                label={t("follow") || "Follow"}
                 active={activeView === "users"}
-                onClick={() => setActiveView("users")}
+                onClick={() => changeView("users")}
               />
 
               <SidebarItem
-                label="Notifications"
+                label={t("notifications") || "Notifications"}
                 active={activeView === "notify"}
                 onClick={() => changeView("notify")}
                 badge={unreadCount}
               />
 
               <SidebarItem
-                label="Banana"
+                label={t("jearn") || "Jearn"}
                 active={activeView === "banana"}
-                onClick={() => setActiveView("banana")}
+                onClick={() => changeView("banana")}
               />
             </nav>
           </aside>
 
           {/* MAIN SCROLL AREA */}
+
           <main
             ref={mainRef}
+            onScroll={(e) => {
+              const current = e.currentTarget.scrollTop;
+
+              if (current <= 0) {
+                setNavbarVisible(true);
+                lastScrollTop.current = 0;
+                return;
+              }
+
+              if (current < lastScrollTop.current) {
+                setNavbarVisible(true); // 上スクロール
+              } else if (current > lastScrollTop.current) {
+                setNavbarVisible(false); // 下スクロール
+              }
+
+              lastScrollTop.current = current;
+            }}
             className="flex-1 overflow-y-auto no-scrollbar
+                       overscroll-y-contain
+                       touch-pan-y
                        pb-[calc(env(safe-area-inset-bottom,0px)+72px)]"
           >
             <HomeViewRenderer
@@ -261,7 +296,9 @@ export default function HomePage() {
           activeView={activeView}
           onChangeView={changeView}
           onCreatePost={() => setShowPostBox(true)}
-          unreadCount={unreadCount} visible={false}/>
+          unreadCount={unreadCount}
+          visible={navbarVisible}
+        />
       </div>
     </>
   );

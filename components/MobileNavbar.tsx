@@ -2,6 +2,7 @@
 
 import { Plus, Home, Users, Bell, Banana } from "lucide-react";
 import { motion } from "framer-motion";
+import { useRef, useEffect } from "react";
 
 type HomeView = "home" | "notify" | "users" | "banana";
 
@@ -20,6 +21,23 @@ export default function MobileNavbar({
   onCreatePost,
   unreadCount = 0,
 }: MobileNavbarProps) {
+  const navRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+
+    const prevent = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    el.addEventListener("touchmove", prevent, { passive: false });
+
+    return () => {
+      el.removeEventListener("touchmove", prevent);
+    };
+  }, []);
+
   function NavButton({
     tab,
     icon,
@@ -97,6 +115,7 @@ export default function MobileNavbar({
 
   return (
     <motion.nav
+      ref={navRef}
       initial={false}
       animate={{
         y: visible ? 0 : 96,
