@@ -49,11 +49,17 @@ export default function HomePage() {
    * ------------------------------------------- */
   const HOME_VIEW_KEY = "home_active_view";
 
-  const [activeView, setActiveView] = useState<HomeView>(() => {
-    if (typeof window === "undefined") return "home";
+  const [activeView, setActiveView] = useState<HomeView>("home");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+
     const saved = sessionStorage.getItem(HOME_VIEW_KEY) as HomeView | null;
-    return saved ?? "home";
-  });
+    if (saved) {
+      setActiveView(saved);
+    }
+  }, []);
 
   /* ---------------------------------------------
    * POSTS LOGIC
@@ -165,6 +171,8 @@ export default function HomePage() {
   useEffect(() => {
     sessionStorage.setItem(HOME_VIEW_KEY, activeView);
   }, [activeView]);
+
+  if (!mounted) return null;
 
   return (
     <>
