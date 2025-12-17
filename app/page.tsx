@@ -8,6 +8,9 @@ import { usePosts } from "@/features/posts/hooks/usePosts";
 import type { Post } from "@/types/post";
 import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
 
+import NotificationPage from "@/components/notifications/NotificationPage";
+import { useNotifications } from "@/features/notifications/useNotifications";
+
 import PostFormBox from "@/components/posts/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
@@ -48,6 +51,8 @@ export default function HomePage() {
    * POSTS LOGIC
    * ------------------------------------------- */
   const { posts, addPost, editPost, deletePost, refetch, loading } = usePosts();
+
+  const { unreadCount, clearUnread } = useNotifications();
 
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -138,6 +143,14 @@ export default function HomePage() {
     mainRef.current?.scrollTo({ top: 0 });
   }, [activeView]);
 
+  function changeView(view: HomeView) {
+    setActiveView(view);
+
+    if (view !== "notify") {
+      clearUnread();
+    }
+  }
+
   return (
     <>
       {/* ───── MODALS ───── */}
@@ -182,7 +195,6 @@ export default function HomePage() {
             className="
     hidden lg:flex flex-col
     w-[280px]
-    border-r border-neutral-800
     px-4 py-4
     gap-4
   "
@@ -212,7 +224,8 @@ export default function HomePage() {
               <SidebarItem
                 label="Notifications"
                 active={activeView === "notify"}
-                onClick={() => setActiveView("notify")}
+                onClick={() => changeView("notify")}
+                badge={unreadCount}
               />
 
               <SidebarItem
@@ -229,56 +242,26 @@ export default function HomePage() {
             className="flex-1 overflow-y-auto no-scrollbar
                        pb-[calc(env(safe-area-inset-bottom,0px)+72px)]"
           >
-            {isRefreshing && (
-              <div className="flex justify-center py-2">
-                <div className="animate-spin w-6 h-6 border-2 border-t-transparent border-blue-500 rounded-full" />
-              </div>
-            )}
-
-            {/* ───── VIEW SWITCH ───── */}
-            {activeView === "home" && (
-              <PostList
-                posts={posts}
-                onEdit={setEditingPost}
-                onDelete={async (id) => {
-                  requestDelete(id);
-                }}
-                onUpvote={upvotePost}
-                scrollContainerRef={mainRef}
-              />
-            )}
-
-            {activeView === "notify" && (
-              <div className="p-4 text-center text-gray-500">
-                🔔 Notifications (placeholder)
-              </div>
-            )}
-
-            {activeView === "users" && (
-              <div className="p-4 text-center text-gray-500">
-                👥 Users (placeholder)
-              </div>
-            )}
-
-            {activeView === "banana" && (
-              <div className="p-4 text-center text-gray-500">
-                🍌 Banana Zone
-              </div>
-            )}
+            <HomeViewRenderer
+              view={activeView}
+              mainRef={mainRef}
+              posts={posts}
+              setEditingPost={setEditingPost}
+              requestDelete={requestDelete}
+              upvotePost={upvotePost}
+            />
           </main>
 
           {/* RIGHT SIDEBAR */}
-          <aside className="hidden lg:flex w-[280px] p-4">
-            Right Content
-          </aside>
+          <aside className="hidden lg:flex w-[280px] p-4">Right Content</aside>
         </div>
 
         {/* MOBILE NAVBAR */}
         <MobileNavbar
           activeView={activeView}
-          onChangeView={setActiveView}
+          onChangeView={changeView}
           onCreatePost={() => setShowPostBox(true)}
-        />
+          unreadCount={unreadCount} visible={false}/>
       </div>
     </>
   );
@@ -288,17 +271,19 @@ function SidebarItem({
   label,
   active,
   onClick,
+  badge = 0,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  badge?: number;
 }) {
   return (
     <button
       onClick={onClick}
       className={`
         w-full text-left px-4 py-2 rounded-lg
-        transition
+        transition flex items-center justify-between
         ${
           active
             ? "bg-blue-600 text-white"
@@ -306,7 +291,51 @@ function SidebarItem({
         }
       `}
     >
-      {label}
+      <span>{label}</span>
+
+      {badge > 0 && (
+        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-600 text-white">
+          {badge}
+        </span>
+      )}
     </button>
   );
+}
+
+function HomeViewRenderer({
+  view,
+  mainRef,
+  posts,
+  setEditingPost,
+  requestDelete,
+  upvotePost,
+}: {
+  view: HomeView;
+  mainRef: React.RefObject<HTMLDivElement | null>;
+  posts: Post[];
+  setEditingPost: (p: Post) => void;
+  requestDelete: (id: string) => void;
+  upvotePost: any;
+}) {
+  switch (view) {
+    case "home":
+      return (
+        <PostList
+          posts={posts}
+          onEdit={setEditingPost}
+          onDelete={async (id) => requestDelete(id)}
+          onUpvote={upvotePost}
+          scrollContainerRef={mainRef}
+        />
+      );
+
+    case "notify":
+      return <NotificationPage />;
+
+    case "users":
+      return <div className="p-4 text-center text-gray-500">👥 Users</div>;
+
+    case "banana":
+      return <div className="p-4 text-center text-gray-500">🍌 Banana</div>;
+  }
 }

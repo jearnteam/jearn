@@ -6,17 +6,29 @@ import { motion } from "framer-motion";
 type HomeView = "home" | "notify" | "users" | "banana";
 
 interface MobileNavbarProps {
+  visible: boolean;
   activeView: HomeView;
   onChangeView: (view: HomeView) => void;
   onCreatePost: () => void;
+  unreadCount?: number; // ✅ add
 }
 
 export default function MobileNavbar({
+  visible,
   activeView,
   onChangeView,
   onCreatePost,
+  unreadCount = 0,
 }: MobileNavbarProps) {
-  function NavButton({ tab, icon }: { tab: HomeView; icon: React.ReactNode }) {
+  function NavButton({
+    tab,
+    icon,
+    badge = 0,
+  }: {
+    tab: HomeView;
+    icon: React.ReactNode;
+    badge?: number;
+  }) {
     const isActive = activeView === tab;
 
     return (
@@ -39,6 +51,23 @@ export default function MobileNavbar({
           >
             {icon}
           </motion.div>
+
+          {/* ✅ UNREAD BADGE */}
+          {badge > 0 && (
+            <span
+              className="
+      absolute -top-2 -right-3
+      min-w-[18px] h-[18px]
+      px-1
+      rounded-full
+      bg-blue-600 text-white
+      text-[10px] leading-[18px]
+      text-center
+    "
+            >
+              {badge > 99 ? "99+" : badge}
+            </span>
+          )}
 
           {isActive && (
             <motion.div
@@ -67,14 +96,20 @@ export default function MobileNavbar({
   }
 
   return (
-    <div
+    <motion.nav
+      initial={false}
+      animate={{
+        y: visible ? 0 : 96,
+        opacity: visible ? 1 : 0,
+      }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
       className="
-      lg:hidden fixed bottom-0 left-0 right-0
-      h-20 bg-white dark:bg-black
-      border-t border-neutral-200 dark:border-neutral-800
-      flex items-center justify-evenly
-      z-40 pt-1 pb-3 px-[5vw]
-    "
+        lg:hidden fixed bottom-0 left-0 right-0
+        h-20 bg-white dark:bg-black
+        border-t border-neutral-200 dark:border-neutral-800
+        flex items-center justify-evenly
+        z-40 pt-1 pb-3 px-[5vw]
+      "
     >
       <NavButton tab="home" icon={<Home size={24} />} />
       <NavButton tab="users" icon={<Users size={24} />} />
@@ -88,8 +123,10 @@ export default function MobileNavbar({
         <Plus size={28} />
       </button>
 
-      <NavButton tab="notify" icon={<Bell size={24} />} />
+      {/* ✅ pass badge only to notify */}
+      <NavButton tab="notify" icon={<Bell size={24} />} badge={unreadCount} />
+
       <NavButton tab="banana" icon={<Banana size={24} />} />
-    </div>
+    </motion.nav>
   );
 }
