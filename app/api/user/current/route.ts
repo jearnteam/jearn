@@ -1,8 +1,11 @@
-// app/api/user/current/route.ts
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import clientPromise from "@/lib/mongodb";
+
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS
+  ?.split(",")
+  .map((e) => e.trim().toLowerCase()) ?? [];
 
 export async function GET() {
   try {
@@ -12,17 +15,19 @@ export async function GET() {
       return NextResponse.json({ ok: false, user: null });
     }
 
+    const email = session.user.email.toLowerCase();
+    const isAdmin = ADMIN_EMAILS.includes(email);
+
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const user = await db.collection("users").findOne({
-      email: session.user.email,
-    });
+    const user = await db.collection("users").findOne({ email });
 
-    if (!user) return NextResponse.json({ ok: false, user: null });
+    if (!user) {
+      return NextResponse.json({ ok: false, user: null });
+    }
 
     const cdnBase = process.env.R2_PUBLIC_URL!.replace(/\/+$/, "");
-
     const avatarUrl =
       user.avatarUrl ??
       `${cdnBase}/avatars/${user._id.toString()}.webp`;
@@ -34,10 +39,10 @@ export async function GET() {
         name: user.name ?? "",
         userId: user.userId ?? "",
         bio: user.bio ?? "",
-        email: user.email,
+        email,
         theme: user.theme ?? "light",
         language: user.language ?? "en",
-        isAdmin: false,
+        isAdmin,
         avatarUrl,
         avatarUpdatedAt: user.avatarUpdatedAt ?? null,
       },
