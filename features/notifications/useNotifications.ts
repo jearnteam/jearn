@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
 
 export function useNotifications() {
   const [items, setItems] = useState<any[]>([]);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
-
-  const { t } = useTranslation();
 
   /* ---------------------------------------------
    * INITIAL LOAD (NO AUTO-READ)
