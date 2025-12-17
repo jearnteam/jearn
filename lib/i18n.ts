@@ -44,6 +44,17 @@ if (!i18n.isInitialized) {
           shareThisPost: "Share this post",
           copied: "Copied!",
           copyLink: "Copy Link",
+          // home page
+          home: "Home",
+          follow: "Follow",
+          notifications: "Notifications",
+          //notification page
+          no_noti_yet: "No notifications yet",
+          upvote_noti: "upvoted your post.",
+          mention_noti: "mentioned you!",
+          comment_noti: "commented on your post.",
+          system_noti: "System notification",
+
           // comment
           comments: "Comments",
           addComment: "Add Comment",
@@ -108,6 +119,16 @@ if (!i18n.isInitialized) {
           shareThisPost: "投稿を共有",
           copied: "コピーしました！",
           copyLink: "リンクをコピー",
+          // home page
+          home: "ホーム",
+          follow: "フォロー",
+          notifications: "通知",
+          //notification page
+          no_noti_yet: "通知はありません",
+          upvote_noti: "さんが投稿を高評価しました",
+          mention_noti: "さんがあなたを＠メンションしました",
+          comment_noti: "さんがあなたの投稿にコメントしました",
+          system_noti: "System notification",
           // comment
           comments: "コメント",
           addComment: "コメントを追加",
@@ -174,6 +195,16 @@ if (!i18n.isInitialized) {
           shareThisPost: "ပို့စ်ကို မျှဝေမည်",
           copied: "ကူးယူပြီး!",
           copyLink: "ပို့စ်လင့်ခ်ကိုကူးယူမည်",
+          // home page
+          home: "ပင်မစာမျက်နှာ",
+          follow: "Follow",
+          notifications: "အသိပေးချက်များ",
+          //notification page
+          no_noti_yet: "အသိပေးစရာ အကြောင်းအရာ မရှိသေးပါ",
+          upvote_noti: "က ပိုစ့်ကို Upvote လုပ်ထားပါတယ်",
+          mention_noti: "က သင့်ကို ပိုစ့်ထဲမှာ Mention ခေါ်ထားပါတယ်",
+          comment_noti: "က ပိုစ့်အောက်မှာ မှတ်ချက်ပေးထားပါတယ်",
+          system_noti: "Jearnအဖွဲ့အစည်းမှ အသိပေးချက်",
           // comment
           comments: "မှတ်ချက်များ",
           addComment: "မှတ်ချက်ရေးမည်",
