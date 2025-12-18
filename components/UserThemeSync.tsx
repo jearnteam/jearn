@@ -1,4 +1,3 @@
-//@/components/UserThemeSync.tsx
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -7,15 +6,27 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 export default function UserThemeSync() {
   const { user } = useCurrentUser();
-  const { setTheme } = useTheme();
-  const hasSyncedRef = useRef(false); // ✅ Prevent re-syncing every render
+  const { setTheme, theme } = useTheme();
+
+  // 🔒 ensure we sync only once, on first meaningful load
+  const hasSyncedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasSyncedRef.current && user?.theme) {
-      setTheme(user.theme);
+    if (!user?.theme) return;
+
+    // ✅ already synced → never touch again
+    if (hasSyncedRef.current) return;
+
+    // ✅ do nothing if theme already matches
+    if (theme === user.theme) {
       hasSyncedRef.current = true;
+      return;
     }
-  }, [user, setTheme]);
+
+    // ✅ initial hydration sync only
+    setTheme(user.theme);
+    hasSyncedRef.current = true;
+  }, [user?.theme, theme, setTheme]);
 
   return null;
 }

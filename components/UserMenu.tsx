@@ -26,16 +26,21 @@ export default function UserMenu({ user }: { user: User }) {
   // THEME LOGIC
   const { theme, setTheme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
+  const [themeAnimating, setThemeAnimating] = useState(false);
 
   const toggleTheme = async () => {
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
-    setTheme(nextTheme);
 
-    await fetch("/api/user/update-theme", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme: nextTheme }),
-    });
+    console.log("🔵 toggle clicked, target =", nextTheme);
+
+    window.dispatchEvent(
+      new CustomEvent("theme-transition", { detail: { to: nextTheme } })
+    );
+
+    // theme flip during peak cover (after ~2.2s here)
+    setTimeout(() => {
+      setTheme(nextTheme);
+    }, 500);
   };
 
   const handleLogout = () => router.push("/logout");
@@ -130,7 +135,6 @@ export default function UserMenu({ user }: { user: User }) {
               {t("dashboard") || "Dashboard"}
             </button>
           )}
-          
 
           {/* LOGOUT */}
           <button

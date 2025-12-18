@@ -4,20 +4,28 @@ import { useEffect, useRef, useState } from "react";
 import lottie from "lottie-web";
 import { useTheme } from "next-themes";
 
-export default function LoadingOwl() {
+export default function LoadingOwl({
+  theme,
+}: {
+  theme?: "light" | "dark";
+}) {
   const container = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
-  // ✅ Prevent hydration mismatch
+  // Prevent hydration mismatch
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  const effectiveTheme =
+    theme ?? (resolvedTheme === "dark" ? "dark" : "light");
+
   useEffect(() => {
     if (!mounted || !container.current) return;
 
-    container.current.innerHTML = ""; // reset animation on theme change
+    container.current.innerHTML = "";
+
     const anim = lottie.loadAnimation({
       container: container.current,
       renderer: "svg",
@@ -27,17 +35,12 @@ export default function LoadingOwl() {
     });
 
     anim.setSpeed(0.8);
-    return () => anim.destroy();
-  }, [mounted, resolvedTheme]);
 
-  // 🚫 Render placeholder during SSR
-  // 🚫 No h-screen here — let parent control layout
+    return () => anim.destroy();
+  }, [mounted]);
+
   if (!mounted) {
-    return (
-      <div className="flex items-center justify-center bg-transparent">
-        <div style={{ width: 200, height: 200 }} />
-      </div>
-    );
+    return <div style={{ width: 200, height: 200 }} />;
   }
 
   return (
@@ -48,10 +51,9 @@ export default function LoadingOwl() {
           width: 200,
           height: 200,
           filter:
-            resolvedTheme === "dark"
+            effectiveTheme === "dark"
               ? "invert(1) brightness(1.2)"
               : "invert(0)",
-          transition: "filter 0.4s ease",
         }}
       />
     </div>
