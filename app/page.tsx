@@ -43,6 +43,7 @@ export default function HomePage() {
   const mainRef = useRef<HTMLDivElement | null>(null);
   const [navbarVisible, setNavbarVisible] = useState(true);
   const lastScrollTop = useRef(0);
+  const prevViewRef = useRef<HomeView>("home");
 
   /* ---------------------------------------------
    * VIEW STATE (KEY PART)
@@ -161,11 +162,16 @@ export default function HomePage() {
   }, [activeView]);
 
   function changeView(view: HomeView) {
+    const prev = prevViewRef.current;
+
     setActiveView(view);
 
-    if (view !== "notify") {
+    // ✅ Clear ONLY when leaving notification page
+    if (prev === "notify" && view !== "notify") {
       clearUnread();
     }
+
+    prevViewRef.current = view;
   }
 
   useEffect(() => {
