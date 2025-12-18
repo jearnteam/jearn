@@ -8,6 +8,7 @@ import PostFooter from "./PostFooter";
 import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
 import Link from "next/link";
+import { env } from "process";
 
 export default function PostItem({
   post,
@@ -80,7 +81,7 @@ export default function PostItem({
 
       <SharePostModal
         open={shareOpen}
-        postUrl={`/posts/${postState._id}`}
+        postUrl={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${postState._id}`}
         onCancel={() => setShareOpen(false)}
       />
 

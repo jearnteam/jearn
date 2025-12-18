@@ -137,9 +137,9 @@ if (!i18n.isInitialized) {
           postComment: "コメントを投稿",
           reply: "返信",
           //UserMenus
-          profile: "Profile",
-          toggleTheme: "Toggle Theme",
-          dashboard: "Dashboard",
+          profile: "プロフィール",
+          toggleTheme: "ダークモード切替",
+          dashboard: "ダッシュボード",
           // profile
           userNotFound: "ユーザーが見つかりませんでした。",
           postsByBefore: "",
