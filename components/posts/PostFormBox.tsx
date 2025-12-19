@@ -5,27 +5,39 @@ import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
 import { useTranslation } from "react-i18next";
+import { PostTypes } from "@/types/post";
 
 interface PostFormBoxProps {
   open: boolean;
   onClose: () => void;
   onSubmit: PostFormProps["onSubmit"];
+  type?: (typeof PostTypes)[Extract<
+    keyof typeof PostTypes,
+    "POST" | "QUESTION" | "ANSWER"
+  >];
 }
 
 export default function PostFormBox({
   open,
   onClose,
   onSubmit,
+  type = PostTypes.POST,
 }: PostFormBoxProps) {
   const { t } = useTranslation();
 
   // ⭐ タブ状態
-  const [activeTab, setActiveTab] = useState<"post" | "question">("post");
+  const [mode, setMode] =
+    useState<
+      (typeof PostTypes)[Extract<
+        keyof typeof PostTypes,
+        "POST" | "QUESTION" | "ANSWER"
+      >]
+    >(type);
 
   /* ⭐ モーダルが開かれたら必ず post に戻す */
   useEffect(() => {
-    if (open) {
-      setActiveTab("post");
+    if (open && mode != PostTypes.ANSWER) {
+      setMode(PostTypes.POST);
     }
   }, [open]);
 
@@ -53,7 +65,13 @@ export default function PostFormBox({
               <header className="p-4">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold">
-                    {t("createPost") || "Create Post"}
+                    {mode === PostTypes.POST
+                      ? t("createPost") || "Create Post"
+                      : mode === PostTypes.QUESTION
+                      ? "Ask Question"
+                      : mode === PostTypes.ANSWER
+                      ? "Answer Question"
+                      : "Create Post(Illegal Statement)"}
                   </h2>
                   <button
                     onClick={onClose}
@@ -64,50 +82,43 @@ export default function PostFormBox({
                 </div>
 
                 {/* ▼ タブヘッダー */}
-                <div className="flex mt-4 border-b dark:border-gray-700">
-                  <button
-                    className={`w-1/2 text-center px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-2 ${
-                      activeTab === "post"
-                        ? "border-b-2 border-blue-500 text-blue-600 font-semibold"
-                        : "text-gray-500 dark:text-gray-400"
-                    }`}
-                    onClick={() => setActiveTab("post")}
-                  >
-                    📝 {t("post") || "Post"}
-                  </button>
+                {mode !== PostTypes.ANSWER && (
+                  <div className="flex mt-4 border-b dark:border-gray-700">
+                    <button
+                      className={`w-1/2 text-center px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-2 ${
+                        mode === PostTypes.POST
+                          ? "border-b-2 border-blue-500 text-blue-600 font-semibold"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                      onClick={() => setMode(PostTypes.POST)}
+                    >
+                      📝 {t("post") || "Post"}
+                    </button>
 
-                  <button
-                    className={`w-1/2 text-center px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-2 ${
-                      activeTab === "question"
-                        ? "border-b-2 border-orange-500 text-orange-600 font-semibold"
-                        : "text-gray-500 dark:text-gray-400"
-                    }`}
-                    onClick={() => setActiveTab("question")}
-                  >
-                    ❓ {t("question") || "Question"}
-                  </button>
-                </div>
+                    <button
+                      className={`w-1/2 text-center px-4 py-2 text-sm font-medium transition flex items-center justify-center gap-2 ${
+                        mode === PostTypes.QUESTION
+                          ? "border-b-2 border-orange-500 text-orange-600 font-semibold"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                      onClick={() => setMode(PostTypes.QUESTION)}
+                    >
+                      ❓ {t("question") || "Question"}
+                    </button>
+                  </div>
+                )}
               </header>
 
               {/* Content */}
               <section className="flex-1 overflow-y-auto p-6">
                 {/* ▼ タブの内容を切り替え */}
-                {activeTab === "post" ? (
-                  <PostForm
-                    onSubmit={async (...args) => {
-                      await onSubmit(...args);
-                      onClose();
-                    }}
-                  />
-                ) : (
-                  <PostForm
-                    onSubmit={async (...args) => {
-                      await onSubmit(...args);
-                      onClose();
-                    }}
-                    mode="question"
-                  />
-                )}
+                <PostForm
+                  onSubmit={async (...args) => {
+                    await onSubmit(...args);
+                    onClose();
+                  }}
+                  mode={mode}
+                />
               </section>
             </motion.div>
           </motion.div>

@@ -19,7 +19,10 @@ export interface PostFormProps {
     categories: string[],
     tags: string[]
   ) => Promise<void>;
-  mode?: "post" | "question";
+  mode: (typeof PostTypes)[Extract<
+    keyof typeof PostTypes,
+    "POST" | "QUESTION" | "ANSWER"
+  >];
 }
 
 interface Category {
@@ -50,7 +53,10 @@ function extractTagsFromHTML(html: string): string[] {
   return Array.from(new Set(tags)); // unique tags
 }
 
-export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
+export default function PostForm({
+  onSubmit,
+  mode,
+}: PostFormProps) {
   const [title, setTitle] = useState("");
   const [resetKey, setResetKey] = useState(0);
 
@@ -108,6 +114,8 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
   }
 
   const handleCheckCategories = async () => {
+    if (mode === PostTypes.ANSWER) return;
+
     let html = editorRef.current?.getHTML() ?? "";
 
     // ⭐ Remove ZWSP (Important)
@@ -177,8 +185,8 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim()) return;
-    if (selected.length === 0) return alert("Choose a category.");
+    if (mode !== PostTypes.ANSWER && !title.trim()) return;
+    if (mode !== PostTypes.ANSWER && selected.length === 0) return alert("Choose a category.");
 
     let html = editorRef.current?.getHTML() ?? "";
 
@@ -191,14 +199,7 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
 
     setSubmitting(true);
     try {
-      await onSubmit(
-        mode === "question" ? PostTypes.QUESTION : PostTypes.POST,
-        title,
-        html,
-        authorId,
-        selected,
-        tags
-      );
+      await onSubmit(mode, title, html, authorId, selected, tags);
 
       editorRef.current?.clearEditor();
       setCategories([]);
@@ -237,42 +238,46 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
       className="flex flex-col h-full space-y-4 bg-white dark:bg-neutral-900 p-4 rounded-lg"
     >
       {/* ------------------------------ Title ------------------------------ */}
-      <motion.div
-        animate={{
-          boxShadow: isTitleFocused
-            ? "0px 0px 12px rgba(0,0,0,0.15)"
-            : "0px 0px 0px rgba(0,0,0,0)",
-        }}
-        className={`rounded-lg border transition ${
-          isTitleFocused
-            ? "border-black dark:border-white"
-            : "border-gray-300 dark:border-gray-500"
-        }`}
-      >
-        <input
-          type="text"
-          placeholder={
-            mode === "question"
-              ? t("questionEnter") || "Question"
-              : t("title") || "Title"
-          }
-          value={title}
-          maxLength={200}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setContentChanged(true);
-          }}
-          onFocus={() => setIsTitleFocused(true)}
-          onBlur={() => setIsTitleFocused(false)}
-          className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
-          autoComplete="off"
-        />
-      </motion.div>
+      {mode !== PostTypes.ANSWER && (
+        <>
+          <motion.div
+            animate={{
+              boxShadow: isTitleFocused
+                ? "0px 0px 12px rgba(0,0,0,0.15)"
+                : "0px 0px 0px rgba(0,0,0,0)",
+            }}
+            className={`rounded-lg border transition ${
+              isTitleFocused
+                ? "border-black dark:border-white"
+                : "border-gray-300 dark:border-gray-500"
+            }`}
+          >
+            <input
+              type="text"
+              placeholder={
+                mode === PostTypes.QUESTION
+                  ? t("questionEnter") || "Question"
+                  : t("title") || "Title"
+              }
+              value={title}
+              maxLength={200}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setContentChanged(true);
+              }}
+              onFocus={() => setIsTitleFocused(true)}
+              onBlur={() => setIsTitleFocused(false)}
+              className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
+              autoComplete="off"
+            />
+          </motion.div>
 
-      {/* Character count */}
-      <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
-        {title.length}/200
-      </p>
+          {/* Character count */}
+          <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
+            {title.length}/200
+          </p>
+        </>
+      )}
 
       {/* ------------------------------ Editor ------------------------------ */}
       <div className="flex-1 overflow-y-auto rounded-md">
@@ -282,102 +287,109 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
           value=""
           onUpdate={handleEditorUpdate}
           placeholder={
-            mode === "question"
+            mode === PostTypes.POST
+              ? t("placeholder") || "Placeholder"
+              : mode === PostTypes.QUESTION
               ? "質問内容を詳しく書いてください"
-              : t("placeholder") || "Placeholder"
+              : mode === PostTypes.ANSWER
+              ? "Answer"
+              : "Placeholder(Illegal Statement)"
           }
         />
       </div>
 
       {/* ------------------------------ Categories ------------------------------ */}
       <AnimatePresence>
-        {!contentChanged && categoryReady && categories.length > 0 && (
-          <motion.div
-            key="cat-list"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 6 }}
-            transition={{ duration: 0.25 }}
-            className="space-y-3"
-            onLayoutAnimationStart={() => setAnimatingLayout(true)}
-            onLayoutAnimationComplete={() => setAnimatingLayout(false)}
-          >
-            <motion.div layout className="overflow-hidden">
-              <motion.div
-                layout
-                className="flex flex-wrap gap-3"
-                transition={{
-                  layout: { duration: 0.35, ease: "easeInOut" },
-                }}
-              >
-                {visibleCats.map((cat) => {
-                  const isSelected = selected.includes(cat.id);
+        {!contentChanged &&
+          categoryReady &&
+          categories.length > 0 &&
+          mode !== PostTypes.ANSWER && (
+            <motion.div
+              key="cat-list"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.25 }}
+              className="space-y-3"
+              onLayoutAnimationStart={() => setAnimatingLayout(true)}
+              onLayoutAnimationComplete={() => setAnimatingLayout(false)}
+            >
+              <motion.div layout className="overflow-hidden">
+                <motion.div
+                  layout
+                  className="flex flex-wrap gap-3"
+                  transition={{
+                    layout: { duration: 0.35, ease: "easeInOut" },
+                  }}
+                >
+                  {visibleCats.map((cat) => {
+                    const isSelected = selected.includes(cat.id);
 
-                  return (
-                    <motion.div
-                      key={cat.label}
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="flex flex-col"
-                    >
-                      <motion.button
-                        type="button"
+                    return (
+                      <motion.div
+                        key={cat.label}
                         layout
-                        whileTap={{ scale: 0.92 }}
-                        whileHover={{ scale: 1.05 }}
-                        onClick={() => handleSelectCategory(cat.id)}
-                        className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                          isSelected
-                            ? "bg-blue-600 text-white shadow"
-                            : "bg-gray-200 dark:bg-gray-700"
-                        }`}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="flex flex-col"
                       >
-                        {i18n.language === "ja" ? cat.jname : cat.label}
-                      </motion.button>
+                        <motion.button
+                          type="button"
+                          layout
+                          whileTap={{ scale: 0.92 }}
+                          whileHover={{ scale: 1.05 }}
+                          onClick={() => handleSelectCategory(cat.id)}
+                          className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                            isSelected
+                              ? "bg-blue-600 text-white shadow"
+                              : "bg-gray-200 dark:bg-gray-700"
+                          }`}
+                        >
+                          {i18n.language === "ja" ? cat.jname : cat.label}
+                        </motion.button>
 
-                      <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${cat.score * 100}%` }}
-                          transition={{ duration: 0.6 }}
-                          className="h-full bg-blue-500 dark:bg-blue-400"
-                        />
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                        <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${cat.score * 100}%` }}
+                            transition={{ duration: 0.6 }}
+                            className="h-full bg-blue-500 dark:bg-blue-400"
+                          />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </motion.div>
               </motion.div>
+
+              {/* Show More / Show Less */}
+              {!animatingLayout && (
+                <motion.div layout className="flex gap-4 text-sm">
+                  {visibleCount < ordered.length && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((v) => v + 5)}
+                      className="text-blue-500 hover:underline"
+                    >
+                      {t("showMore") || "Show more"}
+                    </button>
+                  )}
+
+                  {visibleCount > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(5)}
+                      className="text-blue-500 hover:underline"
+                    >
+                      {t("showLess") || "Show less"}
+                    </button>
+                  )}
+                </motion.div>
+              )}
             </motion.div>
-
-            {/* Show More / Show Less */}
-            {!animatingLayout && (
-              <motion.div layout className="flex gap-4 text-sm">
-                {visibleCount < ordered.length && (
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount((v) => v + 5)}
-                    className="text-blue-500 hover:underline"
-                  >
-                    {t("showMore") || "Show more"}
-                  </button>
-                )}
-
-                {visibleCount > 5 && (
-                  <button
-                    type="button"
-                    onClick={() => setVisibleCount(5)}
-                    className="text-blue-500 hover:underline"
-                  >
-                    {t("showLess") || "Show less"}
-                  </button>
-                )}
-              </motion.div>
-            )}
-          </motion.div>
-        )}
+          )}
       </AnimatePresence>
 
       {/* ------------------------------ Footer ------------------------------ */}
@@ -418,7 +430,7 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
                   const form = new FormData();
                   form.append("file", file);
 
-                  const res = await fetch("//uplapi/imagesoadImage", {
+                  const res = await fetch("/api/images/uploadImage", {
                     method: "POST",
                     body: form,
                   });
@@ -440,7 +452,8 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
               🖼️
             </button>
 
-            {categories.length === 0 || contentChanged ? (
+            {(categories.length === 0 || contentChanged) &&
+            mode !== PostTypes.ANSWER ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 whileHover={{ scale: 1.03 }}
@@ -460,20 +473,26 @@ export default function PostForm({ onSubmit, mode = "post" }: PostFormProps) {
                 type="submit"
                 disabled={submitting || loading || selected.length === 0}
                 className={`px-6 py-2 rounded-lg text-white disabled:bg-gray-400 transition
-    ${
-      mode === "question"
-        ? "bg-orange-500 hover:bg-orange-600"
-        : "bg-blue-600 hover:bg-blue-700"
-    }
-  `}
+                  ${
+                    mode === PostTypes.QUESTION
+                      ? "bg-orange-500 hover:bg-orange-600"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }
+                `}
               >
-                {submitting
-                  ? mode === "question"
+                {mode === PostTypes.POST
+                  ? submitting
+                    ? "Submitting..."
+                    : t("submit") || "Submit"
+                  : mode === PostTypes.QUESTION
+                  ? submitting
                     ? "Submitting Question..."
-                    : "Submitting..."
-                  : mode === "question"
-                  ? "Ask Question"
-                  : t("submit") || "Submit"}
+                    : "Ask Question"
+                  : mode === PostTypes.ANSWER
+                  ? submitting
+                    ? "Submitting Answer..."
+                    : "Answer"
+                  : "Illegal Statement"}
               </motion.button>
             )}
           </div>
