@@ -9,6 +9,7 @@ import PostEditorWrapper, {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n";
 import { PostType, PostTypes } from "@/types/post";
+import { extractTagsFromHTML, extractTextWithMath, removeZWSP } from "@/lib/processText";
 
 export interface PostFormProps {
   onSubmit: (
@@ -32,26 +33,8 @@ interface Category {
   score: number;
 }
 
-/* -------------------------------------------------------------------------- */
-/*                       REMOVE ZERO-WIDTH-SPACE (ZWSP)                       */
-/* -------------------------------------------------------------------------- */
-function removeZWSP(html: string): string {
-  return html.replace(/\u200B/g, "");
-}
 
-/* -------------------------------------------------------------------------- */
-/*                              TAG EXTRACTION                                 */
-/* -------------------------------------------------------------------------- */
-function extractTagsFromHTML(html: string): string[] {
-  const div = document.createElement("div");
-  div.innerHTML = html;
 
-  const tags = Array.from(div.querySelectorAll("a[data-type='tag']"))
-    .map((a) => a.getAttribute("data-value") || "")
-    .filter(Boolean);
-
-  return Array.from(new Set(tags)); // unique tags
-}
 
 export default function PostForm({
   onSubmit,
@@ -80,38 +63,7 @@ export default function PostForm({
 
   const authorId = user?._id || null;
 
-  /* -------------------------------------------------------------------------- */
-  /*                              CHECK CATEGORIES                              */
-  /* -------------------------------------------------------------------------- */
-
-  function extractTextWithMath(html: string): string {
-    const div = document.createElement("div");
-    div.innerHTML = html;
-
-    let text = "";
-
-    function walk(node: Node) {
-      if (!node) return;
-
-      if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent ?? "";
-        return;
-      }
-
-      if (node instanceof HTMLElement && node.dataset.type === "math") {
-        const latex =
-          node.getAttribute("latex") || node.getAttribute("data-latex") || "";
-        if (latex) text += latex + " ";
-        return;
-      }
-
-      node.childNodes.forEach(walk);
-    }
-
-    walk(div);
-
-    return text.replace(/\s+/g, " ").trim();
-  }
+  
 
   const handleCheckCategories = async () => {
     if (mode === PostTypes.ANSWER) return;
