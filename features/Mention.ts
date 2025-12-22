@@ -1,5 +1,5 @@
 // features/Mention.ts
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Node } from "@tiptap/core";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -15,6 +15,7 @@ export const Mention = Node.create({
   group: "inline",
   inline: true,
   atom: true,
+  selectable: false,
 
   addAttributes() {
     return {
@@ -28,31 +29,47 @@ export const Mention = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
+    // ⚠️ used for serialization only
     return [
       "span",
       {
         "data-mention": "true",
         "data-uid": HTMLAttributes.uid,
         "data-userid": HTMLAttributes.userId,
-        class:
-          "mention px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 font-medium",
       },
       `@${HTMLAttributes.userId}`,
     ];
+  },
+
+  addNodeView() {
+    return ({ node }) => {
+      const dom = document.createElement("span");
+
+      dom.dataset.mention = "true";
+      dom.dataset.uid = node.attrs.uid ?? "";
+      dom.dataset.userid = node.attrs.userId ?? "";
+
+      dom.textContent = `@${node.attrs.userId}`;
+      dom.className = "mention";
+
+      return {
+        dom,
+        stopEvent: () => true,
+      };
+    };
   },
   addCommands() {
     return {
       insertMention:
         (attrs) =>
-        ({ chain }) => {
-          return chain()
+        ({ chain }) =>
+          chain()
             .insertContent({
               type: this.name,
               attrs,
             })
             .insertContent(" ")
-            .run();
-        },
+            .run(),
     };
   },
 });
