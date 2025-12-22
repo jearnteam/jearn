@@ -10,6 +10,19 @@ import type { Post } from "@/types/post";
 
 dayjs.extend(relativeTime);
 
+function avatarUrl(userId: string, updatedAt?: string | Date | null) {
+  if (!updatedAt) {
+    return "https://cdn.jearn.site/avatars/default.webp";
+  }
+
+  const ts =
+    typeof updatedAt === "string"
+      ? new Date(updatedAt).getTime()
+      : updatedAt.getTime();
+
+  return `https://cdn.jearn.site/avatars/${userId}.webp?v=${ts}`;
+}
+
 export default function PostHeader({
   post,
   onEdit,
@@ -26,8 +39,10 @@ export default function PostHeader({
       <Link href={`/profile/${post.authorId}`} scroll={false}>
         <div className="flex items-center gap-3">
           <img
-            src={`https://cdn.jearn.site/avatars/${post.authorId}.webp?t=${new Date().getTime()}` || "/default-avatar.png"}
+            src={avatarUrl(post.authorId, post.authorAvatarUpdatedAt)}
             className="w-8 h-8 rounded-full"
+            loading="lazy"
+            decoding="async"
           />
           <div>
             <p className="font-semibold">{post.authorName}</p>

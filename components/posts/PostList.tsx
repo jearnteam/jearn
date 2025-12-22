@@ -61,7 +61,10 @@ export default function PostList({
     if (!posts.length) return;
 
     const slice = posts.slice(0, visibleCount);
-    const avatarURLs = slice.map((p) => `https://cdn.jearn.site/avatars/${p.authorId}?t=${new Date().getTime()}`);
+    const avatarURLs = slice.map(
+      (p) =>
+        `https://cdn.jearn.site/avatars/${p.authorId}?t=${new Date().getTime()}`
+    );
 
     setBatchLoading(true);
 
@@ -90,7 +93,13 @@ export default function PostList({
   const restoredOnce = useRef(false);
 
   useEffect(() => {
-    if (restoredOnce.current) return;
+    if (
+      restoredOnce.current ||
+      !scrollContainerRef?.current ||
+      !sessionStorage.getItem("from-navigation")
+    ) {
+      return;
+    }
 
     const id = sessionStorage.getItem("restore-post-id");
     if (!id) return;
@@ -106,14 +115,50 @@ export default function PostList({
 
     sessionStorage.removeItem("restore-post-id");
     sessionStorage.removeItem("restore-visible-count");
+    sessionStorage.removeItem("from-navigation");
   }, [visiblePosts]);
+
+  async function upvotePost(
+    id: string,
+    userId: string
+  ): Promise<{
+    ok: boolean;
+    action?: "added" | "removed";
+    error?: string;
+  }> {
+    try {
+      const res = await fetch(`/api/posts/${id}/upvote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { ok: false, error: data?.error || "Upvote failed" };
+      }
+
+      if (data.action === "upvoted") {
+        return { ok: true, action: "added" };
+      }
+
+      if (data.action === "unvoted") {
+        return { ok: true, action: "removed" };
+      }
+
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Network error" };
+    }
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="space-y-3 overflow-hidden"
+      className="space-y-[2px] overflow-hidden"
     >
       {visiblePosts.map((post) => (
         <PostItem

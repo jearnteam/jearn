@@ -8,6 +8,8 @@ export function usePosts() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const sseRef = useRef<EventSource | null>(null);
+  const hasFetchedRef = useRef(false);
+
 
   /* -------------------------------------------------------------------------- */
   /*                                 INITIAL FETCH                               */
@@ -32,9 +34,12 @@ export function usePosts() {
   /*                                 SSE CONNECTION                              */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
+    if (hasFetchedRef.current) return;
+    hasFetchedRef.current = true;
+
     fetchPosts();
 
-    const es = new EventSource("/api/stream"); // MUST MATCH YOUR SSE ROUTE
+    const es = new EventSource("/api/stream");
     sseRef.current = es;
 
     es.onmessage = (event) => {

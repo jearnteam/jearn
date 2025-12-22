@@ -9,9 +9,24 @@ import { useTranslation } from "react-i18next";
 import PostList from "@/components/posts/PostList";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
-import LoadingOwl from "@/components/LoadingOwl";
 import type { Post } from "@/types/post";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
+
+/* ---------------------------------------------
+ * Avatar URL helper (cache-safe)
+ * ------------------------------------------- */
+function avatarUrl(userId: string, updatedAt?: string | Date | null) {
+  if (!updatedAt) {
+    return "https://cdn.jearn.site/avatars/default.webp";
+  }
+
+  const ts =
+    typeof updatedAt === "string"
+      ? new Date(updatedAt).getTime()
+      : updatedAt.getTime();
+
+  return `https://cdn.jearn.site/avatars/${userId}.webp?v=${ts}`;
+}
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -27,7 +42,9 @@ export default function ProfilePage() {
   const [userId, setUserId] = useState("");
   const [bio, setBio] = useState("");
 
-  const [preview, setPreview] = useState("/default-avatar.png");
+  const [preview, setPreview] = useState<string>(
+    "https://cdn.jearn.site/avatars/default.webp"
+  );
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -52,7 +69,7 @@ export default function ProfilePage() {
     if (!sessionLoading && status === "unauthenticated") {
       router.push("/");
     }
-  }, [sessionLoading, status]);
+  }, [sessionLoading, status, router]);
 
   /* -------------------------
       Load user profile data
@@ -63,7 +80,8 @@ export default function ProfilePage() {
       setUserId(user.userId || "");
       setBio(user.bio || "");
 
-      setPreview(`https://cdn.jearn.site/avatars/${user._id}?t=${new Date().getTime()}`);
+      // ✅ cache-safe avatar URL
+      setPreview(avatarUrl(user._id, user.avatarUpdatedAt));
     }
   }, [user, loading]);
 
@@ -95,7 +113,7 @@ export default function ProfilePage() {
   }, [user]);
 
   /* -------------------------
-      Local preview for avatar
+      Local avatar preview (file only)
   -------------------------- */
   useEffect(() => {
     if (!file) return;
@@ -129,10 +147,17 @@ export default function ProfilePage() {
       });
 
       const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Update failed");
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || "Update failed");
+      }
 
+      // Refresh user from DB
       await update();
-      setPreview(`https://cdn.jearn.site/avatars/${user._id}?t=${new Date().getTime()}`);
+
+      // Force fresh avatar once after upload
+      setPreview(avatarUrl(user._id, new Date()));
+
+      setFile(null);
       alert("Profile updated!");
     } catch (err: any) {
       alert(err.message);
@@ -154,11 +179,7 @@ export default function ProfilePage() {
 
     try {
       setIsDeleting(true);
-
-      await fetch(`/api/posts/${deletePostId}`, {
-        method: "DELETE",
-      });
-
+      await fetch(`/api/posts/${deletePostId}`, { method: "DELETE" });
       await loadPosts();
     } finally {
       setIsDeleting(false);
@@ -183,15 +204,17 @@ export default function ProfilePage() {
   /* -------------------------
       Loading UI
   -------------------------- */
-  if (sessionLoading || postsLoading)
+  if (sessionLoading || postsLoading) {
     return <FullScreenLoader text={t("loadingPosts")} />;
+  }
 
-  if (!user)
+  if (!user) {
     return (
       <div className="flex justify-center items-center h-[70vh]">
         {t("notLoggedIn") || "Not logged in"}
       </div>
     );
+  }
 
   /* -------------------------
       Page UI
@@ -207,12 +230,7 @@ export default function ProfilePage() {
             await fetch(`/api/posts/${editingPost._id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                title,
-                content,
-                categories,
-                tags,
-              }),
+              body: JSON.stringify({ title, content, categories, tags }),
             });
 
             await loadPosts();
@@ -236,13 +254,13 @@ export default function ProfilePage() {
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
         <main
           className="
-      absolute top-[4.3rem]
-      left-0 right-0
-      h-[calc(100vh-4.3rem)]
-      overflow-y-auto no-scrollbar
-      px-3 md:px-6
-      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-    "
+            absolute top-[4.3rem]
+            left-0 right-0
+            h-[calc(100vh-4.3rem)]
+            overflow-y-auto no-scrollbar
+            px-3 md:px-6
+            pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+          "
         >
           <div className="max-w-2xl mx-auto mt-10">
             {/* PROFILE SETTINGS */}
@@ -253,16 +271,18 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-4">
               {/* Avatar Upload */}
               <div className="flex items-center gap-6">
-                {/* Avatar Preview + Overlay */}
-                <div className="relative group cursor-pointer">
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() =>
+                    document.getElementById("avatarInput")?.click()
+                  }
+                >
                   <div
-                    className="rounded-full overflow-hidden border border-gray-300 dark:border-gray-600 
-                 flex items-center justify-center transition-all duration-200 
-                 group-hover:opacity-80 group-hover:scale-105"
-                    style={{ width: 96, height: 96 }}
-                    onClick={() =>
-                      document.getElementById("avatarInput")?.click()
-                    }
+                    className="
+                      w-24 h-24 rounded-full overflow-hidden
+                      border border-gray-300 dark:border-gray-600
+                      group-hover:opacity-80 transition
+                    "
                   >
                     <img
                       src={preview}
@@ -271,20 +291,35 @@ export default function ProfilePage() {
                     />
                   </div>
 
-                  {/* Hover Overlay */}
                   <div
-                    className="absolute inset-0 rounded-full bg-black/40 text-white 
-                 opacity-0 group-hover:opacity-100 transition-opacity 
-                 flex items-center justify-center text-sm font-medium"
-                    onClick={() =>
-                      document.getElementById("avatarInput")?.click()
-                    }
+                    className="
+                      absolute inset-0 rounded-full
+                      bg-black/40 text-white
+                      opacity-0 group-hover:opacity-100
+                      flex items-center justify-center
+                      text-sm font-medium transition
+                    "
                   >
                     Change
                   </div>
                 </div>
-
-                {/* Hidden input */}
+                {/* Text */}{" "}
+                <div
+                  className="cursor-pointer select-none"
+                  onClick={() =>
+                    document.getElementById("avatarInput")?.click()
+                  }
+                >
+                  {" "}
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                    {" "}
+                    Change profile picture{" "}
+                  </p>{" "}
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {" "}
+                    using JPG, PNG is Recommended{" "}
+                  </p>{" "}
+                </div>
                 <input
                   id="avatarInput"
                   type="file"
@@ -292,24 +327,8 @@ export default function ProfilePage() {
                   className="hidden"
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
-
-                {/* Text */}
-                <div
-                  className="cursor-pointer select-none"
-                  onClick={() =>
-                    document.getElementById("avatarInput")?.click()
-                  }
-                >
-                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                    Change profile picture
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    using JPG, PNG is Recommended
-                  </p>
-                </div>
               </div>
 
-              {/* Name */}
               <label>{t("name") || "Name"}</label>
               <input
                 value={name}
@@ -317,19 +336,12 @@ export default function ProfilePage() {
                 className="border rounded px-2 py-1"
               />
 
-              {/* User ID */}
               <label>User ID</label>
-              <div className="flex items-center">
-                <span className="mr-1 text-gray-500">@</span>
-                <input
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  className="border rounded px-2 py-1 flex-1"
-                  placeholder="unique_id"
-                  minLength={3}
-                  maxLength={32}
-                />
-              </div>
+              <input
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                className="border rounded px-2 py-1"
+              />
 
               <label>{t("bio") || "Bio"}</label>
               <textarea
@@ -347,9 +359,7 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {/* -------------------------
-              USER POSTS
-        -------------------------- */}
+            {/* POSTS */}
             <div className="mt-16">
               <h2 className="text-xl font-semibold mb-4">
                 {t("yourPosts") || "Your Posts"}
