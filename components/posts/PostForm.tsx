@@ -274,7 +274,15 @@ export default function PostForm({
           ref={editorRef}
           value={cleanInitialContent}
           onUpdate={handleEditorUpdate}
-          // placeholderはオプション
+          placeholder={
+            mode === PostTypes.POST
+              ? t("placeholder") || "Placeholder"
+              : mode === PostTypes.QUESTION
+              ? "質問内容を詳しく書いてください"
+              : mode === PostTypes.ANSWER
+              ? "Answer"
+              : "Placeholder(Illegal Statement)"
+          }
         />
       </div>
 
@@ -378,7 +386,15 @@ export default function PostForm({
             ) : (
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
-            <span className="hidden sm:inline">{user?.name}</span>
+            <span>
+              {t("postingAsBefore") ?? "Posting as"}{" "}
+              {user ? (
+                <strong>{user.name}</strong>
+              ) : (
+                <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
+              )}{" "}
+              {t("postingAsAfter") ?? ""}
+            </span>
           </div>
 
           <div className="flex gap-3 items-center">
@@ -456,14 +472,19 @@ export default function PostForm({
                   }
                 `}
               >
-                {submitting
-                  ? "Processing..."
-                  : submitLabel ||
-                    (mode === PostTypes.QUESTION
-                      ? "Ask Question"
-                      : mode === PostTypes.ANSWER
-                      ? "Answer"
-                      : t("submit") || "Submit")}
+                {mode === PostTypes.POST
+                  ? submitting
+                    ? "Submitting..."
+                    : t("submit") || "Submit"
+                  : mode === PostTypes.QUESTION
+                  ? submitting
+                    ? "Submitting Question..."
+                    : "Ask Question"
+                  : mode === PostTypes.ANSWER
+                  ? submitting
+                    ? "Submitting Answer..."
+                    : "Answer"
+                  : "Illegal Statement"}
               </motion.button>
             )}
           </div>

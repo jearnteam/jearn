@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { PostFormProps } from "./PostForm";
 import { useTranslation } from "react-i18next";
-import { PostTypes } from "@/types/post";
+import { PostType, PostTypes } from "@/types/post";
 
 interface PostFormBoxProps {
   open: boolean;
@@ -15,7 +15,7 @@ interface PostFormBoxProps {
   // 今回はリファクタリングなので、親からの呼び出し元も PostFormProps['onSubmit'] に合わせるのが理想的ですが、
   // 互換性維持のためラップします。
   onSubmit: (
-    postType: any,
+    postType: PostType,
     title: string,
     content: string,
     authorId: string | null,
@@ -57,7 +57,6 @@ export default function PostFormBox({
             exit={{ opacity: 0 }}
             aria-modal="true"
             role="dialog"
-            onClick={onClose} // 背景クリックで閉じる
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
