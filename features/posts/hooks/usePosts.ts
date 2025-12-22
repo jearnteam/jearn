@@ -138,6 +138,34 @@ export function usePosts() {
   );
 
   /* -------------------------------------------------------------------------- */
+  /*                               ADD ANSWER                                   */
+  /* -------------------------------------------------------------------------- */
+  const addAnswer = useCallback(
+    async (
+      postType: PostType,
+      content: string,
+      authorId: string | null,
+      tags: string[],
+      parentId: string,
+    ) => {
+      if (!authorId) return;
+
+      await fetch("/api/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postType,
+          content,
+          authorId,
+          tags,
+          parentId,
+        }),
+      }).catch((e) => console.error("🔥 addAnswer error:", e));
+    },
+    []
+  );
+
+  /* -------------------------------------------------------------------------- */
   /*                                 EDIT POST                                   */
   /* -------------------------------------------------------------------------- */
   const editPost = useCallback(
@@ -218,6 +246,7 @@ export function usePosts() {
     loading,
     refetch: fetchPosts,
     addPost,
+    addAnswer,
     editPost,
     deletePost,
     upvotePost,
