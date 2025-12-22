@@ -192,7 +192,7 @@ export async function POST(req: Request) {
     }
 
     // Comment, Answer
-    if (parentId && [PostTypes.COMMENT, PostTypes.ANSWER].includes(postType)) {
+    if (parentId && ![PostTypes.COMMENT, PostTypes.ANSWER].includes(postType)) {
       return NextResponse.json(
         { error: "parentId exists only for Comment or Answer" },
         { status: 400 }
