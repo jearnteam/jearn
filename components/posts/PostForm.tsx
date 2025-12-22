@@ -24,19 +24,6 @@ export interface PostFormData {
   tags: string[];
 }
 
-export interface PostFormProps {
-  mode: PostType;
-  onSubmit: (data: PostFormData) => Promise<void>;
-  
-  // ✅ 拡張: 初期値とUI制御用プロパティ
-  initialTitle?: string;
-  initialContent?: string;
-  initialSelectedCategories?: string[];
-  initialAvailableCategories?: Category[]; // 編集時に既存カテゴリリストを渡す用
-  submitLabel?: string;
-  onCancel?: () => void;
-}
-
 export interface Category {
   id: string;
   label: string;
@@ -44,17 +31,32 @@ export interface Category {
   score: number;
 }
 
+export interface PostFormProps {
+  mode: PostType;
+  onSubmit: (data: PostFormData) => Promise<void>;
+
+  initialTitle?: string;
+  initialContent?: string;
+  initialSelectedCategories?: string[];
+  initialAvailableCategories?: Category[];
+  submitLabel?: string;
+  onCancel?: () => void;
+}
+// ✅ 修正点1: 空配列の参照を固定するための定数
+const EMPTY_CATEGORIES: Category[] = [];
+const EMPTY_STRING_ARRAY: string[] = [];
+
 export default function PostForm({
   mode,
   onSubmit,
   initialTitle = "",
   initialContent = "",
-  initialSelectedCategories = [],
-  initialAvailableCategories = [],
+  // ✅ 修正点2: デフォルト値を定数に置き換え
+  initialSelectedCategories = EMPTY_STRING_ARRAY,
+  initialAvailableCategories = EMPTY_CATEGORIES,
   submitLabel,
   onCancel,
 }: PostFormProps) {
-  // 初期値のZWSP除去
   const cleanInitialContent = removeZWSP(initialContent);
 
   const [title, setTitle] = useState(initialTitle);
@@ -63,16 +65,19 @@ export default function PostForm({
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const [categories, setCategories] = useState<Category[]>(initialAvailableCategories);
+  const [categories, setCategories] = useState<Category[]>(
+    initialAvailableCategories
+  );
   const [selected, setSelected] = useState<string[]>(initialSelectedCategories);
 
-  // 初期コンテンツがある場合(編集時)は変更フラグをfalse、なければtrue
+  // コンテンツがある(編集時)なら変更なし(false)、なければ変更あり(true)
   const [contentChanged, setContentChanged] = useState(!initialContent);
 
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
-  // カテゴリがある場合は準備完了とみなす
-  const [categoryReady, setCategoryReady] = useState(initialAvailableCategories.length > 0);
+  const [categoryReady, setCategoryReady] = useState(
+    initialAvailableCategories.length > 0
+  );
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
 
@@ -82,16 +87,21 @@ export default function PostForm({
 
   const authorId = user?._id || null;
 
-  // 初期値が変更された場合のリセット処理 (Modal再利用時など)
+  // ✅ 修正点3: 依存配列の問題が解消され、無限ループしなくなります
   useEffect(() => {
     setTitle(initialTitle);
     setSelected(initialSelectedCategories);
     setCategories(initialAvailableCategories);
     setCategoryReady(initialAvailableCategories.length > 0);
     setContentChanged(!initialContent);
-    // エディタのリセットはkey変更で行う
+    // エディタのリセット
     setResetKey((k) => k + 1);
-  }, [initialTitle, initialContent, initialAvailableCategories]); // dependencies update
+  }, [
+    initialTitle,
+    initialContent,
+    initialSelectedCategories,
+    initialAvailableCategories,
+  ]);
 
   /* -------------------------------------------------------------------------- */
   /* CHECK CATEGORIES                              */
@@ -171,11 +181,9 @@ export default function PostForm({
     html = removeZWSP(html);
 
     const tags = extractTagsFromHTML(html);
-    console.log("Extracted tags:", tags);
 
     setSubmitting(true);
     try {
-      // ✅ 統合されたオブジェクト形式で送信
       await onSubmit({
         postType: mode,
         title,
@@ -185,7 +193,7 @@ export default function PostForm({
         tags,
       });
 
-      // 新規作成時のみフォームをクリア (編集時は親コンポーネントが閉じるため不要だが、念のため)
+      // 新規作成時のみフォームをクリア
       if (!initialContent) {
         editorRef.current?.clearEditor();
         setCategories([]);
@@ -264,17 +272,9 @@ export default function PostForm({
         <PostEditorWrapper
           key={`${resetKey}-${mode}`}
           ref={editorRef}
-          value={cleanInitialContent} // ✅ 初期値を渡す
+          value={cleanInitialContent}
           onUpdate={handleEditorUpdate}
-          placeholder={
-            mode === PostTypes.POST
-              ? t("placeholder") || "Placeholder"
-              : mode === PostTypes.QUESTION
-              ? "質問内容を詳しく書いてください"
-              : mode === PostTypes.ANSWER
-              ? "Answer"
-              : "Placeholder"
-          }
+          // placeholderはオプション
         />
       </div>
 
@@ -294,7 +294,6 @@ export default function PostForm({
               onLayoutAnimationStart={() => setAnimatingLayout(true)}
               onLayoutAnimationComplete={() => setAnimatingLayout(false)}
             >
-              {/* ... カテゴリリスト表示ロジック (変更なし) ... */}
               <motion.div layout className="overflow-hidden">
                 <motion.div
                   layout
@@ -344,12 +343,20 @@ export default function PostForm({
               {!animatingLayout && (
                 <motion.div layout className="flex gap-4 text-sm">
                   {visibleCount < ordered.length && (
-                    <button type="button" onClick={() => setVisibleCount((v) => v + 5)} className="text-blue-500 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((v) => v + 5)}
+                      className="text-blue-500 hover:underline"
+                    >
                       {t("showMore") || "Show more"}
                     </button>
                   )}
                   {visibleCount > 5 && (
-                    <button type="button" onClick={() => setVisibleCount(5)} className="text-blue-500 hover:underline">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount(5)}
+                      className="text-blue-500 hover:underline"
+                    >
                       {t("showLess") || "Show less"}
                     </button>
                   )}
@@ -363,8 +370,7 @@ export default function PostForm({
       <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700 pt-3 pb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-sm">
-             {/* ... User Avatar logic ... */}
-             {user ? (
+            {user ? (
               <img
                 src={`${user.picture}?t=${Date.now()}`}
                 className="w-8 h-8 rounded-full border border-gray-300 dark:border-neutral-700"
@@ -372,14 +378,12 @@ export default function PostForm({
             ) : (
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
-            <span className="hidden sm:inline">
-              {user?.name}
-            </span>
+            <span className="hidden sm:inline">{user?.name}</span>
           </div>
 
           <div className="flex gap-3 items-center">
-             {/* ✅ Cancel Button */}
-             {onCancel && (
+            {/* Cancel Button */}
+            {onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
@@ -389,7 +393,7 @@ export default function PostForm({
               </button>
             )}
 
-            {/* ✅ Image Upload Button */}
+            {/* Image Upload Button */}
             <button
               type="button"
               onClick={async () => {
@@ -401,7 +405,6 @@ export default function PostForm({
                   if (!file) return;
                   const form = new FormData();
                   form.append("file", file);
-                  // Upload logic...
                   const res = await fetch("/api/images/uploadImage", {
                     method: "POST",
                     body: form,
@@ -421,8 +424,8 @@ export default function PostForm({
             </button>
 
             {/* Submit / Check Categories Button */}
-            {/* 編集モード(カテゴリあり)または未変更ならSubmitを表示。変更があればCheckを表示 */}
-            {(categories.length === 0 || contentChanged) && mode !== PostTypes.ANSWER ? (
+            {(categories.length === 0 || contentChanged) &&
+            mode !== PostTypes.ANSWER ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 whileHover={{ scale: 1.03 }}
@@ -440,9 +443,17 @@ export default function PostForm({
                 whileTap={{ scale: 0.93 }}
                 whileHover={{ scale: 1.05 }}
                 type="submit"
-                disabled={submitting || loading || (mode !== PostTypes.ANSWER && selected.length === 0)}
+                disabled={
+                  submitting ||
+                  loading ||
+                  (mode !== PostTypes.ANSWER && selected.length === 0)
+                }
                 className={`px-6 py-2 rounded-lg text-white disabled:bg-gray-400 transition
-                  ${mode === PostTypes.QUESTION ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700"}
+                  ${
+                    mode === PostTypes.QUESTION
+                      ? "bg-orange-500 hover:bg-orange-600"
+                      : "bg-blue-600 hover:bg-blue-700"
+                  }
                 `}
               >
                 {submitting
