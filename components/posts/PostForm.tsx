@@ -9,7 +9,11 @@ import PostEditorWrapper, {
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n";
 import { PostType, PostTypes } from "@/types/post";
-import { extractTagsFromHTML, extractTextWithMath, removeZWSP } from "@/lib/processText";
+import {
+  extractTagsFromHTML,
+  extractTextWithMath,
+  removeZWSP,
+} from "@/lib/processText";
 
 export interface PostFormProps {
   onSubmit: (
@@ -33,13 +37,7 @@ interface Category {
   score: number;
 }
 
-
-
-
-export default function PostForm({
-  onSubmit,
-  mode,
-}: PostFormProps) {
+export default function PostForm({ onSubmit, mode }: PostFormProps) {
   const [title, setTitle] = useState("");
   const [resetKey, setResetKey] = useState(0);
 
@@ -62,8 +60,6 @@ export default function PostForm({
   const { t } = useTranslation();
 
   const authorId = user?._id || null;
-
-  
 
   const handleCheckCategories = async () => {
     if (mode === PostTypes.ANSWER) return;
@@ -138,7 +134,8 @@ export default function PostForm({
     e.preventDefault();
 
     if (mode !== PostTypes.ANSWER && !title.trim()) return;
-    if (mode !== PostTypes.ANSWER && selected.length === 0) return alert("Choose a category.");
+    if (mode !== PostTypes.ANSWER && selected.length === 0)
+      return alert("Choose a category.");
 
     let html = editorRef.current?.getHTML() ?? "";
 

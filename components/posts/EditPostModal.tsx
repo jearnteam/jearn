@@ -10,7 +10,11 @@ import { useTranslation } from "react-i18next";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n";
 import type { Post } from "@/types/post";
-import { extractTagsFromHTML, extractTextWithMath, removeZWSP } from "@/lib/processText";
+import {
+  extractTagsFromHTML,
+  extractTextWithMath,
+  removeZWSP,
+} from "@/lib/processText";
 
 /* -------------------------------------------------------------------------- */
 /*                                    TYPES                                   */
@@ -33,10 +37,6 @@ interface Category {
   jname?: string;
   score: number;
 }
-
-/* -------------------------------------------------------------------------- */
-/*                               SHARED HELPERS                                */
-/* -------------------------------------------------------------------------- */
 
 /* -------------------------------------------------------------------------- */
 /*                                 COMPONENT                                  */
@@ -286,9 +286,7 @@ export default function EditPostModal({
                                 : "bg-gray-200 dark:bg-gray-700"
                             }`}
                           >
-                            {i18n.language === "ja"
-                              ? cat.jname
-                              : cat.label}
+                            {i18n.language === "ja" ? cat.jname : cat.label}
                           </motion.button>
                         );
                       })}
