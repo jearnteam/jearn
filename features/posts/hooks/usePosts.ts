@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { Post, PostType } from "@/types/post";
+import { PostTypes, type Post, type PostType } from "@/types/post";
 import { isRecentTx } from "@/lib/recentTx";
 
 export function usePosts() {
@@ -142,7 +142,7 @@ export function usePosts() {
   /* -------------------------------------------------------------------------- */
   const addAnswer = useCallback(
     async (
-      postType: PostType,
+      postType: PostType,// TODO: Delete this
       content: string,
       authorId: string | null,
       tags: string[],
@@ -154,7 +154,7 @@ export function usePosts() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          postType,
+          postType: PostTypes.ANSWER,
           content,
           authorId,
           tags,
