@@ -23,29 +23,47 @@ export default function UserMenu({ user }: { user: User }) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
 
-  // THEME LOGIC
+  /* ---------------------------------------------
+   * THEME
+   * ------------------------------------------- */
   const { theme, setTheme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
-  const [themeAnimating, setThemeAnimating] = useState(false);
 
-  const toggleTheme = async () => {
+  /** Persist theme in DB (same as before) */
+  const saveThemeToDB = async (nextTheme: "light" | "dark") => {
+    try {
+      await fetch("/api/user/update-theme", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ theme: nextTheme }),
+      });
+    } catch (err) {
+      console.error("❌ Failed to save theme", err);
+    }
+  };
+
+  const toggleTheme = () => {
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
 
-    console.log("🔵 toggle clicked, target =", nextTheme);
+    console.log("🎨 toggle theme →", nextTheme);
 
+    // 🔵 start animated overlay
     window.dispatchEvent(
       new CustomEvent("theme-transition", { detail: { to: nextTheme } })
     );
 
-    // theme flip during peak cover (after ~2.2s here)
+    // 🔁 flip theme during peak cover
     setTimeout(() => {
       setTheme(nextTheme);
+      saveThemeToDB(nextTheme); // ✅ persist
     }, 500);
   };
 
   const handleLogout = () => router.push("/logout");
 
-  // CLOSE ON OUTSIDE CLICK
+  /* ---------------------------------------------
+   * CLOSE ON OUTSIDE CLICK
+   * ------------------------------------------- */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -61,7 +79,7 @@ export default function UserMenu({ user }: { user: User }) {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* BUTTON TO OPEN MENU */}
+      {/* BUTTON */}
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-2"
@@ -72,7 +90,6 @@ export default function UserMenu({ user }: { user: User }) {
           updatedAt={user.avatarUpdatedAt}
           size={36}
         />
-
         {user.name && (
           <span className="hidden sm:block text-sm font-medium truncate max-w-[120px]">
             {user.name}
@@ -80,7 +97,7 @@ export default function UserMenu({ user }: { user: User }) {
         )}
       </button>
 
-      {/* DROPDOWN MENU */}
+      {/* DROPDOWN */}
       <div
         className={`
           absolute right-0 mt-2 w-48 rounded-xl shadow-lg border
@@ -105,7 +122,7 @@ export default function UserMenu({ user }: { user: User }) {
             {t("profile") || "Profile"}
           </button>
 
-          {/* THEME TOGGLE */}
+          {/* THEME */}
           <button
             onClick={toggleTheme}
             className="px-3 py-2 flex items-center gap-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
@@ -118,12 +135,12 @@ export default function UserMenu({ user }: { user: User }) {
             {t("toggleTheme") || "Toggle Theme"}
           </button>
 
-          {/* LANGUAGE SWITCH */}
+          {/* LANGUAGE */}
           <div className="py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700">
             <LangSwitcher />
           </div>
 
-          {/* ADMIN DASHBOARD */}
+          {/* ADMIN */}
           {user.isAdmin && (
             <button
               onClick={() => {
