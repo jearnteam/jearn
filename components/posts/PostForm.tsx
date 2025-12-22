@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper, {
@@ -15,43 +15,64 @@ import {
   removeZWSP,
 } from "@/lib/processText";
 
-export interface PostFormProps {
-  onSubmit: (
-    postType: PostType,
-    title: string,
-    content: string,
-    authorId: string | null,
-    categories: string[],
-    tags: string[]
-  ) => Promise<void>;
-  mode: (typeof PostTypes)[Extract<
-    keyof typeof PostTypes,
-    "POST" | "QUESTION" | "ANSWER"
-  >];
+export interface PostFormData {
+  postType: PostType;
+  title: string;
+  content: string;
+  authorId: string | null;
+  categories: string[];
+  tags: string[];
 }
 
-interface Category {
+export interface PostFormProps {
+  mode: PostType;
+  onSubmit: (data: PostFormData) => Promise<void>;
+  
+  // ✅ 拡張: 初期値とUI制御用プロパティ
+  initialTitle?: string;
+  initialContent?: string;
+  initialSelectedCategories?: string[];
+  initialAvailableCategories?: Category[]; // 編集時に既存カテゴリリストを渡す用
+  submitLabel?: string;
+  onCancel?: () => void;
+}
+
+export interface Category {
   id: string;
   label: string;
   jname: string;
   score: number;
 }
 
-export default function PostForm({ onSubmit, mode }: PostFormProps) {
-  const [title, setTitle] = useState("");
+export default function PostForm({
+  mode,
+  onSubmit,
+  initialTitle = "",
+  initialContent = "",
+  initialSelectedCategories = [],
+  initialAvailableCategories = [],
+  submitLabel,
+  onCancel,
+}: PostFormProps) {
+  // 初期値のZWSP除去
+  const cleanInitialContent = removeZWSP(initialContent);
+
+  const [title, setTitle] = useState(initialTitle);
   const [resetKey, setResetKey] = useState(0);
 
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [categories, setCategories] = useState<Category[]>(initialAvailableCategories);
+  const [selected, setSelected] = useState<string[]>(initialSelectedCategories);
 
-  const [contentChanged, setContentChanged] = useState(true);
+  // 初期コンテンツがある場合(編集時)は変更フラグをfalse、なければtrue
+  const [contentChanged, setContentChanged] = useState(!initialContent);
 
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
-  const [categoryReady, setCategoryReady] = useState(false);
+  // カテゴリがある場合は準備完了とみなす
+  const [categoryReady, setCategoryReady] = useState(initialAvailableCategories.length > 0);
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
 
@@ -61,12 +82,24 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
 
   const authorId = user?._id || null;
 
+  // 初期値が変更された場合のリセット処理 (Modal再利用時など)
+  useEffect(() => {
+    setTitle(initialTitle);
+    setSelected(initialSelectedCategories);
+    setCategories(initialAvailableCategories);
+    setCategoryReady(initialAvailableCategories.length > 0);
+    setContentChanged(!initialContent);
+    // エディタのリセットはkey変更で行う
+    setResetKey((k) => k + 1);
+  }, [initialTitle, initialContent, initialAvailableCategories]); // dependencies update
+
+  /* -------------------------------------------------------------------------- */
+  /* CHECK CATEGORIES                              */
+  /* -------------------------------------------------------------------------- */
   const handleCheckCategories = async () => {
     if (mode === PostTypes.ANSWER) return;
 
     let html = editorRef.current?.getHTML() ?? "";
-
-    // ⭐ Remove ZWSP (Important)
     html = removeZWSP(html);
 
     const text = extractTextWithMath(html);
@@ -107,17 +140,15 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                              CONTENT CHANGE                                 */
+  /* CONTENT CHANGE                                */
   /* -------------------------------------------------------------------------- */
-
   const handleEditorUpdate = () => {
     setContentChanged(true);
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                           CATEGORY SELECTOR                                 */
+  /* CATEGORY SELECTOR                                */
   /* -------------------------------------------------------------------------- */
-
   const handleSelectCategory = (id: string) => {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
@@ -127,9 +158,8 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                                   SUBMIT                                    */
+  /* SUBMIT                                   */
   /* -------------------------------------------------------------------------- */
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -138,24 +168,32 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
       return alert("Choose a category.");
 
     let html = editorRef.current?.getHTML() ?? "";
-
-    // ⭐ Remove ZWSP before saving
     html = removeZWSP(html);
 
-    // Extract tags from clean HTML
     const tags = extractTagsFromHTML(html);
     console.log("Extracted tags:", tags);
 
     setSubmitting(true);
     try {
-      await onSubmit(mode, title, html, authorId, selected, tags);
+      // ✅ 統合されたオブジェクト形式で送信
+      await onSubmit({
+        postType: mode,
+        title,
+        content: html,
+        authorId,
+        categories: selected,
+        tags,
+      });
 
-      editorRef.current?.clearEditor();
-      setCategories([]);
-      setSelected([]);
-      setTitle("");
-      setResetKey((k) => k + 1);
-      setContentChanged(true);
+      // 新規作成時のみフォームをクリア (編集時は親コンポーネントが閉じるため不要だが、念のため)
+      if (!initialContent) {
+        editorRef.current?.clearEditor();
+        setCategories([]);
+        setSelected([]);
+        setTitle("");
+        setResetKey((k) => k + 1);
+        setContentChanged(true);
+      }
     } catch (err) {
       console.error("❌ Error posting:", err);
     } finally {
@@ -164,19 +202,14 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
   };
 
   /* -------------------------------------------------------------------------- */
-  /*                              CATEGORY ORDER                                 */
+  /* CATEGORY ORDER                                */
   /* -------------------------------------------------------------------------- */
-
   const ordered = [
     ...categories.filter((c) => selected.includes(c.id)),
     ...categories.filter((c) => !selected.includes(c.id)),
   ];
 
   const visibleCats = ordered.slice(0, visibleCount);
-
-  /* -------------------------------------------------------------------------- */
-  /*                                   RENDER                                    */
-  /* -------------------------------------------------------------------------- */
 
   return (
     <motion.form
@@ -220,8 +253,6 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
               autoComplete="off"
             />
           </motion.div>
-
-          {/* Character count */}
           <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
             {title.length}/200
           </p>
@@ -231,9 +262,9 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
       {/* ------------------------------ Editor ------------------------------ */}
       <div className="flex-1 overflow-y-auto rounded-md">
         <PostEditorWrapper
-          key={`${resetKey}-${mode}`} // ⭐ mode を含める
+          key={`${resetKey}-${mode}`}
           ref={editorRef}
-          value=""
+          value={cleanInitialContent} // ✅ 初期値を渡す
           onUpdate={handleEditorUpdate}
           placeholder={
             mode === PostTypes.POST
@@ -242,14 +273,14 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
               ? "質問内容を詳しく書いてください"
               : mode === PostTypes.ANSWER
               ? "Answer"
-              : "Placeholder(Illegal Statement)"
+              : "Placeholder"
           }
         />
       </div>
 
       {/* ------------------------------ Categories ------------------------------ */}
       <AnimatePresence>
-        {!contentChanged &&
+        {(!contentChanged || initialAvailableCategories.length > 0) &&
           categoryReady &&
           categories.length > 0 &&
           mode !== PostTypes.ANSWER && (
@@ -263,17 +294,15 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
               onLayoutAnimationStart={() => setAnimatingLayout(true)}
               onLayoutAnimationComplete={() => setAnimatingLayout(false)}
             >
+              {/* ... カテゴリリスト表示ロジック (変更なし) ... */}
               <motion.div layout className="overflow-hidden">
                 <motion.div
                   layout
                   className="flex flex-wrap gap-3"
-                  transition={{
-                    layout: { duration: 0.35, ease: "easeInOut" },
-                  }}
+                  transition={{ layout: { duration: 0.35, ease: "easeInOut" } }}
                 >
                   {visibleCats.map((cat) => {
                     const isSelected = selected.includes(cat.id);
-
                     return (
                       <motion.div
                         key={cat.label}
@@ -298,7 +327,6 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
                         >
                           {i18n.language === "ja" ? cat.jname : cat.label}
                         </motion.button>
-
                         <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
@@ -313,25 +341,15 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
                 </motion.div>
               </motion.div>
 
-              {/* Show More / Show Less */}
               {!animatingLayout && (
                 <motion.div layout className="flex gap-4 text-sm">
                   {visibleCount < ordered.length && (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount((v) => v + 5)}
-                      className="text-blue-500 hover:underline"
-                    >
+                    <button type="button" onClick={() => setVisibleCount((v) => v + 5)} className="text-blue-500 hover:underline">
                       {t("showMore") || "Show more"}
                     </button>
                   )}
-
                   {visibleCount > 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount(5)}
-                      className="text-blue-500 hover:underline"
-                    >
+                    <button type="button" onClick={() => setVisibleCount(5)} className="text-blue-500 hover:underline">
                       {t("showLess") || "Show less"}
                     </button>
                   )}
@@ -345,7 +363,8 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
       <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700 pt-3 pb-4">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-sm">
-            {user ? (
+             {/* ... User Avatar logic ... */}
+             {user ? (
               <img
                 src={`${user.picture}?t=${Date.now()}`}
                 className="w-8 h-8 rounded-full border border-gray-300 dark:border-neutral-700"
@@ -353,47 +372,47 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
             ) : (
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
-            <span>
-              {t("postingAsBefore") ?? "Posting as"}{" "}
-              {user ? (
-                <strong>{user.name}</strong>
-              ) : (
-                <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
-              )}{" "}
-              {t("postingAsAfter") ?? ""}
+            <span className="hidden sm:inline">
+              {user?.name}
             </span>
           </div>
 
           <div className="flex gap-3 items-center">
+             {/* ✅ Cancel Button */}
+             {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+              >
+                {t("cancel") || "Cancel"}
+              </button>
+            )}
+
+            {/* ✅ Image Upload Button */}
             <button
               type="button"
               onClick={async () => {
                 const input = document.createElement("input");
                 input.type = "file";
                 input.accept = "image/*";
-
                 input.onchange = async () => {
                   const file = input.files?.[0];
                   if (!file) return;
-
                   const form = new FormData();
                   form.append("file", file);
-
+                  // Upload logic...
                   const res = await fetch("/api/images/uploadImage", {
                     method: "POST",
                     body: form,
                   });
-
                   const { id, url, width, height } = await res.json();
-
-                  // ⭐ editor に画像挿入
                   editorRef.current?.editor
                     ?.chain()
                     .focus()
                     .insertImagePlaceholder(id, url, width, height)
                     .run();
                 };
-
                 input.click();
               }}
               className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
@@ -401,8 +420,9 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
               🖼️
             </button>
 
-            {(categories.length === 0 || contentChanged) &&
-            mode !== PostTypes.ANSWER ? (
+            {/* Submit / Check Categories Button */}
+            {/* 編集モード(カテゴリあり)または未変更ならSubmitを表示。変更があればCheckを表示 */}
+            {(categories.length === 0 || contentChanged) && mode !== PostTypes.ANSWER ? (
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 whileHover={{ scale: 1.03 }}
@@ -420,28 +440,19 @@ export default function PostForm({ onSubmit, mode }: PostFormProps) {
                 whileTap={{ scale: 0.93 }}
                 whileHover={{ scale: 1.05 }}
                 type="submit"
-                disabled={submitting || loading || selected.length === 0}
+                disabled={submitting || loading || (mode !== PostTypes.ANSWER && selected.length === 0)}
                 className={`px-6 py-2 rounded-lg text-white disabled:bg-gray-400 transition
-                  ${
-                    mode === PostTypes.QUESTION
-                      ? "bg-orange-500 hover:bg-orange-600"
-                      : "bg-blue-600 hover:bg-blue-700"
-                  }
+                  ${mode === PostTypes.QUESTION ? "bg-orange-500 hover:bg-orange-600" : "bg-blue-600 hover:bg-blue-700"}
                 `}
               >
-                {mode === PostTypes.POST
-                  ? submitting
-                    ? "Submitting..."
-                    : t("submit") || "Submit"
-                  : mode === PostTypes.QUESTION
-                  ? submitting
-                    ? "Submitting Question..."
-                    : "Ask Question"
-                  : mode === PostTypes.ANSWER
-                  ? submitting
-                    ? "Submitting Answer..."
-                    : "Answer"
-                  : "Illegal Statement"}
+                {submitting
+                  ? "Processing..."
+                  : submitLabel ||
+                    (mode === PostTypes.QUESTION
+                      ? "Ask Question"
+                      : mode === PostTypes.ANSWER
+                      ? "Answer"
+                      : t("submit") || "Submit")}
               </motion.button>
             )}
           </div>

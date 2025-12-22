@@ -10,7 +10,18 @@ import { PostTypes } from "@/types/post";
 interface PostFormBoxProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: PostFormProps["onSubmit"];
+  // PostFormPropsのonSubmitはオブジェクトを受け取るようになったため、親のシグネチャもそれに合わせるか、
+  // ここでラップして元のシグネチャ (バラバラの引数) を維持するか。
+  // 今回はリファクタリングなので、親からの呼び出し元も PostFormProps['onSubmit'] に合わせるのが理想的ですが、
+  // 互換性維持のためラップします。
+  onSubmit: (
+    postType: any,
+    title: string,
+    content: string,
+    authorId: string | null,
+    categories: string[],
+    tags: string[]
+  ) => Promise<void>;
   type?: (typeof PostTypes)[Extract<
     keyof typeof PostTypes,
     "POST" | "QUESTION" | "ANSWER"
@@ -25,20 +36,14 @@ export default function PostFormBox({
 }: PostFormBoxProps) {
   const { t } = useTranslation();
 
-  // ⭐ タブ状態
-  const [mode, setMode] =
-    useState<
-      (typeof PostTypes)[Extract<
-        keyof typeof PostTypes,
-        "POST" | "QUESTION" | "ANSWER"
-      >]
-    >(type);
+  const [mode, setMode] = useState(type);
 
-  /* ⭐ モーダルが開かれたら必ず post に戻す */
+  /* ⭐ モーダルが開かれたら必ず post に戻す (Answer以外) */
   useEffect(() => {
     if (open && mode != PostTypes.ANSWER) {
       setMode(PostTypes.POST);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return (
@@ -52,6 +57,7 @@ export default function PostFormBox({
             exit={{ opacity: 0 }}
             aria-modal="true"
             role="dialog"
+            onClick={onClose} // 背景クリックで閉じる
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -62,7 +68,7 @@ export default function PostFormBox({
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
-              <header className="p-4">
+              <header className="p-4 bg-white dark:bg-neutral-900 z-10">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold">
                     {mode === PostTypes.POST
@@ -71,7 +77,7 @@ export default function PostFormBox({
                       ? "Ask Question"
                       : mode === PostTypes.ANSWER
                       ? "Answer Question"
-                      : "Create Post(Illegal Statement)"}
+                      : "Create Post"}
                   </h2>
                   <button
                     onClick={onClose}
@@ -110,14 +116,22 @@ export default function PostFormBox({
               </header>
 
               {/* Content */}
-              <section className="flex-1 overflow-y-auto p-6">
-                {/* ▼ タブの内容を切り替え */}
+              <section className="flex-1 overflow-y-auto p-4">
                 <PostForm
-                  onSubmit={async (...args) => {
-                    await onSubmit(...args);
+                  mode={mode}
+                  // ✅ PostFormはオブジェクトを返すが、既存のonSubmit(引数バラバラ)に合わせて変換
+                  onSubmit={async (data) => {
+                    await onSubmit(
+                      data.postType,
+                      data.title,
+                      data.content,
+                      data.authorId,
+                      data.categories,
+                      data.tags
+                    );
                     onClose();
                   }}
-                  mode={mode}
+                  // 新規作成時はonCancelは不要（閉じるボタンがあるため）
                 />
               </section>
             </motion.div>
