@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { PostTypes, type Post } from "@/types/post";
 import PostHeader from "./PostHeader";
 import PostContent from "./PostContent";
@@ -12,27 +12,34 @@ import Link from "next/link";
 
 export default function PostItem({
   post,
-  setPost, // ✅ ADDED
+  setPost,
   onEdit,
   onDelete,
   onUpvote,
   onAnswer,
+  onShare,
   isSingle = false,
   scrollContainerRef,
 }: {
   post: Post;
-  setPost?: React.Dispatch<React.SetStateAction<Post>>; // ✅ ADDED
-  onEdit?: (post: Post) => Promise<void> | void;
-  onDelete?: (id: string) => Promise<void> | void;
-  onUpvote?: (id: string, userId: string, txId?: string) => Promise<any>;
+
+  setPost?: React.Dispatch<React.SetStateAction<Post | null>>;
+
+  onEdit?: () => Promise<void> | void;
+  onDelete?: () => Promise<void> | void;
+
+  onUpvote?: (id: string, userId: string, txId?: string) => Promise<void>;
+
   onAnswer?: (post: Post) => void;
+  onShare?: () => void;
+
   isSingle?: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // UI-only state (this is OK ✅)
+  // UI-only state (kept)
   const [shareOpen, setShareOpen] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
 
@@ -82,31 +89,15 @@ export default function PostItem({
 
           {/* TITLE */}
           {post.title && (
-            <h2
-              className="
-                font-semibold text-lg
-                text-gray-800 dark:text-gray-100
-                select-text
-                whitespace-normal
-                break-words
-              "
-            >
+            <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100 break-words">
               {post.postType === PostTypes.QUESTION && (
                 <span className="text-red-500">Q. </span>
               )}
-
               <Link
                 href={`/posts/${post._id}`}
                 scroll={false}
-                className="
-                  inline
-                  cursor-pointer
-                  hover:underline
-                  break-words
-                "
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
+                className="hover:underline"
+                onClick={(e) => e.stopPropagation()}
               >
                 {post.title}
               </Link>
@@ -120,21 +111,9 @@ export default function PostItem({
                 e.stopPropagation();
                 router.push(`/posts/${post._id}`, { scroll: false });
               }}
-              className="
-                block                     /* ✅ allow wrapping */
-                cursor-pointer
-                font-semibold text-lg
-                text-gray-800 dark:text-gray-100
-                hover:underline
-                select-text
-
-                break-words                /* ✅ normal word wrap */
-                break-all                  /* ✅ fallback for long strings */
-                whitespace-normal          /* ✅ multi-line */
-              "
+              className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline"
             >
               <span className="text-blue-500">A. </span>
-              {/* {post.parentId} */}
             </h2>
           )}
 
@@ -146,10 +125,13 @@ export default function PostItem({
 
           <PostFooter
             post={post}
-            setPost={setPost} // ✅ PASS DOWN
+            setPost={setPost}
             onUpvote={onUpvote}
             isSingle={isSingle}
-            onShare={() => setShareOpen(true)}
+            onShare={() => {
+              if (onShare) onShare(); // ✅ external hook
+              setShareOpen(true); // ✅ internal modal
+            }}
             onAnswer={() => onAnswer?.(post)}
           />
         </div>

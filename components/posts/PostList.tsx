@@ -3,7 +3,7 @@
 import type { Post } from "@/types/post";
 import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo } from "react";
 
 interface UpvoteResponse {
   ok: boolean;
@@ -32,7 +32,11 @@ export default function PostList({
   onAnswer,
   scrollContainerRef,
 }: Props) {
-  const safePosts: Post[] = Array.isArray(posts) ? posts : [];
+  // 🔧 FIX: stable reference for hooks
+  const safePosts = useMemo(
+    () => (Array.isArray(posts) ? posts : []),
+    [posts]
+  );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const restoredOnce = useRef(false);
@@ -91,11 +95,14 @@ export default function PostList({
     >
       {safePosts.map((post) => (
         <PostItem
-          key={post._id}
+          key={post._id}                 // ✅ FIX: key added
           post={post}
           onEdit={() => onEdit(post)}
-          onDelete={onDelete}
-          onUpvote={onUpvote}
+          onDelete={() => onDelete(post._id)}
+          onUpvote={(id, userId, _txId) => {
+            // discard return value intentionally
+            return onUpvote(id, userId).then(() => {});
+          }}
           onAnswer={onAnswer}
           scrollContainerRef={scrollContainerRef}
         />

@@ -1,15 +1,29 @@
 // app/api/posts/[id]/route.ts
 import clientPromise from "@/lib/mongodb";
-import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { ObjectId, Collection } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 
 export const runtime = "nodejs";
 
+type EnrichedCategory = {
+  id: string;
+  name: string;
+  jname: string;
+  myname: string;
+};
+
 /* ---------------------- AUTHOR RESOLVER ---------------------- */
-async function resolveAuthor(users: any, authorId?: string | null) {
+async function resolveAuthor(
+  users: Collection,
+  authorId?: string | null
+): Promise<{
+  name: string;
+  userId: string | null;
+  avatarUpdatedAt: Date | null;
+}> {
   if (!authorId) {
     return {
       name: "Anonymous",
@@ -45,14 +59,15 @@ async function resolveAuthor(users: any, authorId?: string | null) {
    GET — return enriched post
    =============================================================== */
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
 
-    if (!id || !ObjectId.isValid(id))
+    if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(null, { status: 400 });
+    }
 
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
@@ -66,11 +81,14 @@ export async function GET(
 
     const author = await resolveAuthor(users, post.authorId);
 
-    let populatedCategories: any[] = [];
+    let populatedCategories: EnrichedCategory[] = [];
 
     if (Array.isArray(post.categories)) {
       const catIds = post.categories
-        .filter((cid) => ObjectId.isValid(cid))
+        .filter(
+          (cid): cid is string =>
+            typeof cid === "string" && ObjectId.isValid(cid)
+        )
         .map((cid) => new ObjectId(cid));
 
       const cats = await categories
@@ -107,8 +125,8 @@ export async function GET(
    PUT — update post (title, content, categories, tags, SSE)
    =============================================================== */
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authConfig);
@@ -116,9 +134,11 @@ export async function PUT(
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const id = params.id;
-    if (!id || !ObjectId.isValid(id))
+    const { id } = await params;
+
+    if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
 
     const { title, content, categories, tags, txId = null } = await req.json();
 
@@ -130,19 +150,26 @@ export async function PUT(
     const categoriesColl = db.collection("categories");
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
-    if (!existing)
+    if (!existing) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
-    if (existing.authorId !== session.user.uid)
+    if (existing.authorId !== session.user.uid) {
       return new Response("Forbidden", { status: 403 });
+    }
 
-    const updateFields: any = {};
+    const updateFields: Record<string, unknown> = {};
 
     if (title !== undefined) updateFields.title = title;
     if (content !== undefined) updateFields.content = content;
 
     if (Array.isArray(categories)) {
-      updateFields.categories = categories.map((cid) => new ObjectId(cid));
+      updateFields.categories = categories
+        .filter(
+          (cid): cid is string =>
+            typeof cid === "string" && ObjectId.isValid(cid)
+        )
+        .map((cid) => new ObjectId(cid));
     }
 
     if (Array.isArray(tags)) {
@@ -160,12 +187,19 @@ export async function PUT(
     const author = await resolveAuthor(users, updated?.authorId);
 
     /* ----------- Enrich categories ----------- */
-    let enrichedCategories: any[] = [];
+    let enrichedCategories: EnrichedCategory[] = [];
 
     if (Array.isArray(updated?.categories)) {
       const catDocs = await categoriesColl
         .find({
-          _id: { $in: updated.categories.map((cid: any) => new ObjectId(cid)) },
+          _id: {
+            $in: updated.categories
+              .filter(
+                (cid): cid is string =>
+                  typeof cid === "string" && ObjectId.isValid(cid)
+              )
+              .map((cid) => new ObjectId(cid)),
+          },
         })
         .toArray();
 
@@ -182,7 +216,7 @@ export async function PUT(
       _id: String(updated?._id),
       authorName: author.name,
       authorUserId: author.userId,
-      authorAvatar: author.avatarUpdatedAt,
+      authorAvatarUpdatedAt: author.avatarUpdatedAt,
       categories: enrichedCategories,
       tags: updated?.tags ?? [],
     };

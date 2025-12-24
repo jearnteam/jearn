@@ -2,22 +2,45 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
+type RequestBody = {
+  categoryIds?: unknown;
+};
+
+type UsageResult = {
+  _id: ObjectId;
+  count: number;
+};
+
 export async function POST(req: Request) {
   try {
-    const { categoryIds } = await req.json();
+    const body: unknown = await req.json();
 
-    // Expect ObjectId strings
-    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !Array.isArray((body as RequestBody).categoryIds)
+    ) {
       return NextResponse.json({ usage: {} });
     }
 
-    const ids = categoryIds.map((id) => new ObjectId(id));
+    const categoryIds = (body as RequestBody).categoryIds as unknown[];
+
+    // 🔒 Narrow + validate ObjectIds
+    const ids = categoryIds
+      .filter(
+        (id): id is string =>
+          typeof id === "string" && ObjectId.isValid(id)
+      )
+      .map((id) => new ObjectId(id));
+
+    if (ids.length === 0) {
+      return NextResponse.json({ usage: {} });
+    }
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    // Count matching categories inside posts
-    const results = await db
+    const results = (await db
       .collection("posts")
       .aggregate([
         { $match: { categories: { $in: ids } } },
@@ -26,11 +49,11 @@ export async function POST(req: Request) {
         {
           $group: {
             _id: "$categories",
-            count: { $sum: 1 }
-          }
-        }
+            count: { $sum: 1 },
+          },
+        },
       ])
-      .toArray();
+      .toArray()) as UsageResult[];
 
     // Build usage object EXACTLY as page expects
     const usage: Record<string, number> = {};
@@ -40,7 +63,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ usage });
   } catch (err) {
-    console.error(err);
+    console.error("❌ category usage error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

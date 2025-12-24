@@ -4,9 +4,13 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
 
+/* -------------------------------------------------
+ * Cloudflare R2 client
+ * ------------------------------------------------ */
 const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -16,6 +20,11 @@ const r2 = new S3Client({
   },
 });
 
+type ImageMeta = {
+  width?: number;
+  height?: number;
+};
+
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authConfig);
@@ -24,54 +33,58 @@ export async function POST(req: Request) {
     }
 
     const form = await req.formData();
-    const file = form.get("file") as File | null;
+    const fileEntry = form.get("file");
 
-    if (!file) {
+    if (!(fileEntry instanceof File)) {
       return NextResponse.json(
         { ok: false, error: "Missing file" },
         { status: 400 }
       );
     }
 
-    // Convert file to real Node.js Buffer
-    const ab = await file.arrayBuffer();
-    const buffer = Buffer.from(ab as ArrayBuffer);
-    const input = buffer as unknown as Buffer;
+    const file = fileEntry;
 
-    const mime = file.type; // image/png, image/jpeg, image/gif, etc.
-    const originalExt = mime.split("/")[1]; // png, jpeg, gif, webp
+    /* ---------------------------------------------------------
+     * Convert to Node.js Buffer (SAFE)
+     * ------------------------------------------------------- */
+    const buffer = Buffer.from(await file.arrayBuffer());
 
-    let outputBuffer = input;
-    let outputMime = mime;
+    const mime = file.type; // image/png, image/jpeg, image/gif, image/webp, image/svg+xml
+    const originalExt = mime.split("/")[1] || "png";
+
+    let outputBuffer: Buffer = buffer;
+    let outputMime: string = mime;
 
     const isGIF = mime === "image/gif";
     const isSVG = mime === "image/svg+xml";
 
     /* ---------------------------------------------------------
-     * 🔵 Resize/optimize all images EXCEPT GIF + SVG
-     * --------------------------------------------------------- */
+     * Resize/optimize all images EXCEPT GIF + SVG
+     * ------------------------------------------------------- */
     if (!isGIF && !isSVG) {
       try {
-        outputBuffer = await sharp(input)
+        outputBuffer = await sharp(buffer)
           .rotate()
           .resize(2000, 2000, { fit: "inside" })
           .toBuffer();
-      } catch (err) {
-        outputBuffer = input; // fallback to original
+      } catch {
+        outputBuffer = buffer; // fallback
       }
     }
 
     /* ---------------------------------------------------------
-     * 🔵 HEIC/HEIF → convert to JPEG (required)
-     * --------------------------------------------------------- */
+     * HEIC / HEIF → JPEG
+     * ------------------------------------------------------- */
     if (mime.includes("heic") || mime.includes("heif")) {
-      outputBuffer = await sharp(input).jpeg({ quality: 90 }).toBuffer();
+      outputBuffer = await sharp(buffer)
+        .jpeg({ quality: 90 })
+        .toBuffer();
       outputMime = "image/jpeg";
     }
 
     /* ---------------------------------------------------------
-     * 🔵 Determine correct extension
-     * --------------------------------------------------------- */
+     * Determine correct extension
+     * ------------------------------------------------------- */
     const ext =
       outputMime === "image/jpeg"
         ? "jpg"
@@ -81,14 +94,14 @@ export async function POST(req: Request) {
         ? "webp"
         : outputMime === "image/gif"
         ? "gif"
-        : originalExt || "png";
+        : originalExt;
 
     const id = crypto.randomUUID();
     const key = `posts/${id}.${ext}`;
 
     /* ---------------------------------------------------------
-     * 🔵 Upload to R2
-     * --------------------------------------------------------- */
+     * Upload to R2
+     * ------------------------------------------------------- */
     await r2.send(
       new PutObjectCommand({
         Bucket: process.env.R2_BUCKET_NAME!,
@@ -102,15 +115,20 @@ export async function POST(req: Request) {
     const url = `${CDN}/${key}`;
 
     /* ---------------------------------------------------------
-     * 🔵 Get metadata (width/height)
-     * --------------------------------------------------------- */
-    let meta: any = {};
+     * Metadata (width / height)
+     * ------------------------------------------------------- */
+    let meta: ImageMeta = {};
 
     if (!isGIF && !isSVG) {
       try {
-        const m = await sharp(outputBuffer as unknown as Buffer).metadata();
-        meta = { width: m.width, height: m.height };
-      } catch {}
+        const m = await sharp(outputBuffer).metadata();
+        meta = {
+          width: m.width,
+          height: m.height,
+        };
+      } catch {
+        // ignore
+      }
     }
 
     return NextResponse.json({

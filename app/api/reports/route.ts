@@ -1,22 +1,45 @@
 // app/api/reports/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
+import { ObjectId, WithId, Document } from "mongodb";
 
 export const runtime = "nodejs";
 
 /* ---------------------------------------------------------
-   GET — Fetch ALL reports
---------------------------------------------------------- */
+ * Types
+ * ------------------------------------------------------- */
+type ReporterEntry = {
+  userId: string;
+  reason: string;
+  date: Date;
+};
+
+type ReportDoc = {
+  postId: string;
+  status: "pending" | "resolved" | "rejected";
+  reporters: ReporterEntry[];
+  createdAt: Date;
+};
+
+/* ---------------------------------------------------------
+ * GET — Fetch ALL reports
+ * ------------------------------------------------------- */
 export async function GET() {
-  // TODO: add auth(admin?)
+  // TODO: add auth (admin)
   try {
     const client = await clientPromise;
     const db = client.db("jearn");
-    const reports = db.collection("reports");
+    const reports = db.collection<ReportDoc>("reports");
 
     const docs = await reports.find({}).sort({ createdAt: -1 }).toArray();
 
-    return NextResponse.json(docs);
+    // Normalize _id for client safety
+    const normalized = docs.map((d: WithId<ReportDoc>) => ({
+      ...d,
+      _id: d._id.toString(),
+    }));
+
+    return NextResponse.json(normalized);
   } catch (err) {
     console.error("❌ GET /api/reports error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -24,36 +47,55 @@ export async function GET() {
 }
 
 /* ---------------------------------------------------------
-   POST — Create / Merge Report
-   - one report per post
-   - reporters[] array
-   - prevent duplicate report from same user
---------------------------------------------------------- */
-/* ---------- POST: Create or append a report ---------- */
-export async function POST(req: Request) {
-  // TODO: add auth
-  try {
-    const { postId, reporterId, reason } = await req.json();
+ * POST — Create / Merge Report
+ * ------------------------------------------------------- */
+type CreateReportBody = {
+  postId: string;
+  reporterId: string;
+  reason: string;
+};
 
-    if (!postId || !reporterId || !reason)
+function isCreateReportBody(body: unknown): body is CreateReportBody {
+  if (!body || typeof body !== "object") return false;
+
+  const b = body as Record<string, unknown>;
+
+  return (
+    typeof b.postId === "string" &&
+    typeof b.reporterId === "string" &&
+    typeof b.reason === "string"
+  );
+}
+
+export async function POST(req: Request) {
+  try {
+    const body: unknown = await req.json();
+
+    if (!isCreateReportBody(body)) {
       return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+    }
+
+    const { postId, reporterId, reason } = body;
+
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      return NextResponse.json({ error: "Reason required" }, { status: 400 });
+    }
 
     const client = await clientPromise;
     const db = client.db("jearn");
-    const reports = db.collection("reports");
+    const reports = db.collection<ReportDoc>("reports");
 
-    // 🔍 Check if report exists for that post
     const existing = await reports.findOne({ postId });
 
     if (!existing) {
-      // FIRST report for this post
-      const doc = {
+      const doc: ReportDoc = {
         postId,
         status: "pending",
         reporters: [
           {
             userId: reporterId,
-            reason: reason.trim(),
+            reason: trimmedReason,
             date: new Date(),
           },
         ],
@@ -68,25 +110,23 @@ export async function POST(req: Request) {
       });
     }
 
-    // 🔥 If this user already reported → reject with 409
-    if (existing.reporters.some((r: any) => r.userId === reporterId)) {
+    if (existing.reporters.some((r) => r.userId === reporterId)) {
       return NextResponse.json(
         { error: "Already reported by this user" },
         { status: 409 }
       );
     }
 
-    // Otherwise → push as a new reporter
     await reports.updateOne(
       { _id: existing._id },
       {
         $push: {
           reporters: {
             userId: reporterId,
-            reason: reason.trim(),
+            reason: trimmedReason,
             date: new Date(),
           },
-        } as any,
+        },
       }
     );
 

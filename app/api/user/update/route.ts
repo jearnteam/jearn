@@ -9,9 +9,9 @@ import { authConfig } from "@/features/auth/auth";
 
 export const runtime = "nodejs";
 
-// -------------------------------------------------
-// Cloudflare R2 client
-// -------------------------------------------------
+/* -------------------------------------------------
+ * Cloudflare R2 client
+ * ------------------------------------------------ */
 const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
@@ -30,28 +30,44 @@ export async function POST(req: NextRequest) {
 
     const form = await req.formData();
 
-    const user_id = form.get("user_id") as string | null;
-    const name = (form.get("name") as string | null) ?? "";
-    const userId = (form.get("userId") as string | null) ?? "";
-    const bio = (form.get("bio") as string | null) ?? "";
-    const file = form.get("picture") as File | null;
+    const user_id_raw = form.get("user_id");
+    const name_raw = form.get("name");
+    const userId_raw = form.get("userId");
+    const bio_raw = form.get("bio");
+    const file = form.get("picture");
 
-    if (!user_id) {
+    if (typeof user_id_raw !== "string") {
       return NextResponse.json(
         { ok: false, error: "Missing user_id" },
         { status: 400 }
       );
     }
-    if (user_id !== session.user.uid) {
-      return NextResponse.json({ error: "Incorrect user_id" }, { status: 400 });
+
+    if (!ObjectId.isValid(user_id_raw)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid user_id" },
+        { status: 400 }
+      );
     }
+
+    if (user_id_raw !== session.user.uid) {
+      return NextResponse.json(
+        { ok: false, error: "Incorrect user_id" },
+        { status: 400 }
+      );
+    }
+
+    const user_id = user_id_raw;
+    const name = typeof name_raw === "string" ? name_raw : "";
+    const userId = typeof userId_raw === "string" ? userId_raw : "";
+    const bio = typeof bio_raw === "string" ? bio_raw : "";
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    // -------------------------------------------------
-    // Name & UserID validation
-    // -------------------------------------------------
+    /* -------------------------------------------------
+     * Name & UserID validation
+     * ------------------------------------------------ */
     if (name.length < 4 || name.length > 32) {
       return NextResponse.json(
         { ok: false, error: "Name must be 4–32 characters" },
@@ -59,7 +75,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let userIdUpdate: any = {};
+    const userIdUpdate: Record<string, unknown> = {};
+
     if (userId) {
       if (userId.length < 3 || userId.length > 32) {
         return NextResponse.json(
@@ -83,24 +100,24 @@ export async function POST(req: NextRequest) {
       userIdUpdate.userId = userId;
     }
 
-    // -------------------------------------------------
-    // Avatar upload → ALWAYS convert to WEBP
-    // -------------------------------------------------
-    let pictureUpdate: any = {};
+    /* -------------------------------------------------
+     * Avatar upload → ALWAYS convert to WEBP
+     * ------------------------------------------------ */
+    const pictureUpdate: Record<string, unknown> = {};
 
-    if (file && file.size > 0) {
+    if (file instanceof File && file.size > 0) {
       try {
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        const processed = await sharp(buffer, { animated: true }) // ⭐ IMPORTANT
+        const processed = await sharp(buffer, { animated: true })
           .resize(256, 256, {
             fit: "cover",
             position: "center",
           })
           .webp({
             quality: 80,
-            effort: 4, // good compression
-            loop: 0, // infinite loop for animated webp
+            effort: 4,
+            loop: 0,
           })
           .toBuffer();
 
@@ -123,9 +140,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // -------------------------------------------------
-    // Update DB
-    // -------------------------------------------------
+    /* -------------------------------------------------
+     * Update DB
+     * ------------------------------------------------ */
     const updateData = {
       name,
       bio,
@@ -136,11 +153,17 @@ export async function POST(req: NextRequest) {
 
     await db
       .collection("users")
-      .updateOne({ _id: new ObjectId(user_id) }, { $set: updateData });
+      .updateOne(
+        { _id: new ObjectId(user_id) },
+        { $set: updateData }
+      );
 
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("update error:", err);
-    return NextResponse.json({ ok: false, error: "Server error" });
+    return NextResponse.json(
+      { ok: false, error: "Server error" },
+      { status: 500 }
+    );
   }
 }

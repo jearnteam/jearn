@@ -1,10 +1,20 @@
 // app/api/posts/byUser/[id]/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { ObjectId, Collection, WithId, Document } from "mongodb";
 
-/* ---------------------- AUTHOR RESOLVER ---------------------- */
-async function resolveAuthor(users: any, authorId?: string | null) {
+/* -------------------------------------------------------------
+ * AUTHOR RESOLVER
+ * ----------------------------------------------------------- */
+async function resolveAuthor(
+  users: Collection,
+  authorId?: string | null
+): Promise<{
+  name: string;
+  userId: string | null;
+  avatarUpdatedAt: Date | null;
+  email: string | null;
+}> {
   if (!authorId) {
     return {
       name: "Anonymous",
@@ -14,7 +24,7 @@ async function resolveAuthor(users: any, authorId?: string | null) {
     };
   }
 
-  let user = null;
+  let user: WithId<Document> | null = null;
 
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
@@ -31,19 +41,33 @@ async function resolveAuthor(users: any, authorId?: string | null) {
   }
 
   return {
-    name: user?.name ?? "Anonymous",
-    userId: user?.userId ?? null,
-    avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
-    email: user?.email ?? null,
+    name: (user?.name as string | undefined) ?? "Anonymous",
+    userId: (user?.userId as string | undefined) ?? null,
+    avatarUpdatedAt: (user?.avatarUpdatedAt as Date | undefined) ?? null,
+    email: (user?.email as string | undefined) ?? null,
   };
 }
 
-/* ---------------------- CATEGORY ENRICHER ---------------------- */
-async function enrichCategories(catIds: any[], categoriesColl: any) {
+/* -------------------------------------------------------------
+ * CATEGORY ENRICHER
+ * ----------------------------------------------------------- */
+type EnrichedCategory = {
+  id: string;
+  name: string;
+  jname: string;
+  myname: string;
+};
+
+async function enrichCategories(
+  catIds: unknown[],
+  categoriesColl: Collection
+): Promise<EnrichedCategory[]> {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .filter((c) => ObjectId.isValid(c))
+    .filter(
+      (c): c is string => typeof c === "string" && ObjectId.isValid(c)
+    )
     .map((c) => new ObjectId(c));
 
   if (!validIds.length) return [];
@@ -53,8 +77,8 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
     .project({ name: 1, jname: 1, myname: 1 })
     .toArray();
 
-  return docs.map((c: any) => ({
-    id: String(c._id),
+  return docs.map((c) => ({
+    id: c._id.toString(),
     name: c.name ?? "",
     jname: c.jname ?? "",
     myname: c.myname ?? "",
@@ -62,13 +86,13 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
 }
 
 /* ===============================================================
-   GET — posts by user (PAGINATED, 10 BY 10)
-   =============================================================== */
+ * GET — posts by user (PAGINATED)
+ * ============================================================= */
 export async function GET(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const authorId = params.id;
+  const { id: authorId } = await params;
 
   if (!authorId) {
     return NextResponse.json(
@@ -79,7 +103,7 @@ export async function GET(
 
   try {
     const { searchParams } = new URL(req.url);
-    const limit = Number(searchParams.get("limit") ?? 10);
+    const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
 
     const client = await clientPromise;
@@ -100,7 +124,7 @@ export async function GET(
       !!author.email && adminEmails.includes(author.email);
 
     /* -------- Build query -------- */
-    const query: any = {
+    const query: Record<string, unknown> = {
       authorId,
       parentId: null,
     };
@@ -125,14 +149,14 @@ export async function GET(
 
     /* -------- Enrich posts -------- */
     const enrichedPosts = await Promise.all(
-      page.map(async (post: any) => {
+      page.map(async (post: WithId<Document>) => {
         const categories = await enrichCategories(
           Array.isArray(post.categories) ? post.categories : [],
           categoriesColl
         );
 
         return {
-          _id: String(post._id),
+          _id: post._id.toString(),
           title: post.title,
           content: post.content,
           createdAt: post.createdAt,

@@ -5,12 +5,21 @@ import { MathRenderer } from "@/components/math/MathRenderer";
 import { ArrowBigUp } from "lucide-react";
 import dayjs from "dayjs";
 
+interface CommentPopupData {
+  _id: string;
+  authorName: string;
+  authorAvatar?: string;
+  createdAt: string | Date;
+  content: string;
+  upvoteCount?: number;
+}
+
 export default function CommentPopup({
   comment,
   onClose,
   onUpvote,
 }: {
-  comment: any;
+  comment: CommentPopupData;
   onClose: () => void;
   onUpvote: (id: string) => Promise<void>;
 }) {
@@ -35,9 +44,11 @@ export default function CommentPopup({
         {/* Header */}
         <div className="flex items-center gap-3">
           <img
-            src={comment.authorAvatar}
+            src={comment.authorAvatar ?? "/default-avatar.png"}
+            alt={comment.authorName}
             className="w-9 h-9 rounded-full border border-gray-300 dark:border-neutral-700"
           />
+
           <div>
             <p className="font-semibold">{comment.authorName}</p>
             <p className="text-xs text-gray-500">

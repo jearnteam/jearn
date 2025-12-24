@@ -1,15 +1,21 @@
-import { NextResponse } from "next/server";
+// app/api/images/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { GridFSBucket, ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    return new Response("Outdated image", { status: 503 });
-    /*
-    const { id } = params;
+    const { id } = await params;
 
+    // 🔒 Temporary disable
+    return new Response("Outdated image", { status: 503 });
+
+    /*
     if (!id || id === "undefined") {
       return new Response("Invalid ID", { status: 400 });
     }

@@ -20,7 +20,7 @@ function setupLazyImages(container: HTMLElement) {
     const FAILED_IMAGE_CACHE = new Set<string>();
 
     // Calculate preview height but DO NOT render any padding box.
-    let previewHeight = height > 0 ? Math.min(height, 400) : 400;
+    const previewHeight = height > 0 ? Math.min(height, 400) : 400;
 
     // Tell PostItem a preview height exists
     el.dispatchEvent(
@@ -102,8 +102,9 @@ function setupLazyImages(container: HTMLElement) {
  * ---------------------------------------------------------- */
 function renderMath(el: HTMLElement) {
   const nodes = el.querySelectorAll("span[data-type='math']");
-  nodes.forEach((span: any) => {
-    let latex =
+  nodes.forEach((span) => {
+    const el = span as HTMLElement;
+    const latex =
       span.getAttribute("data-latex") ||
       span.getAttribute("latex") ||
       span.textContent ||
@@ -146,7 +147,6 @@ function styleMentions(el: HTMLElement) {
     );
   });
 }
-
 
 function setupMentions(el: HTMLElement) {
   let popup: HTMLElement | null = null;
@@ -203,7 +203,13 @@ function setupMentions(el: HTMLElement) {
       popup.style.top = rect.bottom + 8 + "px";
       popup.style.left = rect.left + "px";
 
-      let user: any = null;
+      let user: {
+        userId?: string;
+        name?: string;
+        bio?: string;
+        picture?: string;
+      } | null = null;
+
       try {
         const res = await fetch(`/api/user/by-uid/${uid}`);
         const data = await res.json();

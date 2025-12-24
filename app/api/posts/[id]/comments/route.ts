@@ -1,42 +1,81 @@
 // app/api/posts/[id]/comments/route.ts
 import clientPromise from "@/lib/mongodb";
-import { NextResponse } from "next/server";
-import { ObjectId } from "mongodb";
+import { NextRequest, NextResponse } from "next/server";
+import { ObjectId, Collection, WithId, Document } from "mongodb";
 
 export const runtime = "nodejs";
 
-// reuse same author resolver inline
-async function resolveAuthor(users: any, authorId?: string | null) {
-  if (!authorId) return { name: "Anonymous", avatar: null, avatarId: null };
-  let user = null;
+/* -------------------------------------------------------------
+ * AUTHOR RESOLVER (STRICT, REUSABLE SHAPE)
+ * ----------------------------------------------------------- */
+async function resolveAuthor(
+  users: Collection,
+  authorId?: string | null
+): Promise<{
+  name: string;
+  userId: string | null;
+}> {
+  if (!authorId) {
+    return { name: "Anonymous", userId: null };
+  }
+
+  let user: WithId<Document> | null = null;
+
+  // 1️⃣ ObjectId
   if (ObjectId.isValid(authorId)) {
-    user = await users.findOne({ _id: new ObjectId(authorId) }, { projection: { name: 1, userId: 1 } });
+    user = await users.findOne(
+      { _id: new ObjectId(authorId) },
+      { projection: { name: 1, userId: 1 } }
+    );
   }
+
+  // 2️⃣ provider_id fallback
   if (!user) {
-    user = await users.findOne({ provider_id: authorId }, { projection: { name: 1, userId: 1 } });
+    user = await users.findOne(
+      { provider_id: authorId },
+      { projection: { name: 1, userId: 1 } }
+    );
   }
-  // const avatarId = user?._id ? String(user._id) : (ObjectId.isValid(authorId) ? authorId : null);
-  // const avatar = avatarId ? `/api/user/avatar/${avatarId}?t=${Date.now()}` : null;
-  return { name: user?.name ?? "Anonymous", userId: user?.userId, /*avatar, avatarId*/ };
+
+  return {
+    name: (user?.name as string | undefined) ?? "Anonymous",
+    userId: (user?.userId as string | undefined) ?? null,
+  };
 }
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+/* -------------------------------------------------------------
+ * GET COMMENTS FOR POST
+ * ----------------------------------------------------------- */
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
+    const { id: postId } = await params;
+
+    if (!postId || !ObjectId.isValid(postId)) {
+      return NextResponse.json([], { status: 400 });
+    }
+
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");
 
-    const docs = await posts.find({ parentId: params.id }).sort({ createdAt: 1 }).toArray();
+    const docs = await posts
+      .find({ parentId: postId })
+      .sort({ createdAt: 1 })
+      .toArray();
+
     const enriched = await Promise.all(
-      docs.map(async (c: any) => {
-        const a = await resolveAuthor(users, c.authorId);
+      docs.map(async (c: WithId<Document>) => {
+        const author = await resolveAuthor(users, c.authorId as string | null);
+
         return {
           ...c,
           _id: c._id.toString(),
-          authorName: a.name,
-          authorUserId: a.userId,
-          authorAvatar: a.avatar,
+          authorName: author.name,
+          authorUserId: author.userId,
         };
       })
     );

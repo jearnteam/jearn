@@ -23,7 +23,7 @@ function toBurmeseDigits(input: string | number): string {
 }
 
 // Relative time
-const relativeTime: any = {
+const relativeTime = {
   future: "%sအတွင်း",
   past: "%s",
   s: "စက္ကန့်အနည်းငယ်က",
@@ -47,8 +47,8 @@ const relativeTime: any = {
 // Register only Burmese locale
 dayjs.locale("my", {
   name: "my",
-  relativeTime,
-} as any);
+  ...relativeTime,
+});
 
 // ❗ Export nothing — just registering the locale
 export {};

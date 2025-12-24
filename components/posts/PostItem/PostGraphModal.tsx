@@ -3,6 +3,7 @@
 import FullScreenPortal from "@/features/FullScreenPortal";
 import GraphView from "@/components/graphview/GraphView";
 import type { Post } from "@/types/post";
+import { PostTypes } from "@/types/post";
 
 export default function PostGraphModal({
   open,
@@ -14,6 +15,29 @@ export default function PostGraphModal({
   onClose: () => void;
 }) {
   if (!open) return null;
+
+  /**
+   * 🔧 NORMALIZE Post → GraphPost
+   * GraphView requires a strict GraphPost shape.
+   */
+  const graphPost = {
+    _id: post._id,
+
+    // title must ALWAYS exist for graph
+    title:
+      post.title ??
+      (post.postType === PostTypes.ANSWER ? "Answer" : "Untitled Post"),
+
+    // ✅ align with real Post type
+    authorId: post.authorId,
+    authorName: post.authorName ?? "Unknown",
+
+    // GraphView REQUIRES arrays
+    tags: post.tags ?? [],
+    categories: (post.categories ?? []).map((c) => ({
+      name: c.name || c.jname || c.myname || "Category",
+    })),
+  };
 
   return (
     <FullScreenPortal>
@@ -33,7 +57,7 @@ export default function PostGraphModal({
           </button>
 
           <div className="w-full h-full border border-blue-500 overflow-auto">
-            <GraphView post={post} />
+            <GraphView post={graphPost} />
           </div>
         </div>
       </div>

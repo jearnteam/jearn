@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server";
+// app/api/user/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
 
     if (!ObjectId.isValid(id)) {
       return NextResponse.json(
@@ -26,7 +27,7 @@ export async function GET(
           name: 1,
           userId: 1,
           bio: 1,
-          avatarR2Key: 1, // optional: if you stored R2 key
+          avatarR2Key: 1, // optional: if stored
           picture: 1, // backward compatibility
         },
       }
@@ -42,14 +43,12 @@ export async function GET(
     // -------------------------------------------------------------------------
     // ⭐ AVATAR LOGIC (R2 CDN)
     // -------------------------------------------------------------------------
-    let avatarUrl: string | null = null;
+    let avatarUrl: string;
 
     if (user.avatarR2Key) {
-      // If you store the R2 key directly in DB
-      avatarUrl = `${process.env.R2_PUBLIC_URL}/${user.avatarR2Key}?t=${new Date().getTime()}`;
+      avatarUrl = `${process.env.R2_PUBLIC_URL}/${user.avatarR2Key}?t=${Date.now()}`;
     } else {
-      // Fallback: predictable R2 path
-      avatarUrl = `${process.env.R2_PUBLIC_URL}/avatars/${id}.webp?t=${new Date().getTime()}`;
+      avatarUrl = `${process.env.R2_PUBLIC_URL}/avatars/${id}.webp?t=${Date.now()}`;
     }
 
     return NextResponse.json({
@@ -63,7 +62,7 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error("Error in /api/user/[id]:", err);
+    console.error("❌ GET /api/user/[id]:", err);
     return NextResponse.json(
       { ok: false, error: "Server error" },
       { status: 500 }

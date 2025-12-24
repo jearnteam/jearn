@@ -14,40 +14,55 @@ import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
 import i18n from "@/lib/i18n";
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 dayjs.extend(relativeTime);
 
 export default function PostFooter({
   post,
-  setPost, // ← now optional
+  setPost,
   onUpvote,
   isSingle,
   onShare,
   onAnswer,
 }: {
   post: Post;
-  setPost?: React.Dispatch<React.SetStateAction<Post>>;
-  onUpvote?: (id: string, userId: string, txId?: string) => Promise<any>;
+  setPost?: React.Dispatch<React.SetStateAction<Post | null>>;
+  onUpvote?: (id: string, userId: string, txId?: string) => Promise<void>;
   isSingle?: boolean;
-  onShare: () => void;
-  onAnswer: () => void;
+
+  /** Optional actions (safe defaults below) */
+  onShare?: () => void;
+  onAnswer?: () => void;
 }) {
   const { user } = useCurrentUser();
   const userId = user?._id;
   const { t } = useTranslation();
 
   /* -------------------------------------------------
-   * LOCAL RENDER STATE (memo / safety)
+   * SAFE FALLBACK HANDLERS (do not remove)
    * ------------------------------------------------- */
+  const safeShare = useCallback(() => {
+    if (onShare) onShare();
+  }, [onShare]);
+
+  const safeAnswer = useCallback(() => {
+    if (onAnswer) onAnswer();
+  }, [onAnswer]);
+
+  /* -------------------------------------------------
+   * LOCAL RENDER STATE (optimistic)
+   * ------------------------------------------------- */
+  const upvoterIds = (post.upvoters ?? []).map(String);
+
   const [localCount, setLocalCount] = useState(post.upvoteCount ?? 0);
   const [localUpvoted, setLocalUpvoted] = useState(
-    !!userId && post.upvoters?.includes(userId)
+    !!userId && upvoterIds.includes(userId)
   );
 
   useEffect(() => {
     setLocalCount(post.upvoteCount ?? 0);
-    setLocalUpvoted(!!userId && post.upvoters?.includes(userId));
+    setLocalUpvoted(!!userId && upvoterIds.includes(userId));
   }, [post.upvoteCount, post.upvoters, userId]);
 
   function handleUpvote(e: React.MouseEvent) {
@@ -58,18 +73,21 @@ export default function PostFooter({
     setLocalCount((c) => c + (localUpvoted ? -1 : 1));
     setLocalUpvoted((v) => !v);
 
-    // ✅ optimistic parent state (ONLY if available)
+    // ✅ optimistic parent state (null-safe)
     if (setPost) {
       setPost((prev) => {
-        const hasUpvoted = prev.upvoters?.includes(userId);
+        if (!prev) return prev;
+
+        const upvoters = (prev.upvoters ?? []).map(String);
+        const hasUpvoted = upvoters.includes(userId);
 
         return {
           ...prev,
           upvoteCount:
             (prev.upvoteCount ?? 0) + (hasUpvoted ? -1 : 1),
           upvoters: hasUpvoted
-            ? prev.upvoters?.filter((id) => id !== userId)
-            : [...(prev.upvoters ?? []), userId],
+            ? upvoters.filter((id) => id !== userId)
+            : [...upvoters, userId],
         };
       });
     }
@@ -132,7 +150,7 @@ export default function PostFooter({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onShare();
+                safeShare();
               }}
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
@@ -147,7 +165,7 @@ export default function PostFooter({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onAnswer?.();
+              safeAnswer();
             }}
             className="absolute left-1/2 -translate-x-1/2 border border-slate-600 px-3 py-1 rounded text-xs hover:bg-slate-100 dark:hover:bg-neutral-800"
           >

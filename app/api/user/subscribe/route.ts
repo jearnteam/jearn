@@ -1,17 +1,19 @@
-//@/app/api/subscribe/route.ts
+// @/app/api/subscribe/route.ts
 import { NextRequest } from "next/server";
-import { ObjectId } from "mongodb";
+import { ObjectId, ChangeStreamDocument, WithId, Document } from "mongodb";
 import clientPromise from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const user_id = searchParams.get("id");
+  const userId = searchParams.get("id");
 
-  if (!user_id) {
-    return new Response("Missing user _id", { status: 400 });
+  if (!userId || !ObjectId.isValid(userId)) {
+    return new Response("Invalid user _id", { status: 400 });
   }
+
+  const userObjId = new ObjectId(userId);
 
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
@@ -28,9 +30,7 @@ export async function GET(req: NextRequest) {
       controller.enqueue(`: connected\n\n`);
       controller.enqueue(`data: {"status":"connected"}\n\n`);
 
-      const pipeline = [
-        { $match: { "documentKey._id": new ObjectId(user_id) } },
-      ];
+      const pipeline = [{ $match: { "documentKey._id": userObjId } }];
 
       const changeStream = users.watch(pipeline, {
         fullDocument: "updateLookup",
@@ -41,23 +41,32 @@ export async function GET(req: NextRequest) {
         controller.enqueue(`: ping\n\n`);
       }, 15_000);
 
-      // 🔥 Avatar CDN URL (no more MongoDB avatar)
-      const CDN_URL = process.env.R2_PUBLIC_URL; // e.g., https://cdn.jearn.site
+      const CDN_URL = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
 
-      changeStream.on("change", (change: any) => {
-        const doc = change.fullDocument;
-        if (!doc) return;
+      changeStream.on(
+        "change",
+        (change: ChangeStreamDocument<WithId<Document>>) => {
+          if (
+            change.operationType !== "insert" &&
+            change.operationType !== "update" &&
+            change.operationType !== "replace"
+          ) {
+            return;
+          }
 
-        const payload = {
-          name: doc.name,
-          userId: doc.userId,
-          bio: doc.bio,
-          // 🔥 CDN avatar with cache-busting query
-          avatar: `${CDN_URL}/avatars/${user_id}.webp?t=${Date.now()}`,
-        };
+          const doc = change.fullDocument;
+          if (!doc) return;
 
-        controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`);
-      });
+          const payload = {
+            name: doc.name,
+            userId: doc.userId,
+            bio: doc.bio,
+            avatar: `${CDN_URL}/avatars/${userId}.webp?t=${Date.now()}`,
+          };
+
+          controller.enqueue(`data: ${JSON.stringify(payload)}\n\n`);
+        }
+      );
 
       req.signal.addEventListener("abort", () => {
         clearInterval(keepAlive);

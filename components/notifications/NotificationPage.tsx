@@ -9,13 +9,18 @@ import { useTranslation } from "react-i18next";
  * TYPES
  * ------------------------------------------- */
 export type Notification = {
-  lastActorName: string;
-  postPreview?: string;
   _id: string;
   type: "post_like" | "comment" | "mention" | "system";
+
+  lastActorName: string;
+  lastActorId?: string;
+  lastActorAvatar?: string;
+
+  postPreview?: string;
   count?: number;
-  updatedAt?: string;
+
   createdAt: string;
+  updatedAt?: string;
   read?: boolean;
 };
 
@@ -137,13 +142,12 @@ function NotificationItem({
       {/* AVATAR */}
       <img
         src={
-          (notification as any).lastActorAvatar ||
-          ((notification as any).lastActorId
-            ? `https://cdn.jearn.site/avatars/${
-                (notification as any).lastActorId
-              }.webp`
+          notification.lastActorAvatar ||
+          (notification.lastActorId
+            ? `https://cdn.jearn.site/avatars/${notification.lastActorId}.webp`
             : "/default-avatar.png")
         }
+        alt={notification.lastActorName}
         className="w-9 h-9 rounded-full flex-shrink-0 mt-0.5"
       />
 

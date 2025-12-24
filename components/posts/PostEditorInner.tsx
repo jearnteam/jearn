@@ -3,13 +3,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
-
 import Placeholder from "@tiptap/extension-placeholder";
 
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 
 import { Plugin, PluginKey } from "prosemirror-state";
+import type { Node as ProseMirrorNode } from "prosemirror-model";
 
 import Underline from "@tiptap/extension-underline";
 import Strike from "@tiptap/extension-strike";
@@ -32,7 +32,7 @@ import { ImagePlaceholder } from "@/features/ImagePlaceholder";
 import { CursorExitFix } from "@/features/CursorExitFix";
 import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
 
-import { Extension } from "@tiptap/core";
+import { Extension, ChainedCommands } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
 import type { Level } from "@tiptap/extension-heading";
 import { AtomBoundaryFix } from "@/features/AtomBoundaryFix";
@@ -70,10 +70,10 @@ const ZeroWidthCleanup = Extension.create({
 
 const ZERO_WIDTH_REGEX = /[\u200B-\u200D\uFEFF]/g;
 
-function countCharactersWithMath(doc: any) {
+function countCharactersWithMath(doc: ProseMirrorNode) {
   let count = 0;
 
-  doc.descendants((node: any) => {
+  doc.descendants((node: ProseMirrorNode) => {
     if (node.type?.name === "paragraph") {
       // Count paragraph as 1 (empty or not)
       count++;
@@ -97,7 +97,7 @@ function countCharactersWithMath(doc: any) {
       return false;
     }
 
-    if (node.isText) {
+    if (node.isText && typeof node.text === "string") {
       const clean = node.text.replace(ZERO_WIDTH_REGEX, "");
       count += clean.length;
     }
@@ -319,12 +319,15 @@ export default function PostEditorInner({
   if (!editor) return null;
 
   /* Restore selection for toolbar actions */
-  const withRestore = (fn: (c: any) => any) => {
+  const withRestore = (fn: (c: ChainedCommands) => ChainedCommands) => {
     let c = editor.chain().focus();
 
     if (lastSelRef.current) {
       const { from, to } = lastSelRef.current;
-      c = c.setTextSelection({ from, to });
+      c = c.setTextSelection({
+        from: lastSelRef.current.from,
+        to: lastSelRef.current.to,
+      });
     }
 
     fn(c).run();

@@ -3,15 +3,15 @@ import { categorize } from "@/features/categorize/services/categorize";
 import clientPromise from "@/lib/mongodb";
 
 /* -------------------------------------------------------------------------- */
-/*                         Remove invisible Unicode chars                     */
+/*                         Remove invisible Unicode chars                      */
 /* -------------------------------------------------------------------------- */
 function cleanInput(text: string): string {
   if (!text) return "";
   return text
-    .replace(/\u200B/g, "")       // ZWSP
-    .replace(/\uFEFF/g, "")       // BOM
-    .replace(/\u2060/g, "")       // Word joiner
-    .replace(/\s+/g, " ")         // collapse whitespace
+    .replace(/\u200B/g, "") // ZWSP
+    .replace(/\uFEFF/g, "") // BOM
+    .replace(/\u2060/g, "") // Word joiner
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -28,25 +28,54 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 /* -------------------------------------------------------------------------- */
+/*                                   Types                                     */
+/* -------------------------------------------------------------------------- */
+type DbCategory = {
+  _id: { toString(): string };
+  name: string;
+  jname?: string;
+  myname?: string;
+};
+
+type AiCategory = {
+  label?: unknown;
+  score?: unknown;
+};
+
+type EnrichedCategory = {
+  id: string;
+  label: string;
+  jname?: string;
+  myname?: string;
+  score: number;
+};
+
+/* -------------------------------------------------------------------------- */
 /*                                   ROUTE                                     */
 /* -------------------------------------------------------------------------- */
 export async function POST(req: Request) {
   try {
-    let { content } = await req.json();
+    const body: unknown = await req.json();
 
-    if (!content || typeof content !== "string") {
+    if (
+      !body ||
+      typeof body !== "object" ||
+      !("content" in body) ||
+      typeof (body as { content?: unknown }).content !== "string"
+    ) {
       return NextResponse.json({ error: "Missing content" }, { status: 400 });
     }
 
-    // ⭐ Clean input to avoid breaking AI
-    content = cleanInput(content);
+    const content = cleanInput(
+      (body as { content: string }).content
+    );
 
-    // ---------------------------- DB Load ----------------------------------
+    /* ---------------------------- DB Load ---------------------------------- */
     const client = await clientPromise;
     const db = client.db("jearn");
     const categoriesColl = db.collection("categories");
 
-    const allCategories = await categoriesColl
+    const allCategories = (await categoriesColl
       .find()
       .project({
         _id: 1,
@@ -54,34 +83,29 @@ export async function POST(req: Request) {
         jname: 1,
         myname: 1,
       })
-      .toArray();
+      .toArray()) as DbCategory[];
 
-    // Map DB categories → lookup by lowercase
-    const mapByName = new Map<string, any>();
+    /* -------- Map DB categories by lowercase name -------- */
+    const mapByName = new Map<string, DbCategory>();
     for (const cat of allCategories) {
       mapByName.set(cat.name.toLowerCase(), cat);
     }
 
-    let aiResult: any[] = [];
+    let aiResult: unknown[] = [];
 
-    /* ---------------------------------------------------------------------- */
-    /*                          Run AI Categorizer                             */
-    /* ---------------------------------------------------------------------- */
+    /* ----------------------- Run AI Categorizer ---------------------------- */
     try {
-      aiResult = await withTimeout<any[]>(categorize(content), 6000);
+      const result = await withTimeout(categorize(content), 6000);
 
-      if (!Array.isArray(aiResult)) {
-        console.warn("⚠️ AI returned non-array:", aiResult);
+      if (!Array.isArray(result)) {
         throw new Error("Invalid AI format");
       }
+
+      aiResult = result;
     } catch (err) {
       console.error("⚠️ AI failed, timeout, or bad JSON:", err);
-      console.log("⚠️ Falling back to full category list with random scores");
 
-      // FULL fallback list (shuffled)
-      const shuffled = [...allCategories].sort(() => Math.random() - 0.5);
-
-      const fallback = shuffled.map((cat) => ({
+      const fallback: EnrichedCategory[] = allCategories.map((cat) => ({
         id: cat._id.toString(),
         label: cat.name,
         jname: cat.jname,
@@ -92,46 +116,40 @@ export async function POST(req: Request) {
       return NextResponse.json(fallback);
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                 VALIDATE & MAP AI RESULT TO DATABASE IDs               */
-    /* ---------------------------------------------------------------------- */
-
-    let enriched = aiResult
-      .map((c) => {
+    /* ---------------- Map AI result → DB categories ------------------------ */
+    const enriched: EnrichedCategory[] = aiResult
+      .map((c): EnrichedCategory | null => {
         if (!c || typeof c !== "object") return null;
 
-        const rawLabel = String(c.label || "").trim();
-        if (!rawLabel) return null;
+        const { label, score } = c as AiCategory;
 
-        const key = rawLabel.toLowerCase();
+        if (typeof label !== "string") return null;
+
+        const key = label.trim().toLowerCase();
         const match = mapByName.get(key);
-
-        if (!match) {
-          console.warn("⚠️ AI output label not found in DB:", rawLabel);
-          return null;
-        }
+        if (!match) return null;
 
         return {
           id: match._id.toString(),
           label: match.name,
           jname: match.jname,
           myname: match.myname,
-          score: Number(c.score) || 0,
+          score: typeof score === "number" ? score : 0,
         };
       })
-      .filter(Boolean);
+      .filter((c): c is EnrichedCategory => c !== null);
 
-    // ⭐ If AI returned unknown labels → fallback
+    /* ---------------- AI returned nothing usable → fallback ---------------- */
     if (enriched.length === 0) {
-      console.warn("⚠️ AI returned no valid categories → fallback to DB");
-
-      enriched = allCategories.map((cat) => ({
+      const fallback: EnrichedCategory[] = allCategories.map((cat) => ({
         id: cat._id.toString(),
         label: cat.name,
         jname: cat.jname,
         myname: cat.myname,
         score: 0,
       }));
+
+      return NextResponse.json(fallback);
     }
 
     return NextResponse.json(enriched);

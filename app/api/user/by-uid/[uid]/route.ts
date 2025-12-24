@@ -1,12 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-export async function GET(_req: Request, { params }: { params: { uid: string } }) {
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ uid: string }> }
+) {
   try {
-    const raw = await params.uid?.trim();
+    const { uid } = await params; // 🔥 IMPORTANT
+    const raw = uid?.trim();
+
     if (!raw) {
-      return NextResponse.json({ ok: false, error: "Missing uid" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "Missing uid" },
+        { status: 400 }
+      );
     }
 
     const client = await clientPromise;
@@ -30,12 +38,14 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
     } catch {}
 
     if (!user) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: "User not found" },
+        { status: 404 }
+      );
     }
 
     const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
     const avatarUrl = user.avatarUrl ?? `${CDN}/avatars/${user._id}.webp`;
-    const updatedAt = user.avatarUpdatedAt ?? null;
 
     return NextResponse.json({
       ok: true,
@@ -45,11 +55,14 @@ export async function GET(_req: Request, { params }: { params: { uid: string } }
         userId: user.userId ?? null,
         bio: user.bio ?? "",
         picture: avatarUrl,
-        avatarUpdatedAt: updatedAt, // 🔥 critical
+        avatarUpdatedAt: user.avatarUpdatedAt ?? null,
       },
     });
   } catch (err) {
     console.error("Error in /api/user/by-uid:", err);
-    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Server error" },
+      { status: 500 }
+    );
   }
 }

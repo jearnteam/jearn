@@ -1,9 +1,20 @@
-import { NextResponse } from "next/server";
+// app/api/tags/[tag]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { ObjectId, Collection, WithId, Document } from "mongodb";
 
-/* ---------------------- AUTHOR RESOLVER (SHARED LOGIC) ---------------------- */
-async function resolveAuthor(users: any, authorId?: string | null) {
+/* -------------------------------------------------------------
+ * AUTHOR RESOLVER (SHARED LOGIC)
+ * ----------------------------------------------------------- */
+async function resolveAuthor(
+  users: Collection,
+  authorId?: string | null
+): Promise<{
+  name: string;
+  userId: string | null;
+  avatarUpdatedAt: Date | null;
+  email: string | null;
+}> {
   if (!authorId) {
     return {
       name: "Anonymous",
@@ -13,8 +24,9 @@ async function resolveAuthor(users: any, authorId?: string | null) {
     };
   }
 
-  let user = null;
+  let user: WithId<Document> | null = null;
 
+  // ObjectId
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
@@ -22,6 +34,7 @@ async function resolveAuthor(users: any, authorId?: string | null) {
     );
   }
 
+  // provider_id fallback
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
@@ -30,19 +43,33 @@ async function resolveAuthor(users: any, authorId?: string | null) {
   }
 
   return {
-    name: user?.name ?? "Anonymous",
-    userId: user?.userId ?? null,
-    avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
-    email: user?.email ?? null,
+    name: (user?.name as string | undefined) ?? "Anonymous",
+    userId: (user?.userId as string | undefined) ?? null,
+    avatarUpdatedAt: (user?.avatarUpdatedAt as Date | undefined) ?? null,
+    email: (user?.email as string | undefined) ?? null,
   };
 }
 
-/* ---------------------- CATEGORY ENRICHER ---------------------- */
-async function enrichCategories(catIds: any[], categoriesColl: any) {
+/* -------------------------------------------------------------
+ * CATEGORY ENRICHER
+ * ----------------------------------------------------------- */
+type EnrichedCategory = {
+  id: string;
+  name: string;
+  jname: string;
+  myname: string;
+};
+
+async function enrichCategories(
+  catIds: unknown[],
+  categoriesColl: Collection
+): Promise<EnrichedCategory[]> {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .filter((c) => ObjectId.isValid(c))
+    .filter(
+      (c): c is string => typeof c === "string" && ObjectId.isValid(c)
+    )
     .map((c) => new ObjectId(c));
 
   if (!validIds.length) return [];
@@ -52,8 +79,8 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
     .project({ name: 1, jname: 1, myname: 1 })
     .toArray();
 
-  return docs.map((c: any) => ({
-    id: String(c._id),
+  return docs.map((c) => ({
+    id: c._id.toString(),
     name: c.name ?? "",
     jname: c.jname ?? "",
     myname: c.myname ?? "",
@@ -61,14 +88,22 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
 }
 
 /* ===============================================================
-   GET — posts by tag (MODERN, AVATAR-SAFE)
-   =============================================================== */
+ * GET — posts by tag (MODERN, AVATAR-SAFE)
+ * ============================================================= */
 export async function GET(
-  _req: Request,
-  { params }: { params: { tag: string } }
+  _req: NextRequest,
+  { params }: { params: Promise<{ tag: string }> }
 ) {
   try {
-    const tag = decodeURIComponent(params.tag);
+    const { tag } = await params;
+    const decodedTag = decodeURIComponent(tag);
+
+    if (!decodedTag) {
+      return NextResponse.json(
+        { ok: false, error: "Missing tag" },
+        { status: 400 }
+      );
+    }
 
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
@@ -79,7 +114,7 @@ export async function GET(
 
     /* ----------- Fetch top-level posts ----------- */
     const posts = await postsColl
-      .find({ parentId: null, tags: tag })
+      .find({ parentId: null, tags: decodedTag })
       .sort({ createdAt: -1 })
       .toArray();
 
@@ -87,8 +122,11 @@ export async function GET(
       process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) || [];
 
     const enrichedPosts = await Promise.all(
-      posts.map(async (post: any) => {
-        const author = await resolveAuthor(usersColl, post.authorId);
+      posts.map(async (post: WithId<Document>) => {
+        const author = await resolveAuthor(
+          usersColl,
+          post.authorId as string | null
+        );
 
         const isAdmin =
           !!author.email && adminEmails.includes(author.email);
@@ -99,7 +137,7 @@ export async function GET(
         );
 
         return {
-          _id: String(post._id),
+          _id: post._id.toString(),
           title: post.title,
           content: post.content,
           createdAt: post.createdAt,
@@ -123,7 +161,7 @@ export async function GET(
 
     return NextResponse.json({
       ok: true,
-      tag,
+      tag: decodedTag,
       posts: enrichedPosts,
     });
   } catch (err) {

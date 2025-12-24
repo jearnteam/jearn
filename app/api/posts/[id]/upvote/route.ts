@@ -1,5 +1,5 @@
 // app/api/posts/[id]/upvote/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
@@ -10,8 +10,8 @@ import { authConfig } from "@/features/auth/auth";
 export const runtime = "nodejs";
 
 export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     /* --------------------------------------------------------
@@ -22,20 +22,23 @@ export async function POST(
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const { userId, txId } = await req.json();
+    const { id } = await params;
+
+    const body: { userId?: string; txId?: string | null } = await req.json();
+    const { userId, txId } = body;
 
     if (!userId || userId !== session.user.uid) {
       return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
     }
 
-    if (!ObjectId.isValid(params.id)) {
+    if (!ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
     }
 
     /* --------------------------------------------------------
        SETUP
     --------------------------------------------------------- */
-    const postId = new ObjectId(params.id);
+    const postId = new ObjectId(id);
     const actorObjId = new ObjectId(userId);
 
     const client = await clientPromise;
@@ -83,21 +86,18 @@ export async function POST(
       { returnDocument: "after" }
     );
 
-    /* --------------------------------------------------------
-   TS SAFETY (this is what fixes the error)
-    --------------------------------------------------------- */
     if (!result || !result.value) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
     const updated = result.value;
 
-    if (!updated) {
-      return NextResponse.json({ error: "Post not found" }, { status: 404 });
-    }
+    const upvoters = Array.isArray(updated.upvoters)
+      ? (updated.upvoters as ObjectId[])
+      : [];
 
-    const action: "added" | "removed" = updated.upvoters.some((id: ObjectId) =>
-      id.equals(actorObjId)
+    const action: "added" | "removed" = upvoters.some((oid) =>
+      oid.equals(actorObjId)
     )
       ? "added"
       : "removed";
@@ -108,7 +108,11 @@ export async function POST(
     if (action === "added") {
       const postOwnerUid = updated.authorId;
 
-      if (postOwnerUid && postOwnerUid !== userId) {
+      if (
+        typeof postOwnerUid === "string" &&
+        ObjectId.isValid(postOwnerUid) &&
+        postOwnerUid !== userId
+      ) {
         const ownerObjId = new ObjectId(postOwnerUid);
         const groupKey = `post_like:${postId.toString()}`;
         const now = new Date();
@@ -117,47 +121,49 @@ export async function POST(
         const actorAvatar = `${process.env.R2_PUBLIC_URL}/avatars/${userId}.webp`;
         const preview = (updated.title ?? "").slice(0, 80).replace(/\n/g, " ");
 
+        const pipeline = [
+          {
+            $set: {
+              userId: { $ifNull: ["$userId", ownerObjId] },
+              type: { $ifNull: ["$type", "post_like"] },
+              postId: { $ifNull: ["$postId", postId] },
+              groupKey: { $ifNull: ["$groupKey", groupKey] },
+              read: { $ifNull: ["$read", false] },
+              createdAt: { $ifNull: ["$createdAt", now] },
+              actors: { $ifNull: ["$actors", []] },
+              count: { $ifNull: ["$count", 0] },
+            },
+          },
+          {
+            $set: {
+              _already: { $in: [actorObjId, "$actors"] },
+            },
+          },
+          {
+            $set: {
+              actors: {
+                $cond: [
+                  "$_already",
+                  "$actors",
+                  { $concatArrays: ["$actors", [actorObjId]] },
+                ],
+              },
+              count: {
+                $cond: ["$_already", "$count", { $add: ["$count", 1] }],
+              },
+              lastActorId: actorObjId,
+              lastActorName: actorName,
+              lastActorAvatar: actorAvatar,
+              postPreview: preview,
+              updatedAt: now,
+            },
+          },
+          { $unset: "_already" },
+        ];
+
         const notifResult = await notifications.updateOne(
           { userId: ownerObjId, groupKey, read: false },
-          [
-            {
-              $set: {
-                userId: { $ifNull: ["$userId", ownerObjId] },
-                type: { $ifNull: ["$type", "post_like"] },
-                postId: { $ifNull: ["$postId", postId] },
-                groupKey: { $ifNull: ["$groupKey", groupKey] },
-                read: { $ifNull: ["$read", false] },
-                createdAt: { $ifNull: ["$createdAt", now] },
-                actors: { $ifNull: ["$actors", []] },
-                count: { $ifNull: ["$count", 0] },
-              },
-            },
-            {
-              $set: {
-                _already: { $in: [actorObjId, "$actors"] },
-              },
-            },
-            {
-              $set: {
-                actors: {
-                  $cond: [
-                    "$_already",
-                    "$actors",
-                    { $concatArrays: ["$actors", [actorObjId]] },
-                  ],
-                },
-                count: {
-                  $cond: ["$_already", "$count", { $add: ["$count", 1] }],
-                },
-                lastActorId: actorObjId,
-                lastActorName: actorName,
-                lastActorAvatar: actorAvatar,
-                postPreview: preview,
-                updatedAt: now,
-              },
-            },
-            { $unset: "_already" },
-          ] as any,
+          pipeline as unknown as object[],
           { upsert: true }
         );
 
@@ -178,8 +184,8 @@ export async function POST(
       userId,
       action,
       txId: txId ?? null,
-      parentId: updated.parentId ?? null,
-      replyTo: updated.replyTo ?? null,
+      parentId: typeof updated.parentId === "string" ? updated.parentId : null,
+      replyTo: typeof updated.replyTo === "string" ? updated.replyTo : null,
     };
 
     broadcastSSE({ type: "upvote", ...payload });
@@ -203,7 +209,7 @@ export async function POST(
       post: {
         _id: updated._id.toString(),
         upvoteCount: updated.upvoteCount,
-        upvoters: updated.upvoters.map((id: ObjectId) => id.toString()),
+        upvoters: upvoters.map((oid) => oid.toString()),
       },
     });
   } catch (err) {

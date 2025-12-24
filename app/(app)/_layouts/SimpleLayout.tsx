@@ -3,7 +3,7 @@ export default function SimpleLayout({
   overlay,
 }: {
   children: React.ReactNode;
-  overlay: React.ReactNode;
+  overlay?: React.ReactNode;
 }) {
   return (
     <>

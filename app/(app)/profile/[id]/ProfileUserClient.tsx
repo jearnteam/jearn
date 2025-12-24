@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import PostList from "@/components/posts/PostList";
@@ -13,11 +12,25 @@ interface Props {
   userId: string;
 }
 
-export default function ProfileUserClient({ userId }: Props) {
-  const router = useRouter();
+type ApiUser = {
+  _id: string;
+  userId: string;
+  name?: string;
+  bio?: string;
+  picture?: string;
+};
 
-  const [user, setUser] = useState<any>(null);
+type UIUser = {
+  _id: string;
+  userId: string;
+  name: string;
+  bio: string;
+};
+
+export default function ProfileUserClient({ userId }: Props) {
   const { user: currentUser } = useCurrentUser();
+
+  const [user, setUser] = useState<UIUser | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -40,11 +53,18 @@ export default function ProfileUserClient({ userId }: Props) {
 
         const userData = await userRes.json();
         if (!userData.ok) {
-          setUser(null); // show "User not found"
+          setUser(null);
           return;
         }
 
-        setUser(userData.user);
+        const apiUser: ApiUser = userData.user;
+
+        setUser({
+          _id: apiUser._id,
+          userId: apiUser.userId,
+          name: apiUser.name ?? "Unnamed User",
+          bio: apiUser.bio ?? "",
+        });
 
         const postRes = await fetch(`/api/posts/byUser/${userId}?limit=10`, {
           cache: "no-store",
@@ -59,10 +79,10 @@ export default function ProfileUserClient({ userId }: Props) {
         setLoading(false);
       }
     })();
-  }, [userId, router]);
+  }, [userId]);
 
   /* ---------------------------------------------
-   * Load more (infinite scroll)
+   * Load more
    * ------------------------------------------- */
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || !cursor) return;
@@ -86,7 +106,7 @@ export default function ProfileUserClient({ userId }: Props) {
   }, [cursor, hasMore, loadingMore, userId]);
 
   /* ---------------------------------------------
-   * UI states
+   * UI
    * ------------------------------------------- */
   if (loading) return <FullScreenLoader />;
 
@@ -101,13 +121,11 @@ export default function ProfileUserClient({ userId }: Props) {
   return (
     <div className="bg-white dark:bg-black min-h-screen pb-24">
       <div className="feed-container mt-10">
-        {/* PROFILE HEADER */}
         <div className="flex items-start gap-5 mb-8 relative">
           <Avatar id={userId} size={80} className="border" />
 
           <div className="flex-1">
-            <h1 className="text-xl font-bold">{user.name || "Unnamed User"}</h1>
-
+            <h1 className="text-xl font-bold">{user.name}</h1>
             <p className="text-sm text-gray-500">@{user.userId}</p>
 
             {user.bio && (
@@ -117,7 +135,6 @@ export default function ProfileUserClient({ userId }: Props) {
             )}
           </div>
 
-          {/* ✅ FOLLOW BUTTON */}
           {currentUser?._id !== userId && (
             <div className="absolute top-0 right-0">
               <FollowButton targetUserId={userId} />
@@ -125,7 +142,6 @@ export default function ProfileUserClient({ userId }: Props) {
           )}
         </div>
 
-        {/* POSTS */}
         <PostList
           posts={posts}
           hasMore={hasMore}

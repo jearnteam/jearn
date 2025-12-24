@@ -17,16 +17,23 @@ interface Report {
   createdAt?: string;
 }
 
+type ReportPost = {
+  _id: string;
+  title?: string;
+  content?: string;
+  [key: string]: unknown;
+};
+
 export default function ReportsPanel() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const [selectedPost, setSelectedPost] = useState<ReportPost | null>(null);
 
-  const [filterStatus, setFilterStatus] = useState<"all" | "pending" | "reviewed" | "ignored">(
-    "all"
-  );
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "pending" | "reviewed" | "ignored"
+  >("all");
 
   /* ---------------- Load Reports ---------------- */
   const loadReports = async () => {
@@ -270,12 +277,10 @@ export default function ReportsPanel() {
 
             {selectedPost && (
               <div className="p-4 border rounded-lg bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 max-h-[300px] overflow-y-auto">
-                <h4 className="font-bold text-lg mb-2">
-                  {selectedPost.title}
-                </h4>
+                <h4 className="font-bold text-lg mb-2">{selectedPost.title}</h4>
                 <div
                   className="prose dark:prose-invert text-sm"
-                  dangerouslySetInnerHTML={{ __html: selectedPost.content }}
+                  dangerouslySetInnerHTML={{ __html: selectedPost.content ?? "" }}
                 />
               </div>
             )}

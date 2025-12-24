@@ -129,4 +129,6 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
   }
 );
 
+PostEditorWrapper.displayName = "PostEditorWrapper";
+
 export default memo(PostEditorWrapper);

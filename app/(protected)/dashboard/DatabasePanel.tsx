@@ -3,10 +3,20 @@
 import { useEffect, useState, useMemo } from "react";
 import { Edit3, Trash2, Save, XCircle, Search } from "lucide-react";
 
+type AdminPost = {
+  _id: string;
+  title?: string;
+  categories?: string[];
+  authorName?: string;
+  authorId?: string;
+  createdAt: string;
+  [key: string]: unknown;
+};
+
 export default function DatabasePanel() {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<AdminPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editPost, setEditPost] = useState<any | null>(null);
+  const [editPost, setEditPost] = useState<AdminPost | null>(null);
   const [jsonText, setJsonText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -98,14 +108,10 @@ export default function DatabasePanel() {
   ]);
 
   /* Reset pagination on filter change */
-  useEffect(() => setCurrentPage(1), [
-    searchPostId,
-    searchUser,
-    searchUserId,
-    searchCategory,
-    dateFrom,
-    dateTo,
-  ]);
+  useEffect(
+    () => setCurrentPage(1),
+    [searchPostId, searchUser, searchUserId, searchCategory, dateFrom, dateTo]
+  );
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
 
@@ -115,7 +121,7 @@ export default function DatabasePanel() {
   }, [filtered, currentPage]);
 
   /* ---------- JSON Editor ---------- */
-  const openEditor = (post: any) => {
+  const openEditor = (post: AdminPost) => {
     setEditPost(post);
     setJsonText(JSON.stringify(post, null, 2));
     setErrorMsg("");
@@ -145,8 +151,12 @@ export default function DatabasePanel() {
       );
 
       setEditPost(null);
-    } catch (err: any) {
-      setErrorMsg(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg("Unknown error");
+      }
     }
   }
 

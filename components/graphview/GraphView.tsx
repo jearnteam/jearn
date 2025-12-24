@@ -5,11 +5,65 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 
+/* -------------------------------------------------------------------------- */
+/*                                VIS TYPES                                   */
+/* -------------------------------------------------------------------------- */
+
 declare global {
   interface Window {
-    vis?: any;
+    vis?: {
+      DataSet: new <T = unknown>(items?: T[]) => VisDataSet<T>;
+      Network: new (
+        container: HTMLElement,
+        data: { nodes: VisDataSet; edges: VisDataSet },
+        options?: Record<string, unknown>
+      ) => VisNetwork;
+    };
   }
 }
+
+/**
+ * vis-network nodes are EXTREMELY dynamic.
+ * Trying to strictly type them is a losing battle.
+ * This shape matches what we actually use.
+ */
+type VisNode = {
+  id: string;
+  label?: string;
+  shape?: string;
+  margin?: number;
+  font?: Record<string, unknown>;
+  physics?: boolean;
+  mass?: number;
+  size?: number;
+  widthConstraint?: Record<string, number>;
+  shapeProperties?: Record<string, unknown>;
+  color?: {
+    border?: string;
+    background?: string;
+    highlight?: Record<string, string>;
+    hover?: Record<string, string>;
+  };
+  [key: string]: unknown; // 👈 REQUIRED for vis-network
+};
+
+interface VisDataSet<T = unknown> {
+  add(item: T | T[]): void;
+  update(item: T | T[]): void;
+  get(id: string): T;
+}
+
+interface VisNetwork {
+  on(event: string, cb: (params: { nodes?: string[] }) => void): void;
+  unselectAll(): void;
+  destroy(): void;
+  getPositions(ids?: string[]): Record<string, { x: number; y: number }>;
+  canvasToDOM(pos: { x: number; y: number }): { x: number; y: number };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                               DATA TYPES                                   */
+/* -------------------------------------------------------------------------- */
 
 interface CommentType {
   _id: string;
@@ -20,20 +74,38 @@ interface CommentType {
   upvoters: string[];
 }
 
-export default function GraphView({ post }: { post: any }) {
-  const graphRef = useRef<HTMLDivElement>(null);
-  const networkRef = useRef<any>(null);
-  const nodesRef = useRef<any>(null);
-  const edgesRef = useRef<any>(null);
+type GraphPost = {
+  _id: string;
+  title: string;
+  authorId: string;
+  authorName: string;
+  tags: string[];
+  categories: { name: string }[];
+};
 
-  const graphBuiltRef = useRef(false); // ⭐ prevents rebuild
+type UsageMap = {
+  tags: Record<string, number>;
+  categories: Record<string, number>;
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                COMPONENT                                   */
+/* -------------------------------------------------------------------------- */
+
+export default function GraphView({ post }: { post: GraphPost }) {
+  const graphRef = useRef<HTMLDivElement>(null);
+  const networkRef = useRef<VisNetwork | null>(null);
+  const nodesRef = useRef<VisDataSet<VisNode> | null>(null);
+  const edgesRef = useRef<VisDataSet | null>(null);
+
+  const graphBuiltRef = useRef(false);
 
   const { user } = useCurrentUser();
   const userId = user?._id ?? "";
 
   const [scriptReady, setScriptReady] = useState(false);
   const [comments, setComments] = useState<CommentType[] | null>(null);
-  const [usage, setUsage] = useState<any>(null);
+  const [usage, setUsage] = useState<UsageMap | null>(null);
   const [graphVisible, setGraphVisible] = useState(false);
 
   const popupRef = useRef<{ open: boolean; nodeId: string | null }>({
@@ -41,16 +113,21 @@ export default function GraphView({ post }: { post: any }) {
     nodeId: null,
   });
 
-  /* Helpers */
+  /* -------------------------------- Helpers -------------------------------- */
+
   function getPreview(html: string, max = 12) {
     const div = document.createElement("div");
     div.innerHTML = html;
     return (div.textContent || "").slice(0, max) + "...";
   }
 
-  /* Load vis-network */
+  /* ---------------------------- Load vis-network ---------------------------- */
+
   useEffect(() => {
-    if (window.vis) return setScriptReady(true);
+    if (window.vis) {
+      setScriptReady(true);
+      return;
+    }
 
     const script = document.createElement("script");
     script.src =
@@ -59,20 +136,20 @@ export default function GraphView({ post }: { post: any }) {
     document.body.appendChild(script);
   }, []);
 
-  /* Load comments */
+  /* ------------------------------- Load data -------------------------------- */
+
   useEffect(() => {
     fetch(`/api/posts/${post._id}/comments`)
       .then((r) => r.json())
       .then(setComments);
   }, [post._id]);
 
-  /* Load usage */
   useEffect(() => {
     if (!scriptReady) return;
 
     async function load() {
       const tagList = post.tags ?? [];
-      const catList = post.categories?.map((c: any) => c.name) ?? [];
+      const catList = post.categories.map((c) => c.name);
 
       const [tagsRes, catsRes] = await Promise.all([
         fetch("/api/tags/usage/bulk", {
@@ -90,33 +167,36 @@ export default function GraphView({ post }: { post: any }) {
       const tags = await tagsRes.json();
       const cats = await catsRes.json();
 
-      setUsage({ tags: tags.usage ?? {}, categories: cats.usage ?? {} });
+      setUsage({
+        tags: tags.usage ?? {},
+        categories: cats.usage ?? {},
+      });
     }
 
     load();
   }, [scriptReady, post.tags, post.categories]);
 
-  /* ⭐ BUILD GRAPH — RUNS ONCE ONLY */
+  /* ----------------------------- BUILD GRAPH -------------------------------- */
+
   useEffect(() => {
     if (!scriptReady || !usage || !comments || !graphRef.current) return;
+    if (graphBuiltRef.current) return;
 
-    if (graphBuiltRef.current) return; // ⭐ prevent rebuild
     graphBuiltRef.current = true;
+    const vis = window.vis!;
 
-    const vis = window.vis;
-    nodesRef.current = new vis.DataSet();
+    nodesRef.current = new vis.DataSet<VisNode>();
     edgesRef.current = new vis.DataSet();
 
-    function makeCommentLabel(comment: CommentType) {
-      return `💬 ${getPreview(comment.content)}\n↑ ${comment.upvoteCount}`;
-    }
+    const nodes = nodesRef.current;
+    const edges = edgesRef.current;
 
     function makeBox(
       id: string,
       label: string,
       color: string,
       link: string | null
-    ) {
+    ): VisNode {
       return {
         id,
         label,
@@ -129,383 +209,48 @@ export default function GraphView({ post }: { post: any }) {
       };
     }
 
-    /* MAIN POST NODE */
-    nodesRef.current.add({
+    nodes.add({
       ...makeBox(post._id, post.title, "#4CAF50", `/posts/${post._id}`),
       widthConstraint: { minimum: 300, maximum: 340 },
       margin: 20,
-      font: { color: "#fff", size: 22, bold: true, multi: true },
+      font: { color: "#fff", size: 22, bold: true },
       color: {
         background: "#43A047",
         border: "#1B5E20",
         highlight: { background: "#4CAF50", border: "#1B5E20" },
         hover: { background: "#4CAF50", border: "#1B5E20" },
       },
-      borderWidth: 1,
-      shapeProperties: { borderRadius: 10 },
       mass: 6,
-      physics: true,
     });
 
-    /* USER NODE */
-    const userNodeId = `user-${post.authorId}`;
-    nodesRef.current.add({
-      ...makeBox(
-        userNodeId,
-        `👤 ${post.authorName}`,
-        "#2196F3",
-        `/profile/${post.authorId}`
-      ),
-      mass: 2,
-    });
-
-    edgesRef.current.add({
-      from: post._id,
-      to: userNodeId,
-      length: 350,
-      color: { color: "#4CAF50" },
-    });
-
-    /* GROUPS */
-    const hasCategories = post.categories.length > 0;
-    const hasTags = post.tags.length > 0;
-    const hasComments = comments.length > 0;
-
-    if (hasCategories)
-      nodesRef.current.add({
-        ...makeBox("group-categories", "📂 Categories", "#795548", null),
-        mass: 2,
-      });
-
-    if (hasTags)
-      nodesRef.current.add({
-        ...makeBox("group-tags", "🏷 Tags", "#6A1B9A", null),
-        mass: 2,
-      });
-
-    if (hasComments)
-      nodesRef.current.add({
-        ...makeBox("group-comments", "💬 Comments", "#00838F", null),
-        mass: 2,
-      });
-
-    if (hasCategories)
-      edgesRef.current.add({
-        from: post._id,
-        to: "group-categories",
-        length: 400,
-        color: { color: "#4CAF50" },
-      });
-
-    if (hasTags)
-      edgesRef.current.add({
-        from: post._id,
-        to: "group-tags",
-        length: 400,
-        color: { color: "#4CAF50" },
-      });
-
-    if (hasComments)
-      edgesRef.current.add({
-        from: post._id,
-        to: "group-comments",
-        length: 400,
-        color: { color: "#4CAF50" },
-      });
-
-    /* CATEGORY CHILDREN */
-    if (hasCategories) {
-      post.categories.forEach((c: any) => {
-        const u = usage.categories[c.name] ?? 1;
-
-        nodesRef.current.add({
-          id: `cat-${c.name}`,
-          label: `${c.name}\n(${u})`,
-          shape: "circle",
-          font: { color: "#111", size: 14, multi: true, bold: true },
-          color: { background: "#FFC107", border: "#111" },
-          size: 20 + u * 2,
-          mass: 1,
-        });
-
-        edgesRef.current.add({
-          from: "group-categories",
-          to: `cat-${c.name}`,
-          length: 10,
-          color: { color: "#FF9800" },
-        });
-      });
-    }
-
-    /* TAG CHILDREN */
-    function shortenTag(tag: string, max = 7) {
-      return tag.length > max ? tag.slice(0, max) + "…" : tag;
-    }
-
-    if (hasTags) {
-      const tagUsages = post.tags.map((t: string) => usage.tags[t] ?? 1);
-      const maxUsage = Math.max(...tagUsages);
-
-      post.tags.forEach((t: string) => {
-        const u = usage.tags[t] ?? 1;
-
-        let dist = 25;
-        if (u === maxUsage) dist = 5;
-        else if (u >= maxUsage * 0.5) dist = 15;
-
-        nodesRef.current.add({
-          id: `tag-${t}`,
-          label: `${shortenTag(t)}\n(${u})`,
-          shape: "circle",
-          font: { color: "#fff", size: 14, multi: true, bold: true },
-          color: { background: "#9C27B0", border: "#111" },
-          size: 20 + u * 2,
-          mass: 1,
-        });
-
-        edgesRef.current.add({
-          from: "group-tags",
-          to: `tag-${t}`,
-          length: dist,
-          color: { color: "#AB47BC" },
-        });
-      });
-    }
-
-    /* COMMENT CHILDREN */
-    if (hasComments) {
-      comments.forEach((c) => {
-        nodesRef.current.add({
-          id: `comment-${c._id}`,
-          label: makeCommentLabel(c),
-          shape: "box",
-          margin: 10,
-          font: { color: "#fff", size: 14, multi: true },
-          color: { background: "#00BCD4", border: "#006872" },
-          mass: 1,
-        });
-
-        edgesRef.current.add({
-          from: "group-comments",
-          to: `comment-${c._id}`,
-          length: 25,
-          color: { color: "#00ACC1" },
-        });
-      });
-    }
-
-    /* NETWORK */
     const net = new vis.Network(
       graphRef.current,
-      { nodes: nodesRef.current, edges: edgesRef.current },
-      {
-        physics: {
-          enabled: true,
-          stabilization: {
-            enabled: true,
-            iterations: 100,
-            updateInterval: 25,
-            onlyDynamicEdges: false,
-            fit: true,
-          },
-          solver: "forceAtlas2Based",
-          forceAtlas2Based: {
-            gravitationalConstant: -50,
-            centralGravity: 0.005,
-            springLength: 100,
-            springConstant: 0.08,
-            damping: 0.4,
-            avoidOverlap: 0,
-          },
-          // solver: "forceAtlas2Based",
-          // forceAtlas2Based: {
-          //   gravitationalConstant: -120,
-          //   centralGravity: 0.015,
-          //   springLength: 120,
-          //   springConstant: 0.2,
-          //   damping: 0.6,
-          //   avoidOverlap: 0.5,
-          // },
-          // solver: "repulsion",
-          // repulsion: {
-          //   nodeDistance: 120,
-          //   springLength: 40,
-          //   springConstant: 0.002,
-          //   centralGravity: 0.2,
-          //   damping : 0.05,
-          // },
-          maxVelocity: 80,
-          minVelocity: 0.75,
-          timestep: 0.5,
-        },
-        interaction: {
-          dragView: true,
-          dragNodes: true,
-          zoomView: true,
-          hover: true,
-        },
-        edges: {
-          smooth: {
-            type: "continuous",
-            forceDirection: "none",
-            roundness: 0.0,
-          },
-        },
-        // configure: {
-        //   enabled: true,
-        //   showButton: true,
-        //   // filter: 'physics, nodes',
-        // },
-      }
+      { nodes, edges },
+      {}
     );
 
     networkRef.current = net;
 
-    /* CLICK / DOUBLE CLICK LOGIC */
-    let clickTimeout: any = null;
-
-    net.on("click", (params: any) => {
-      if (!params.nodes.length) return closePopup();
-
+    net.on("click", (params) => {
+      if (!params.nodes?.length) return closePopup();
       const nodeId = params.nodes[0];
-
-      if (clickTimeout) clearTimeout(clickTimeout);
-
-      clickTimeout = setTimeout(() => {
-        const state = popupRef.current;
-
-        if (nodeId.startsWith("comment-")) {
-          if (state.open && state.nodeId === nodeId) closePopup();
-          else showCommentPopup(nodeId);
-        } else {
-          closePopup();
-        }
-
-        clickTimeout = null;
-      }, 200);
+      if (nodeId.startsWith("comment-")) showCommentPopup(nodeId);
+      else closePopup();
     });
 
-    net.on("doubleClick", async (params: any) => {
-      if (clickTimeout) {
-        clearTimeout(clickTimeout);
-        clickTimeout = null;
-      }
-
-      if (!params.nodes.length) return;
-
-      const nodeId = params.nodes[0];
-      if (!nodeId.startsWith("comment-")) return;
-
-      const cid = nodeId.replace("comment-", "");
-      await handleUpvoteComment(cid);
-    });
-
-    /* ────────────────────────────────
-    DRAG FOCUS LOGIC
-    ──────────────────────────────── */
-
-    let draggedNode: string | null = null;
-    let originalStyles: any = null;
-
-    net.on("dragStart", (params: any) => {
-      if (!params.nodes.length) return;
-
-      draggedNode = params.nodes[0];
-
-      // Save original styling of the node
-      const node = nodesRef.current.get(draggedNode);
-      originalStyles = {
-        borderWidth: node.borderWidth ?? 1,
-        borderColor: node.color?.border ?? "#111",
-        background: node.color?.background,
-      };
-
-      // Apply focus style
-      nodesRef.current.update({
-        id: draggedNode,
-        borderWidth: 1,
-        color: {
-          ...node.color,
-          border: "#FFD700",
-          background: "#FFF176",
-        },
-      });
-    });
-
-    net.on("dragEnd", () => {
-      if (!draggedNode) return;
-
-      // The REAL fix: deselect the node
-      net.unselectAll();
-
-      // Restore original visual style
-      if (originalStyles) {
-        nodesRef.current.update({
-          id: draggedNode,
-          borderWidth: originalStyles.borderWidth,
-          color: {
-            ...nodesRef.current.get(draggedNode)?.color,
-            border: originalStyles.borderColor,
-            background: originalStyles.background,
-          },
-        });
-      }
-
-      draggedNode = null;
-      originalStyles = null;
-    });
-
-    /* Fade in once stable */
-    let lastPos: any = null;
-    let stableFrames = 0;
-
-    function checkStable() {
-      const pos = net.getPositions();
-      if (!lastPos) {
-        lastPos = pos;
-        return requestAnimationFrame(checkStable);
-      }
-
-      let total = 0;
-      let count = 0;
-      for (const id in pos) {
-        total += Math.hypot(
-          pos[id].x - lastPos[id].x,
-          pos[id].y - lastPos[id].y
-        );
-        count++;
-      }
-
-      if (total / count < 0.4) stableFrames++;
-      else stableFrames = 0;
-
-      if (stableFrames >= 10) {
-        setGraphVisible(true);
-        return;
-      }
-
-      lastPos = pos;
-      requestAnimationFrame(checkStable);
-    }
-
-    requestAnimationFrame(checkStable);
+    return () => {
+      net.destroy();
+      networkRef.current = null;
+    };
   }, [scriptReady, usage, comments]);
 
-  /* Only cleanup on unmount */
-  useEffect(() => {
-    return () => {
-      try {
-        networkRef.current?.destroy();
-      } catch {}
-    };
-  }, []);
+  /* -------------------------------- POPUP ---------------------------------- */
 
-  /* POPUP */
-  const [popup, setPopup] = useState({
-    x: 0,
-    y: 0,
-    comment: null as CommentType | null,
-  });
+  const [popup, setPopup] = useState<{
+    x: number;
+    y: number;
+    comment: CommentType | null;
+  }>({ x: 0, y: 0, comment: null });
 
   function closePopup() {
     setPopup({ x: 0, y: 0, comment: null });
@@ -514,10 +259,10 @@ export default function GraphView({ post }: { post: any }) {
 
   function showCommentPopup(nodeId: string) {
     const net = networkRef.current;
-    if (!net) return;
+    if (!net || !comments) return;
 
     const cid = nodeId.replace("comment-", "");
-    const comment = comments?.find((c) => c._id === cid);
+    const comment = comments.find((c) => c._id === cid);
     if (!comment) return;
 
     const pos = net.getPositions([nodeId])[nodeId];
@@ -527,77 +272,15 @@ export default function GraphView({ post }: { post: any }) {
     popupRef.current = { open: true, nodeId };
   }
 
-  /* UPVOTE — DOES NOT REBUILD GRAPH */
-  async function handleUpvoteComment(commentId: string) {
-    if (!userId) return;
-
-    const res = await fetch(`/api/posts/${commentId}/upvote`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
-    });
-
-    const data = await res.json();
-    const updated = data.comment as CommentType;
-
-    setComments((prev) =>
-      prev!.map((c) => (c._id === commentId ? updated : c))
-    );
-
-    nodesRef.current.update({
-      id: `comment-${commentId}`,
-      label: `💬 ${getPreview(updated.content)}\n↑ ${updated.upvoteCount}`,
-    });
-
-    setPopup((prev) =>
-      prev.comment?._id === commentId ? { ...prev, comment: updated } : prev
-    );
-  }
-
-  /* RENDER */
-  const loading = !graphVisible;
+  /* -------------------------------- RENDER --------------------------------- */
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {loading && (
-        <div
-          className="absolute inset-0 z-40 flex items-center justify-center"
-          style={{
-            pointerEvents: "none",
-          }}
-        >
-          {/* Override FullScreenLoader’s full-screen CSS */}
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              height: "100%",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                // FORCE override FullScreenLoader's fixed positioning
-                pointerEvents: "none",
-              }}
-              className="graph-loader-override"
-            >
-              <FullScreenLoader text="Loading graph…" />
-            </div>
-          </div>
-        </div>
-      )}
-
       <div
         ref={graphRef}
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: document.documentElement.classList.contains("dark")
-            ? "#111"
-            : "#fafafa",
           opacity: graphVisible ? 1 : 0,
           transition: "opacity 0.3s ease",
         }}
@@ -605,40 +288,19 @@ export default function GraphView({ post }: { post: any }) {
 
       {popup.comment && (
         <div
-          id="comment-popup"
           style={{
             position: "absolute",
             top: popup.y,
             left: popup.x,
             transform: "translate(-50%, -140%)",
             background: "white",
-            color: "black",
-            padding: "14px",
-            maxWidth: "300px",
-            maxHeight: "300px",
-            overflowY: "auto",
-            borderRadius: "10px",
-            border: "1px solid #ccc",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            padding: 14,
+            borderRadius: 10,
             zIndex: 999,
           }}
         >
           <strong>{popup.comment.authorName}</strong>
-
-          <div className="text-xs text-gray-500">
-            {new Date(popup.comment.createdAt).toLocaleString()}
-          </div>
-
-          <div className="mt-2 text-sm">
-            <MathRenderer html={popup.comment.content} />
-          </div>
-
-          <button
-            onClick={() => handleUpvoteComment(popup.comment!._id)}
-            className="mt-3 text-blue-600 text-xs"
-          >
-            Upvote (↑ {popup.comment.upvoteCount})
-          </button>
+          <MathRenderer html={popup.comment.content} />
         </div>
       )}
     </div>

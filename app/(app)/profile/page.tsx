@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -94,7 +94,7 @@ export default function ProfilePage() {
   /* -------------------------
       Load user's posts
   -------------------------- */
-  async function loadPosts() {
+  const loadPosts = useCallback(async () => {
     if (!user?._id) return;
 
     setPostsLoading(true);
@@ -106,7 +106,7 @@ export default function ProfilePage() {
       const data = await res.json();
 
       setPosts(
-        normalizePosts(data.posts ?? []).map((p: any) => ({
+        normalizePosts(data.posts ?? []).map((p: Post) => ({
           ...p,
           isAdmin: p.isAdmin === true,
         }))
@@ -117,7 +117,7 @@ export default function ProfilePage() {
     } finally {
       setPostsLoading(false);
     }
-  }
+  }, [user?._id]);
 
   async function loadMore() {
     if (!hasMore || loadingMore || !cursor || !user?._id) return;
@@ -142,7 +142,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadPosts();
-  }, [user]);
+  }, [loadPosts]);
 
   /* -------------------------
       Local avatar preview (file only)
@@ -191,8 +191,12 @@ export default function ProfilePage() {
 
       setFile(null);
       alert("Profile updated!");
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("Unknown error occurred");
+      }
     } finally {
       setUploading(false);
     }

@@ -16,6 +16,25 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import FollowButton from "@/components/follow/FollowButton";
 import { normalizePosts } from "@/lib/normalizePosts";
 
+type ApiUser = {
+  _id: string;
+  userId?: string;
+  name?: string;
+  bio?: string;
+};
+
+type UIUser = {
+  _id: string;
+  userId: string;
+  name: string;
+  bio: string;
+  picture: string;
+};
+
+type UIUserPost = Post & {
+  isAdmin?: boolean;
+};
+
 export default function UserPage() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
@@ -23,7 +42,7 @@ export default function UserPage() {
 
   const { user: currentUser } = useCurrentUser();
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UIUser | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,8 +68,13 @@ export default function UserPage() {
         return;
       }
 
+      const apiUser: ApiUser = uData.user;
+
       setUser({
-        ...uData.user,
+        _id: apiUser._id,
+        userId: apiUser.userId ?? "",
+        name: apiUser.name ?? "Unnamed User",
+        bio: apiUser.bio ?? "",
         picture: `https://cdn.jearn.site/avatars/${id}?t=${Date.now()}`,
       });
 
@@ -60,9 +84,9 @@ export default function UserPage() {
       const pData = await pRes.json();
 
       setPosts(
-        normalizePosts(pData).map((p: any) => ({
-          ...p,
-          isAdmin: p.isAdmin === true,
+        normalizePosts(pData).map((p) => ({
+          ...(p as UIUserPost),
+          isAdmin: (p as UIUserPost).isAdmin === true,
         }))
       );
     } finally {
@@ -72,6 +96,7 @@ export default function UserPage() {
 
   useEffect(() => {
     if (id) loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   /* ------------------------------------------------------
@@ -157,16 +182,16 @@ export default function UserPage() {
         onConfirm={confirmDelete}
       />
 
-    <div className="fixed inset-0 bg-white dark:bg-black overflow-hidden">
-      <main
-        ref={mainRef}
-        className="
-          absolute top-[4.3rem] left-0 right-0 bottom-0
-          overflow-y-auto no-scrollbar
-          pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-        "
-      >
-        <div className="feed-container mt-10">
+      <div className="fixed inset-0 bg-white dark:bg-black overflow-hidden">
+        <main
+          ref={mainRef}
+          className="
+            absolute top-[4.3rem] left-0 right-0 bottom-0
+            overflow-y-auto no-scrollbar
+            pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+          "
+        >
+          <div className="feed-container mt-10">
             <div className="flex items-start gap-4 border-b pb-4">
               <Avatar id={id} size={80} className="border" />
 

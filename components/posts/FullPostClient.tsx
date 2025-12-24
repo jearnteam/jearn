@@ -13,7 +13,9 @@ interface Props {
 }
 
 export default function FullPostClient({ initialPost }: Props) {
-  const [post, setPost] = useState<Post>(initialPost);
+  // 🔧 FIX: must allow null to match PostItem/PostFooter contract
+  const [post, setPost] = useState<Post | null>(initialPost);
+
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
@@ -24,6 +26,8 @@ export default function FullPostClient({ initialPost }: Props) {
    * SSE Listener — live sync post (title, content, categories, tags)
    * --------------------------------------------------------- */
   useEffect(() => {
+    if (!post?._id) return;
+
     const es = new EventSource("/api/stream");
 
     es.onmessage = (event) => {
@@ -36,11 +40,11 @@ export default function FullPostClient({ initialPost }: Props) {
             ? {
                 ...prev,
                 upvoteCount:
-                  prev.upvoteCount + (data.action === "added" ? 1 : -1),
+                  (prev.upvoteCount ?? 0) + (data.action === "added" ? 1 : -1),
                 upvoters:
                   data.action === "added"
-                    ? [...prev.upvoters, data.userId]
-                    : prev.upvoters.filter((u) => u !== data.userId),
+                    ? [...(prev.upvoters ?? []), data.userId]
+                    : (prev.upvoters ?? []).filter((u) => u !== data.userId),
               }
             : prev
         );
@@ -48,7 +52,7 @@ export default function FullPostClient({ initialPost }: Props) {
 
       // Full post update sync
       if (data.type === "update-post" && data.post._id === post._id) {
-        setPost((prev) => ({ ...prev, ...data.post }));
+        setPost((prev) => (prev ? { ...prev, ...data.post } : prev));
       }
 
       // When deleted
@@ -59,22 +63,48 @@ export default function FullPostClient({ initialPost }: Props) {
 
     es.onerror = () => console.warn("⚠️ SSE error (FullPostClient)");
     return () => es.close();
-  }, [post._id, router]);
+  }, [post?._id, router]);
 
   /* ---------------------------------------------------------
    * Upvote
    * --------------------------------------------------------- */
-  const handleUpvote = useCallback(async () => {
-    if (!user?.uid || !post._id) return;
+  const handleUpvote = useCallback(
+    async (id: string, userId: string, _txId?: string) => {
+      if (!userId || !id) return;
 
-    const res = await fetch(`/api/posts/${post._id}/upvote`, {
-      method: "POST",
-      body: JSON.stringify({ userId: user.uid }),
-      headers: { "Content-Type": "application/json" },
-    });
+      const res = await fetch(`/api/posts/${id}/upvote`, {
+        method: "POST",
+        body: JSON.stringify({ userId }),
+        headers: { "Content-Type": "application/json" },
+      });
 
-    if (!res.ok) console.error("❌ Upvote error", await res.text());
-  }, [post._id, user?.uid]);
+      if (!res.ok) console.error("❌ Upvote error", await res.text());
+    },
+    []
+  );
+
+  /* ---------------------------------------------------------
+   * Share
+   * --------------------------------------------------------- */
+  const handleShare = useCallback(() => {
+    if (!post?._id) return;
+
+    try {
+      const url = `${window.location.origin}/posts/${post._id}`;
+      navigator.clipboard?.writeText(url);
+    } catch (e) {
+      console.warn("Share failed", e);
+    }
+  }, [post?._id]);
+
+  /* ---------------------------------------------------------
+   * Answer
+   * --------------------------------------------------------- */
+  const handleAnswer = useCallback(() => {
+    if (!post?._id) return;
+
+    router.push(`/posts/${post._id}?focus=comments`, { scroll: false });
+  }, [router, post?._id]);
 
   /* ---------------------------------------------------------
    * Edit
@@ -90,7 +120,7 @@ export default function FullPostClient({ initialPost }: Props) {
       categories: string[],
       tags: string[]
     ) => {
-      if (!post._id) return;
+      if (!post?._id) return;
 
       const res = await fetch(`/api/posts`, {
         method: "PUT",
@@ -112,7 +142,7 @@ export default function FullPostClient({ initialPost }: Props) {
       const { post: updated } = await res.json();
       setPost(updated as Post);
     },
-    [post._id]
+    [post?._id]
   );
 
   /* ---------------------------------------------------------
@@ -123,7 +153,7 @@ export default function FullPostClient({ initialPost }: Props) {
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
-    if (!post._id) return;
+    if (!post?._id) return;
 
     const res = await fetch(`/api/posts`, {
       method: "DELETE",
@@ -132,18 +162,22 @@ export default function FullPostClient({ initialPost }: Props) {
     });
 
     if (res.ok) router.push("/");
-  }, [post._id, router]);
+  }, [post?._id, router]);
 
   /* ---------------------------------------------------------
    * Render
    * --------------------------------------------------------- */
+  if (!post) return null;
+
   return (
     <>
-      {/* FULL POST — use isSingle to hide comment icon */}
       <PostItem
         post={post}
+        setPost={setPost}          // ✅ now type-compatible
         isSingle={true}
         onUpvote={handleUpvote}
+        onShare={handleShare}
+        onAnswer={handleAnswer}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
       />

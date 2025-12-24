@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+// app/api/admin/update-post/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
@@ -6,35 +7,60 @@ export const runtime = "nodejs";
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
+
   try {
-    const body = await req.json();
+    // 🔒 Validate ObjectId early
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid post id" },
+        { status: 400 }
+      );
+    }
+
+    const body = (await req.json()) as Record<string, unknown>;
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    // 全てを受け入れる
-    const updateData: any = body;
+    // 🧹 Accept everything, but never allow _id overwrite
+    const updateData: Record<string, unknown> = { ...body };
     delete updateData["_id"];
-    /*const updateData: any = {
-      title: body.title,
-      content: body.content,
-      categories: body.categories ?? [],
-      updatedAt: new Date(),
-    };*/
 
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key] === undefined) delete updateData[key];
+    // 🧹 Remove undefined fields
+    for (const key of Object.keys(updateData)) {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    }
+
+    const result = await db
+      .collection("posts")
+      .findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: updateData },
+        { returnDocument: "after" }
+      );
+
+    // 🔒 Handle Mongo returning null
+    if (!result || !result.value) {
+      return NextResponse.json(
+        { ok: false, error: "Post not found" },
+        { status: 404 }
+      );
+    }
+
+    const post = result.value;
+
+    return NextResponse.json({
+      ok: true,
+      post: {
+        ...post,
+        _id: post._id.toString(),
+      },
     });
-
-    const updated = await db.collection("posts").findOneAndUpdate(
-      { _id: new ObjectId(params.id) },
-      { $set: updateData },
-      { returnDocument: "after" }
-    );
-
-    return NextResponse.json({ ok: true, post: updated });
   } catch (err) {
     console.error("❌ /api/admin/update-post error:", err);
     return NextResponse.json(
