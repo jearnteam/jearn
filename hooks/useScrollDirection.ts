@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 
 export type ScrollDirection = "up" | "down";
 
-export function useScrollDirection(threshold = 12): ScrollDirection {
+export function useScrollDirection(threshold = 12) {
   const [direction, setDirection] = useState<ScrollDirection>("up");
+  const [atTop, setAtTop] = useState(true);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -13,6 +14,9 @@ export function useScrollDirection(threshold = 12): ScrollDirection {
 
     const onScroll = () => {
       const currentY = window.scrollY;
+
+      // ✅ 画面一番上判定
+      setAtTop(currentY <= 0);
 
       if (!ticking) {
         window.requestAnimationFrame(() => {
@@ -34,5 +38,5 @@ export function useScrollDirection(threshold = 12): ScrollDirection {
     return () => window.removeEventListener("scroll", onScroll);
   }, [threshold]);
 
-  return direction;
+  return { direction, atTop };
 }

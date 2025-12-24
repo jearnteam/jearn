@@ -271,6 +271,10 @@ code {
   inset: 0 !important;
 }
 
+.feed-container {
+  max-width: 1100px; /* or 1200 */
+  margin-inline: auto;
+}
 /* ---------------------------------------------------------- */
 /*                ADMIN BORDER WITH RUNNING LIGHTS             */
 /* ---------------------------------------------------------- */

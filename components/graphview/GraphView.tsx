@@ -303,7 +303,7 @@ export default function GraphView({ post }: { post: any }) {
           enabled: true,
           stabilization: {
             enabled: true,
-            iterations: 1000,
+            iterations: 100,
             updateInterval: 25,
             onlyDynamicEdges: false,
             fit: true,
@@ -348,7 +348,7 @@ export default function GraphView({ post }: { post: any }) {
           smooth: {
             type: "continuous",
             forceDirection: "none",
-            roundness: 0.5,
+            roundness: 0.0,
           },
         },
         // configure: {

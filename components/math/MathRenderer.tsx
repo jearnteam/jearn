@@ -16,6 +16,9 @@ function setupLazyImages(container: HTMLElement) {
     const width = Number(el.dataset.width ?? 0);
     const height = Number(el.dataset.height ?? 0);
 
+    // Reset automatically on full page reload
+    const FAILED_IMAGE_CACHE = new Set<string>();
+
     // Calculate preview height but DO NOT render any padding box.
     let previewHeight = height > 0 ? Math.min(height, 400) : 400;
 
@@ -46,25 +49,33 @@ function setupLazyImages(container: HTMLElement) {
 
     function tryLoad(i: number) {
       if (i >= trySources.length) {
-        box.innerHTML = `<div class="text-red-500">Image not found</div>`;
+        box.innerHTML = "";
+        return;
+      }
+
+      const src = trySources[i];
+
+      // 🚫 already failed in this session → skip silently
+      if (FAILED_IMAGE_CACHE.has(src)) {
+        tryLoad(i + 1);
         return;
       }
 
       const img = new Image();
-      img.src = trySources[i];
       img.decoding = "async";
+      img.src = src;
 
       img.onload = () => {
         if (loaded) return;
         loaded = true;
 
-        // Clean box
         box.innerHTML = "";
+
         img.style.width = "auto";
         img.style.height = "auto";
-        img.style.maxHeight = "400px"; // respected without cropping
-        img.style.objectFit = "unset"; // keep natural aspect ratio
-        img.style.display = "block"; // remove inline gap
+        img.style.maxHeight = "400px";
+        img.style.objectFit = "unset";
+        img.style.display = "block";
         img.style.borderRadius = "8px";
         img.style.margin = "0 auto";
         img.className = "opacity-0 transition-opacity duration-300";
@@ -76,7 +87,10 @@ function setupLazyImages(container: HTMLElement) {
         });
       };
 
-      img.onerror = () => tryLoad(i + 1);
+      img.onerror = () => {
+        FAILED_IMAGE_CACHE.add(src); // 🧠 remember for this page only
+        tryLoad(i + 1);
+      };
     }
 
     tryLoad(0);
@@ -113,6 +127,27 @@ function renderMath(el: HTMLElement) {
 /* ----------------------------------------------------------
  *  MENTION POPUP
  * ---------------------------------------------------------- */
+function styleMentions(el: HTMLElement) {
+  const mentions = el.querySelectorAll(
+    "span[data-mention='true']"
+  ) as NodeListOf<HTMLElement>;
+
+  mentions.forEach((mentionEl) => {
+    mentionEl.classList.add(
+      "mention",
+      "px-1",
+      "py-0.5",
+      "rounded",
+      "bg-blue-100",
+      "dark:bg-blue-900",
+      "text-blue-700",
+      "dark:text-blue-300",
+      "font-medium"
+    );
+  });
+}
+
+
 function setupMentions(el: HTMLElement) {
   let popup: HTMLElement | null = null;
 
@@ -135,7 +170,13 @@ function setupMentions(el: HTMLElement) {
       e.stopPropagation();
       const target = uid || userId;
       if (target)
-        window.location.href = `/profile/${encodeURIComponent(target)}`;
+        window.dispatchEvent(
+          new CustomEvent("app:navigate", {
+            detail: {
+              href: `/profile/${encodeURIComponent(target)}`,
+            },
+          })
+        );
     });
 
     mentionEl.addEventListener("mouseenter", async () => {
@@ -195,6 +236,36 @@ function setupMentions(el: HTMLElement) {
 }
 
 /* ----------------------------------------------------------
+ *  TAG HANDLER (SPA / OVERLAY NAVIGATION)
+ * ---------------------------------------------------------- */
+function setupTags(el: HTMLElement) {
+  el.addEventListener(
+    "click",
+    (e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      const tagEl = target.closest("[data-type='tag']") as HTMLElement | null;
+      if (!tagEl) return;
+
+      const value = tagEl.dataset.value;
+      if (!value) return;
+
+      // 🔥 STOP native anchor navigation BEFORE it fires
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      window.dispatchEvent(
+        new CustomEvent("app:navigate", {
+          detail: { href: `/tags/${encodeURIComponent(value)}` },
+        })
+      );
+    },
+    true // 👈 CAPTURE PHASE (THIS IS THE KEY)
+  );
+}
+
+/* ----------------------------------------------------------
  *  MAIN RENDERER
  * ---------------------------------------------------------- */
 function MathRendererBase({ html }: { html: string }) {
@@ -205,7 +276,9 @@ function MathRendererBase({ html }: { html: string }) {
     if (!el) return;
 
     renderMath(el);
+    styleMentions(el);
     setupMentions(el);
+    setupTags(el);
     setupLazyImages(el);
 
     return () => {

@@ -1,6 +1,7 @@
+// @/lib/googleLogout.ts
 export const getGoogleLogoutUrl = () => {
-  const base = process.env.NEXT_PUBLIC_BASE_URL;
-  if (!base) throw new Error("NEXT_PUBLIC_BASE_URL is missing");
+  const base =
+    process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
   const returnUrl = `${base}/after-google-logout`;
 

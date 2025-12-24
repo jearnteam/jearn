@@ -3,7 +3,7 @@
 import type { Post } from "@/types/post";
 import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 interface UpvoteResponse {
   ok: boolean;
@@ -13,85 +13,49 @@ interface UpvoteResponse {
 
 interface Props {
   posts: Post[];
+  hasMore: boolean;
+  onLoadMore: () => void;
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
   onUpvote: (id: string, userId: string) => Promise<UpvoteResponse>;
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>; // fixed type
+  onAnswer: (post: Post) => void;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function PostList({
-  posts = [],
+  posts,
+  hasMore,
+  onLoadMore,
   onEdit,
   onDelete,
   onUpvote,
+  onAnswer,
   scrollContainerRef,
 }: Props) {
-  const [visibleCount, setVisibleCount] = useState(5);
-  const [visiblePosts, setVisiblePosts] = useState<Post[]>([]);
-  const [batchLoading, setBatchLoading] = useState(false);
+  const safePosts: Post[] = Array.isArray(posts) ? posts : [];
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const restoredOnce = useRef(false);
 
+  /* ---------------- INFINITE SCROLL ---------------- */
   useEffect(() => {
-    const saved = sessionStorage.getItem("restore-visible-count");
-    if (saved) {
-      const n = Number(saved);
-      if (!Number.isNaN(n) && n > 0) setVisibleCount(n);
-    }
-  }, []);
-
-  useEffect(() => {
-    sessionStorage.setItem("postListVisibleCount", String(visibleCount));
-  }, [visibleCount]);
-
-  async function preloadImages(urls: string[]) {
-    const tasks = urls.map(
-      (url) =>
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = resolve;
-          img.src = url;
-        })
-    );
-    await Promise.all(tasks);
-  }
-
-  useEffect(() => {
-    if (!posts.length) return;
-
-    const slice = posts.slice(0, visibleCount);
-    const avatarURLs = slice.map(
-      (p) =>
-        `https://cdn.jearn.site/avatars/${p.authorId}?t=${new Date().getTime()}`
-    );
-
-    setBatchLoading(true);
-
-    preloadImages(avatarURLs).then(() => {
-      setVisiblePosts(slice);
-      setBatchLoading(false);
-    });
-  }, [visibleCount, posts]);
-
-  useEffect(() => {
-    if (!posts.length) return;
+    if (!hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !batchLoading) {
-          setVisibleCount((prev) => Math.min(prev + 5, posts.length));
-        }
+        if (entries[0]?.isIntersecting) onLoadMore();
       },
-      { root: null, rootMargin: "300px", threshold: 0.01 }
+      {
+        root: scrollContainerRef?.current ?? null,
+        rootMargin: "400px",
+      }
     );
 
     if (sentinelRef.current) observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [posts.length, batchLoading]);
+  }, [hasMore, onLoadMore, scrollContainerRef]);
 
-  const restoredOnce = useRef(false);
-
+  /* ---------------- SCROLL RESTORE ---------------- */
   useEffect(() => {
     if (
       restoredOnce.current ||
@@ -110,49 +74,14 @@ export default function PostList({
     restoredOnce.current = true;
 
     requestAnimationFrame(() => {
-      el.scrollIntoView({ behavior: "instant", block: "start" });
+      el.scrollIntoView({ block: "start" });
     });
 
     sessionStorage.removeItem("restore-post-id");
-    sessionStorage.removeItem("restore-visible-count");
     sessionStorage.removeItem("from-navigation");
-  }, [visiblePosts]);
+  }, [safePosts, scrollContainerRef]);
 
-  async function upvotePost(
-    id: string,
-    userId: string
-  ): Promise<{
-    ok: boolean;
-    action?: "added" | "removed";
-    error?: string;
-  }> {
-    try {
-      const res = await fetch(`/api/posts/${id}/upvote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { ok: false, error: data?.error || "Upvote failed" };
-      }
-
-      if (data.action === "upvoted") {
-        return { ok: true, action: "added" };
-      }
-
-      if (data.action === "unvoted") {
-        return { ok: true, action: "removed" };
-      }
-
-      return { ok: true };
-    } catch {
-      return { ok: false, error: "Network error" };
-    }
-  }
-
+  /* ---------------- RENDER ---------------- */
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -160,22 +89,26 @@ export default function PostList({
       transition={{ duration: 0.4 }}
       className="space-y-[2px] overflow-hidden"
     >
-      {visiblePosts.map((post) => (
+      {safePosts.map((post) => (
         <PostItem
           key={post._id}
           post={post}
           onEdit={() => onEdit(post)}
           onDelete={onDelete}
           onUpvote={onUpvote}
+          onAnswer={onAnswer}
           scrollContainerRef={scrollContainerRef}
         />
       ))}
 
-      {batchLoading && (
-        <div className="text-center py-4 text-gray-500">Loading…</div>
+      {hasMore && (
+        <div
+          ref={sentinelRef}
+          className="h-10 flex items-center justify-center text-gray-500"
+        >
+          Loading…
+        </div>
       )}
-
-      <div ref={sentinelRef} className="h-10" />
     </motion.div>
   );
 }

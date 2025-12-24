@@ -1,13 +1,12 @@
 // app/api/notifications/stream/route.ts
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
 import { subscribe, unsubscribe } from "@/lib/notificationHub";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const session = await getServerSession(authOptions);
-
+  const session = await getServerSession(authConfig);
   if (!session?.user?.uid) {
     return new Response("Unauthorized", { status: 401 });
   }

@@ -1,29 +1,50 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const LINE_HEIGHT = 20;
 const FULL_LINES_LIMIT = 10;
 
 export function usePostCollapse(html: string) {
-  const ref = useRef<HTMLDivElement | null>(null);
+  const measureRef = useRef<HTMLDivElement | null>(null);
+
   const [expanded, setExpanded] = useState(false);
   const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
+  const [fullHeight, setFullHeight] = useState<number>(0);
+  const [initialized, setInitialized] = useState(false);
 
-  useEffect(() => {
-    const el = ref.current;
+  useLayoutEffect(() => {
+    const el = measureRef.current;
     if (!el) return;
 
-    const full = el.scrollHeight;
     const limit = LINE_HEIGHT * FULL_LINES_LIMIT;
-    setCollapsedHeight(full > limit ? limit : null);
+
+    const measure = () => {
+      const style = getComputedStyle(el);
+      const paddingBottom = parseFloat(style.paddingBottom || "0");
+
+      const full = el.scrollHeight + paddingBottom;
+
+      setFullHeight(full);
+      setCollapsedHeight(full > limit ? limit : null);
+      setInitialized(true);
+    };
+
+    requestAnimationFrame(measure);
+
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+
+    return () => ro.disconnect();
   }, [html]);
 
   return {
-    ref,
+    measureRef,
     expanded,
     setExpanded,
     collapsedHeight,
-    shouldTruncate: collapsedHeight !== null,
+    fullHeight,
+    initialized,
+    shouldTruncate: initialized && collapsedHeight !== null,
   };
 }

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
 import { PostTypes } from "@/types/post";
 import { emitNotification } from "@/lib/notificationHub";
 
@@ -14,40 +14,47 @@ export const runtime = "nodejs";
 /*                         ENRICH POST WITH USER DATA                         */
 /* -------------------------------------------------------------------------- */
 async function enrichPost(post: any, usersColl: any) {
+  const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+
+  // 🔒 System posts
+  if (post.authorId === "system") {
+    return {
+      ...post,
+      _id: post._id.toString(),
+      authorId: "system",
+      authorName: "System",
+      authorAvatar: `${CDN}/avatars/system.webp`,
+    };
+  }
+
   let user = null;
 
-  // 1) If authorId is a valid ObjectId → lookup by _id
+  // Try resolving user by current ObjectId
   if (ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, userId: 1, email: 1, avatarUpdatedAt: 1 } }
+      { projection: { name: 1, avatarUpdatedAt: 1 } }
     );
   }
 
-  // 2) Fallback: lookup by provider_id (old users)
-  if (!user) {
-    user = await usersColl.findOne(
-      { provider_id: post.authorId },
-      { projection: { name: 1, userId: 1, email: 1, avatarUpdatedAt: 1 } }
-    );
-  }
-
-  // 3) If STILL not found → anonymous placeholder
-  const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+  // 🔑 DO NOT DESTROY EXISTING DATA
+  const authorName = post.authorName ?? user?.name ?? "Unknown";
 
   const avatarId = user?._id?.toString() ?? post.authorId;
+
   const timestamp = user?.avatarUpdatedAt
     ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
     : "";
 
+  const authorAvatar =
+    post.authorAvatar ?? `${CDN}/avatars/${avatarId}.webp${timestamp}`;
+
   return {
     ...post,
     _id: post._id.toString(),
-    authorId: user?._id?.toString() ?? post.authorId,
-    authorName: user?.name ?? "Unknown",
-    authorUserId: user?.userId ?? "",
-    authorAvatarUpdatedAt: user?.avatarUpdatedAt ?? null,
-    authorAvatar: `${CDN}/avatars/${avatarId}.webp${timestamp}`,
+    authorId: post.authorId,
+    authorName,
+    authorAvatar,
   };
 }
 
@@ -82,7 +89,9 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const category = searchParams.get("category");
+
+    const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
+    const cursor = searchParams.get("cursor"); // createdAt|_id
 
     const client = await clientPromise;
     const db = client.db("jearn");
@@ -90,13 +99,36 @@ export async function GET(req: Request) {
     const users = db.collection("users");
     const categoriesColl = db.collection("categories");
 
-    const query: any = { parentId: null };
+    const query: any = {
+      $and: [
+        {
+          $or: [
+            { postType: PostTypes.POST },
+            { postType: PostTypes.QUESTION },
+            { postType: PostTypes.ANSWER },
+            { parentId: null },
+          ],
+        },
+        { postType: { $ne: PostTypes.COMMENT } },
+      ],
+    };
 
-    if (category && ObjectId.isValid(category)) {
-      query.categories = new ObjectId(category);
+    if (cursor) {
+      const [createdAt, id] = cursor.split("|");
+      query.$or = [
+        { createdAt: { $lt: new Date(createdAt) } },
+        {
+          createdAt: new Date(createdAt),
+          _id: { $lt: new ObjectId(id) },
+        },
+      ];
     }
 
-    const docs = await posts.find(query).sort({ createdAt: -1 }).toArray();
+    const docs = await posts
+      .find(query)
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(limit)
+      .toArray();
 
     // comment count map
     const commentCounts = await posts
@@ -108,28 +140,38 @@ export async function GET(req: Request) {
 
     const countMap: Record<string, number> = {};
     commentCounts.forEach((c) => {
-      countMap[c._id] = c.count;
+      countMap[c._id.toString()] = c.count;
     });
 
     const enriched = await Promise.all(
       docs.map(async (p) => {
-        const categoryData = await enrichCategories(
+        const categories = await enrichCategories(
           Array.isArray(p.categories) ? p.categories : [],
           categoriesColl
         );
 
-        const enrichedPost = await enrichPost(p, users);
+        const post = await enrichPost(p, users);
 
         return {
-          ...enrichedPost,
-          categories: categoryData,
-          commentCount: countMap[p._id.toString()] ?? 0,
+          ...post,
+          categories,
           tags: p.tags ?? [],
+          commentCount: countMap[p._id.toString()] ?? 0,
         };
       })
     );
 
-    return NextResponse.json(enriched);
+    const nextCursor =
+      docs.length > 0
+        ? `${docs[docs.length - 1].createdAt.toISOString()}|${docs[
+            docs.length - 1
+          ]._id.toString()}`
+        : null;
+
+    return NextResponse.json({
+      items: enriched,
+      nextCursor,
+    });
   } catch (err) {
     console.error("❌ GET /api/posts error:", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -141,8 +183,8 @@ export async function GET(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -375,8 +417,8 @@ export async function POST(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function PUT(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -460,8 +502,8 @@ export async function PUT(req: Request) {
 /* -------------------------------------------------------------------------- */
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 

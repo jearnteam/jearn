@@ -5,7 +5,7 @@ import { ObjectId } from "mongodb";
 import sharp from "sharp";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
 
 export const runtime = "nodejs";
 
@@ -23,8 +23,8 @@ const r2 = new S3Client({
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 

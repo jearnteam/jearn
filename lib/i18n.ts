@@ -70,6 +70,7 @@ if (!i18n.isInitialized) {
           userNotFound: "User not found.",
           postsByBefore: "Posts by",
           postsByAfter: "",
+          following: "following",
           // profile setting
           profileSettings: "Profile Settings",
           name: "Name",
@@ -144,6 +145,7 @@ if (!i18n.isInitialized) {
           userNotFound: "ユーザーが見つかりませんでした。",
           postsByBefore: "",
           postsByAfter: "の投稿",
+          following: "フォロー済み",
           // profile setting
           profileSettings: "プロフィール設定",
           name: "名前",
@@ -220,6 +222,7 @@ if (!i18n.isInitialized) {
           userNotFound: "အကောင့်ရှာမတွေ့ပါ",
           postsByBefore: "",
           postsByAfter: "၏ပို့စ်များ",
+          following: "following",
           // profile setting
           profileSettings: "ပရိုဖိုင် ဆက်တင်များ",
           name: "နာမည်",

@@ -2,17 +2,50 @@ import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
-/* --------------------------------------------- */
-/*                 ENRICH CATEGORY               */
-/* --------------------------------------------- */
+/* ---------------------- AUTHOR RESOLVER (SHARED LOGIC) ---------------------- */
+async function resolveAuthor(users: any, authorId?: string | null) {
+  if (!authorId) {
+    return {
+      name: "Anonymous",
+      userId: null,
+      avatarUpdatedAt: null,
+      email: null,
+    };
+  }
+
+  let user = null;
+
+  if (ObjectId.isValid(authorId)) {
+    user = await users.findOne(
+      { _id: new ObjectId(authorId) },
+      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1, email: 1 } }
+    );
+  }
+
+  if (!user) {
+    user = await users.findOne(
+      { provider_id: authorId },
+      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1, email: 1 } }
+    );
+  }
+
+  return {
+    name: user?.name ?? "Anonymous",
+    userId: user?.userId ?? null,
+    avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
+    email: user?.email ?? null,
+  };
+}
+
+/* ---------------------- CATEGORY ENRICHER ---------------------- */
 async function enrichCategories(catIds: any[], categoriesColl: any) {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .map((c) => (ObjectId.isValid(c) ? new ObjectId(c) : null))
-    .filter((x): x is ObjectId => x !== null);
+    .filter((c) => ObjectId.isValid(c))
+    .map((c) => new ObjectId(c));
 
-  if (validIds.length === 0) return [];
+  if (!validIds.length) return [];
 
   const docs = await categoriesColl
     .find({ _id: { $in: validIds } })
@@ -20,93 +53,70 @@ async function enrichCategories(catIds: any[], categoriesColl: any) {
     .toArray();
 
   return docs.map((c: any) => ({
-    id: c._id.toString(),
-    name: c.name,
-    jname: c.jname,
+    id: String(c._id),
+    name: c.name ?? "",
+    jname: c.jname ?? "",
     myname: c.myname ?? "",
   }));
 }
 
-/* --------------------------------------------- */
-/*             ENRICH POST WITH USER DATA        */
-/* --------------------------------------------- */
-async function enrichPost(post: any, usersColl: any) {
-  const uid = post.authorId;
-
-  let user = null;
-
-  // Find by _id
-  if (ObjectId.isValid(uid)) {
-    user = await usersColl.findOne(
-      { _id: new ObjectId(uid) },
-      { projection: { name: 1, picture: 1, email: 1, admin: 1 } }
-    );
-  }
-
-  // Find by provider_id fallback
-  if (!user) {
-    user = await usersColl.findOne(
-      { provider_id: uid },
-      { projection: { name: 1, picture: 1, email: 1, admin: 1 } }
-    );
-  }
-
-  const avatarId = user?._id?.toString() ?? uid;
-
-  // ⭐ ADMIN CHECK — SAME AS /api/posts
-  const adminEmails = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) || [];
-  const isAdminViaEmail = user?.email && adminEmails.includes(user.email.trim());
-  const isAdminViaFlag = user?.admin === true;
-
-  return {
-    ...post,
-    _id: post._id.toString(),
-
-    authorId: avatarId,
-    authorName: user?.name ?? "Unknown",
-
-    // ⭐ final admin flag
-    isAdmin: isAdminViaFlag || isAdminViaEmail,
-  };
-}
-
-/* --------------------------------------------- */
-/*                    GET ROUTE                  */
-/* --------------------------------------------- */
+/* ===============================================================
+   GET — posts by tag (MODERN, AVATAR-SAFE)
+   =============================================================== */
 export async function GET(
-  req: Request,
+  _req: Request,
   { params }: { params: { tag: string } }
 ) {
   try {
     const tag = decodeURIComponent(params.tag);
 
     const client = await clientPromise;
-    const db = client.db("jearn");
+    const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const postsColl = db.collection("posts");
     const usersColl = db.collection("users");
     const categoriesColl = db.collection("categories");
 
-    // Only top-level posts
+    /* ----------- Fetch top-level posts ----------- */
     const posts = await postsColl
       .find({ parentId: null, tags: tag })
       .sort({ createdAt: -1 })
       .toArray();
 
-    // ⭐ Enrich
-    const enriched = await Promise.all(
-      posts.map(async (p) => {
-        const enrichedPost = await enrichPost(p, usersColl);
-        const categoryData = await enrichCategories(
-          p.categories ?? [],
+    const adminEmails =
+      process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) || [];
+
+    const enrichedPosts = await Promise.all(
+      posts.map(async (post: any) => {
+        const author = await resolveAuthor(usersColl, post.authorId);
+
+        const isAdmin =
+          !!author.email && adminEmails.includes(author.email);
+
+        const categories = await enrichCategories(
+          Array.isArray(post.categories) ? post.categories : [],
           categoriesColl
         );
 
         return {
-          ...enrichedPost,
-          categories: categoryData,
-          tags: p.tags ?? [],
-          commentCount: p.commentCount ?? 0,
+          _id: String(post._id),
+          title: post.title,
+          content: post.content,
+          createdAt: post.createdAt,
+          edited: post.edited ?? false,
+          editedAt: post.editedAt ?? null,
+
+          authorId: post.authorId,
+          authorName: author.name,
+          authorUserId: author.userId,
+          authorAvatarUpdatedAt: author.avatarUpdatedAt,
+
+          categories,
+          tags: post.tags ?? [],
+          upvoteCount: post.upvoteCount ?? 0,
+          commentCount: post.commentCount ?? 0,
+
+          isAdmin,
         };
       })
     );
@@ -114,10 +124,13 @@ export async function GET(
     return NextResponse.json({
       ok: true,
       tag,
-      posts: enriched,
+      posts: enrichedPosts,
     });
   } catch (err) {
-    console.error("❌ /api/tags/[tag] error:", err);
-    return NextResponse.json({ ok: false, error: "Server error" }, { status: 500 });
+    console.error("❌ GET /api/tags/[tag]:", err);
+    return NextResponse.json(
+      { ok: false, error: "Server error" },
+      { status: 500 }
+    );
   }
 }

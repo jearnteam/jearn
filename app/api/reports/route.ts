@@ -8,6 +8,7 @@ export const runtime = "nodejs";
    GET — Fetch ALL reports
 --------------------------------------------------------- */
 export async function GET() {
+  // TODO: add auth(admin?)
   try {
     const client = await clientPromise;
     const db = client.db("jearn");
@@ -30,6 +31,7 @@ export async function GET() {
 --------------------------------------------------------- */
 /* ---------- POST: Create or append a report ---------- */
 export async function POST(req: Request) {
+  // TODO: add auth
   try {
     const { postId, reporterId, reason } = await req.json();
 

@@ -12,6 +12,7 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // TODO: add auth
   try {
     const { id } = await params; // ✅ FIXED
 

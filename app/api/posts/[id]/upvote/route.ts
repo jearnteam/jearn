@@ -5,86 +5,126 @@ import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { emitNotification } from "@/lib/notificationHub";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
+
+export const runtime = "nodejs";
 
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email || !session.user.uid) {
+    /* --------------------------------------------------------
+       AUTH
+    --------------------------------------------------------- */
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 
     const { userId, txId } = await req.json();
-    const postId = await params.id;
 
-    if (!userId) {
-      return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+    if (!userId || userId !== session.user.uid) {
+      return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
     }
-    if (userId !== session.user.uid) {
-      return NextResponse.json({ error: "Incorrect userId" }, { status: 400 });
-    }
-    if (!ObjectId.isValid(postId)) {
+
+    if (!ObjectId.isValid(params.id)) {
       return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
     }
+
+    /* --------------------------------------------------------
+       SETUP
+    --------------------------------------------------------- */
+    const postId = new ObjectId(params.id);
+    const actorObjId = new ObjectId(userId);
 
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
     const posts = db.collection("posts");
     const notifications = db.collection("notifications");
 
-    const _id = new ObjectId(postId);
-    const post = await posts.findOne({ _id });
+    /* --------------------------------------------------------
+       ATOMIC UPSERT (RACE SAFE)
+    --------------------------------------------------------- */
+    const result = await posts.findOneAndUpdate(
+      { _id: postId },
+      [
+        {
+          $set: {
+            upvoters: { $ifNull: ["$upvoters", []] },
+            upvoteCount: { $ifNull: ["$upvoteCount", 0] },
+          },
+        },
+        {
+          $set: {
+            _alreadyUpvoted: { $in: [actorObjId, "$upvoters"] },
+          },
+        },
+        {
+          $set: {
+            upvoters: {
+              $cond: [
+                "$_alreadyUpvoted",
+                { $setDifference: ["$upvoters", [actorObjId]] },
+                { $concatArrays: ["$upvoters", [actorObjId]] },
+              ],
+            },
+            upvoteCount: {
+              $cond: [
+                "$_alreadyUpvoted",
+                { $max: [{ $subtract: ["$upvoteCount", 1] }, 0] },
+                { $add: ["$upvoteCount", 1] },
+              ],
+            },
+          },
+        },
+        { $unset: "_alreadyUpvoted" },
+      ],
+      { returnDocument: "after" }
+    );
 
-    if (!post) {
+    /* --------------------------------------------------------
+   TS SAFETY (this is what fixes the error)
+    --------------------------------------------------------- */
+    if (!result || !result.value) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
-    const already =
-      Array.isArray(post.upvoters) && post.upvoters.includes(userId);
+    const updated = result.value;
 
-    const action: "added" | "removed" = already ? "removed" : "added";
+    if (!updated) {
+      return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    }
 
-    /* --------------------------------------------------------
-       APPLY UPVOTE UPDATE
-    --------------------------------------------------------- */
-    await posts.updateOne(
-      { _id },
-      already
-        ? { $pull: { upvoters: userId }, $inc: { upvoteCount: -1 } }
-        : { $addToSet: { upvoters: userId }, $inc: { upvoteCount: 1 } }
-    );
-
-    const updated = await posts.findOne({ _id });
-
-    const actorName = session.user.name ?? "Someone";
-    const actorAvatar = `${process.env.R2_PUBLIC_URL}/avatars/${userId}.webp`;
-
-    const preview = (post.title ?? "").slice(0, 80).replace(/\n/g, " ");
+    const action: "added" | "removed" = updated.upvoters.some((id: ObjectId) =>
+      id.equals(actorObjId)
+    )
+      ? "added"
+      : "removed";
 
     /* --------------------------------------------------------
-   🔔 GROUPED LIKE NOTIFICATION
+       🔔 GROUPED LIKE NOTIFICATION
     --------------------------------------------------------- */
     if (action === "added") {
-      const postOwnerUid = post.authorId;
+      const postOwnerUid = updated.authorId;
 
       if (postOwnerUid && postOwnerUid !== userId) {
-        const groupKey = `post_like:${postId}`;
-        const actorObjId = new ObjectId(userId);
         const ownerObjId = new ObjectId(postOwnerUid);
+        const groupKey = `post_like:${postId.toString()}`;
         const now = new Date();
 
-        // Only group while unread; if read=true exists, upsert will create a new unread doc
-        const result = await notifications.updateOne(
+        const actorName = session.user.name ?? "Someone";
+        const actorAvatar = `${process.env.R2_PUBLIC_URL}/avatars/${userId}.webp`;
+        const preview = (updated.title ?? "").slice(0, 80).replace(/\n/g, " ");
+
+        const notifResult = await notifications.updateOne(
           { userId: ownerObjId, groupKey, read: false },
           [
             {
               $set: {
                 userId: { $ifNull: ["$userId", ownerObjId] },
                 type: { $ifNull: ["$type", "post_like"] },
-                postId: { $ifNull: ["$postId", _id] },
+                postId: { $ifNull: ["$postId", postId] },
                 groupKey: { $ifNull: ["$groupKey", groupKey] },
                 read: { $ifNull: ["$read", false] },
                 createdAt: { $ifNull: ["$createdAt", now] },
@@ -94,7 +134,6 @@ export async function POST(
             },
             {
               $set: {
-                // if actor already exists, keep actors + count
                 _already: { $in: [actorObjId, "$actors"] },
               },
             },
@@ -110,7 +149,6 @@ export async function POST(
                 count: {
                   $cond: ["$_already", "$count", { $add: ["$count", 1] }],
                 },
-
                 lastActorId: actorObjId,
                 lastActorName: actorName,
                 lastActorAvatar: actorAvatar,
@@ -123,54 +161,49 @@ export async function POST(
           { upsert: true }
         );
 
-        // If it inserted a brand-new unread notification doc, unread count +1
-        const unreadDelta = result.upsertedId ? 1 : 0;
-
         emitNotification(postOwnerUid, {
           type: "post_like",
-          postId,
+          postId: postId.toString(),
           actorId: userId,
-          unreadDelta,
+          unreadDelta: notifResult.upsertedId ? 1 : 0,
         });
       }
     }
 
     /* --------------------------------------------------------
-       🔊 EXISTING POST / GRAPH SSE (UNCHANGED)
+       🔊 SSE
     --------------------------------------------------------- */
     const payload = {
-      postId,
+      postId: postId.toString(),
       userId,
       action,
       txId: txId ?? null,
-      parentId: updated?.parentId ?? null,
-      replyTo: updated?.replyTo ?? null,
+      parentId: updated.parentId ?? null,
+      replyTo: updated.replyTo ?? null,
     };
 
     broadcastSSE({ type: "upvote", ...payload });
 
-    const type = updated?.replyTo
-      ? "upvote-reply"
-      : updated?.parentId
-      ? "upvote-comment"
-      : "upvote-post";
-
-    broadcastSSE({ type, ...payload });
+    broadcastSSE({
+      type: updated.replyTo
+        ? "upvote-reply"
+        : updated.parentId
+        ? "upvote-comment"
+        : "upvote-post",
+      ...payload,
+    });
 
     /* --------------------------------------------------------
-       ✅ RETURN UPDATED OBJECT (FOR GRAPHVIEW)
+       ✅ RESPONSE
     --------------------------------------------------------- */
     return NextResponse.json({
       ok: true,
       action,
       txId: txId ?? null,
-      comment: {
-        _id: updated!._id.toString(),
-        content: updated!.content ?? "",
-        authorName: updated!.authorName ?? "",
-        createdAt: updated!.createdAt ?? "",
-        upvoteCount: updated!.upvoteCount ?? 0,
-        upvoters: updated!.upvoters ?? [],
+      post: {
+        _id: updated._id.toString(),
+        upvoteCount: updated.upvoteCount,
+        upvoters: updated.upvoters.map((id: ObjectId) => id.toString()),
       },
     });
   } catch (err) {

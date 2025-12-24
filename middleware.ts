@@ -4,47 +4,68 @@ import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 const PUBLIC_PATHS = [
-  "/manifest.webmanifest",
   "/login",
+  "/logout",
+
+  // ✅ NextAuth MUST be fully public
   "/api/auth",
+
+  // SSE / public APIs
   "/api/stream",
   "/api/user/current",
-  "/api/posts",
+
   "/api/images",
   "/api/categories",
   "/api/category",
   "/api/tags",
+
+  "/manifest.webmanifest",
   "/favicon.ico",
-  "/_next",
   "/icons",
   "/default-avatar.png",
 ];
 
-const ADMIN_EMAILS = process.env.ADMIN_EMAILS?.split(",").map(e => e.trim()) ?? [];
+const ADMIN_EMAILS =
+  process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim().toLowerCase()) ?? [];
 
+// middleware.ts
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-
-  // ✅ Public routes
-  const isPublic = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
-  if (isPublic) return NextResponse.next();
-
-  // ✅ Get token from NextAuth
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  if (!token) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.url);
-    return NextResponse.redirect(loginUrl);
+  if (req.method === "OPTIONS") {
+    return NextResponse.next();
   }
 
-  // ✅ Restrict dashboard to specific email(s)
+  const { pathname } = req.nextUrl;
+
+  // ✅ Always allow Next.js internals
+  if (pathname.startsWith("/_next")) {
+    return NextResponse.next();
+  }
+
+  // ✅ PUBLIC PROFILE PAGES (FIX)
+  if (pathname === "/profile" || pathname.startsWith("/profile/")) {
+    return NextResponse.next();
+  }
+
+  // ✅ Allow all other public paths
+  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
+  // 🔐 Auth check
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+
+  if (!token) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // 🔒 Admin-only routes
   if (pathname.startsWith("/dashboard")) {
-    const userEmail = token.email?.toLowerCase();
-    const allowed = ADMIN_EMAILS.map(e => e.toLowerCase());
-    if (!userEmail || !allowed.includes(userEmail)) {
-      // Not an admin → redirect to home or 403
-      const homeUrl = new URL("/", req.url);
-      return NextResponse.redirect(homeUrl);
+    const email = token.email?.toLowerCase();
+    if (!email || !ADMIN_EMAILS.includes(email)) {
+      return NextResponse.redirect(new URL("/", req.url));
     }
   }
 
@@ -52,5 +73,12 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Run middleware on all routes except:
+     * - _next static files
+     * - static assets
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

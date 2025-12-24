@@ -1,4 +1,4 @@
-// hooks/useCurrentUser.ts
+//@/hooks/useCurrentUser.ts
 "use client";
 
 import { useState, useEffect } from "react";

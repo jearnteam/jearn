@@ -1,72 +1,110 @@
+"use client";
+
 import type { Post } from "@/types/post";
-import React from "react";
 import { motion } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse } from "./usePostCollapse";
 
 export default function PostContent({
   post,
-  scrollContainerRef,
   wrapperRef,
+  scrollContainerRef,
 }: {
   post: Post;
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
-  const { ref, expanded, setExpanded, collapsedHeight, shouldTruncate } =
-    usePostCollapse(post.content ?? "");
+  const {
+    measureRef,
+    expanded,
+    setExpanded,
+    collapsedHeight,
+    fullHeight,
+    initialized,
+    shouldTruncate,
+  } = usePostCollapse(post.content ?? "");
+
+  const collapsed = collapsedHeight ?? fullHeight;
+  const targetHeight = expanded ? fullHeight : collapsed;
+
+  /* -------------------------------------------------
+   * 🔧 Scroll correction BEFORE collapsing
+   * ------------------------------------------------- */
+  function jumpBeforeCollapseIfNeeded() {
+    const wrapper = wrapperRef.current;
+    const scroller = scrollContainerRef?.current;
+
+    if (!wrapper || !scroller) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+
+    const topVisible =
+      wrapperRect.top >= scrollerRect.top &&
+      wrapperRect.top <= scrollerRect.bottom;
+
+    if (topVisible) return;
+
+    const delta = wrapperRect.top - scrollerRect.top;
+
+    scroller.scrollTo({
+      top: scroller.scrollTop + delta,
+      behavior: "auto",
+    });
+  }
 
   return (
     <>
-      <motion.div
-        animate={{ height: expanded ? "auto" : collapsedHeight ?? "auto" }}
-        className="overflow-hidden mt-2"
+      {/* 🔒 Hidden measurement layer (always mounted) */}
+      <div
+        className="absolute invisible pointer-events-none"
+        style={{ height: 0, overflow: "hidden" }}
       >
-        <div ref={ref}>
+        <div ref={measureRef}>
           <MathRenderer html={post.content ?? ""} />
         </div>
-      </motion.div>
+      </div>
 
-      {shouldTruncate && (
-        <button
-          onClick={() => {
-            setExpanded((prev) => {
-              const next = !prev;
+      {/* 🎬 Visible collapsing layer */}
+      {initialized && (
+        <>
+          {shouldTruncate ? (
+            /* 🎬 COLLAPSIBLE CONTENT */
+            <>
+              <motion.div
+                initial={{ height: collapsed }}
+                animate={{ height: targetHeight }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="overflow-hidden mt-2"
+              >
+                <div className="pb-3">
+                  <MathRenderer html={post.content ?? ""} />
+                </div>
+              </motion.div>
 
-              // 👇 ONLY when collapsing
-              if (prev && wrapperRef.current) {
-                requestAnimationFrame(() => {
-                  const scroller = scrollContainerRef?.current;
-
-                  if (scroller) {
-                    const postTop =
-                      wrapperRef.current!.offsetTop - scroller.offsetTop;
-
-                    scroller.scrollTo({
-                      top: postTop,
-                      behavior: "smooth",
+              <button
+                onClick={() => {
+                  if (expanded) {
+                    setExpanded(false);
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(jumpBeforeCollapseIfNeeded);
                     });
                   } else {
-                    // fallback (window scroll)
-                    const postTop =
-                      wrapperRef.current!.getBoundingClientRect().top +
-                      window.scrollY;
-
-                    window.scrollTo({
-                      top: postTop,
-                      behavior: "smooth",
-                    });
+                    setExpanded(true);
                   }
-                });
-              }
-
-              return next;
-            });
-          }}
-          className="mt-2 text-blue-600 text-sm"
-        >
-          {expanded ? "Show Less ▲" : "Show More ▼"}
-        </button>
+                }}
+                className="mt-2 text-blue-600 text-sm"
+              >
+                {expanded ? "Show Less ▲" : "Show More ▼"}
+              </button>
+            </>
+          ) : (
+            /* ✅ NORMAL CONTENT — NO HEIGHT LOCK */
+            <div className="mt-2">
+              <MathRenderer html={post.content ?? ""} />
+            </div>
+          )}
+        </>
       )}
     </>
   );

@@ -1,3 +1,7 @@
+"use client";
+
+import HomePage from "./HomePage";
+
 export default function AppLayout({
   children,
   overlay,
@@ -7,6 +11,7 @@ export default function AppLayout({
 }) {
   return (
     <>
+      <HomePage />   {/* 🔒 stays mounted */}
       {children}
       {overlay}
     </>

@@ -2,6 +2,7 @@
 
 import { useParams, notFound } from "next/navigation";
 import { useEffect, useState } from "react";
+import PostOverlayShell from "@/app/(app)/posts/[id]/PostOverlayShell";
 import FullPostClient from "@/components/posts/FullPostClient";
 import CommentClientSection from "@/components/comments/CommentClientSection";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
@@ -17,49 +18,66 @@ export default function OverlayPostPage() {
   useEffect(() => {
     if (!id) return;
 
+    let cancelled = false;
+
     (async () => {
       try {
-        const postRes = await fetch(`/api/posts/${id}`, { cache: "no-store" });
-        if (!postRes.ok) return notFound();
-        setPost(await postRes.json());
+        const postRes = await fetch(`/api/posts/${id}`, {
+          cache: "no-store",
+        });
+
+        if (!postRes.ok) {
+          if (!cancelled) setPost(null);
+          return;
+        }
+
+        const postData = await postRes.json();
+        if (!cancelled) setPost(postData);
 
         const commentsRes = await fetch(`/api/posts/${id}/comments`, {
           cache: "no-store",
         });
-        if (commentsRes.ok) setComments(await commentsRes.json());
+        if (commentsRes.ok && !cancelled) {
+          setComments(await commentsRes.json());
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  if (loading) return <FullScreenLoader />;
-  if (!post) return notFound();
+  /* -------------------------------
+     1️⃣ LOADING
+  -------------------------------- */
+  if (loading) {
+    return <FullScreenLoader text="Loading post…" />;
+  }
 
+  /* -------------------------------
+     2️⃣ NOT FOUND (AFTER loading)
+  -------------------------------- */
+  if (!post) {
+    return notFound();
+  }
+
+  /* -------------------------------
+     3️⃣ CONTENT
+  -------------------------------- */
   return (
-    /* 🔴 CRITICAL FIX */
-    <div>
-      {/* Backdrop click */}
-      <div
-        className="absolute inset-0"
-        onClick={() => history.back()}
-      />
-
-      {/* Modal */}
-      <div className="
-        absolute inset-x-0 top-[4.3rem] bottom-0
-        bg-white dark:bg-black
-        overflow-y-auto
-        no-scrollbar
-      ">
-        <div className="max-w-2xl mx-auto py-6 space-y-10 px-4">
+    <PostOverlayShell onClose={() => history.back()}>
+      {() => (
+        <>
           <FullPostClient initialPost={post} />
           <CommentClientSection
             comments={comments}
             postId={post._id}
           />
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </PostOverlayShell>
   );
 }

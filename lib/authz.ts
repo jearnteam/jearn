@@ -1,3 +1,4 @@
+//@/lib/authz.ts
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 

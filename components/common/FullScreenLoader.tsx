@@ -9,27 +9,28 @@ export default function FullScreenLoader({ text }: { text?: string }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
+      /* ❌ no fade-in */
+      initial={false}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
-      className={`
-  flex flex-col items-center justify-center
-  bg-white/80 dark:bg-neutral-900/80
-  z-50
-  ${
-    typeof window !== "undefined" &&
-    document.querySelector(".graph-loader-container")
-      ? "absolute inset-0 pointer-events-none"
-      : "fixed inset-0"
-  }
-  `}
+      /* ✅ fade-out allowed */
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="
+        fixed
+        inset-x-0
+        top-[4.3rem]
+        bottom-0
+        z-50
+        flex flex-col items-center justify-center
+        bg-white dark:bg-neutral-900
+      "
     >
       <div className="w-40 h-40">
         <LoadingOwl />
       </div>
 
       <p className="text-lg font-medium mt-4 text-gray-700 dark:text-gray-300">
-        {text || t("loading") || "Loading"}...
+        {text || t('loading') || 'Loading'}...
       </p>
     </motion.div>
   );

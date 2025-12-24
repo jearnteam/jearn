@@ -4,41 +4,40 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
-import { authOptions } from "../../auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
 
 export const runtime = "nodejs";
 
 /* ---------------------- AUTHOR RESOLVER ---------------------- */
 async function resolveAuthor(users: any, authorId?: string | null) {
-  if (!authorId)
-    return { name: "Anonymous", userId: null, avatar: null, avatarId: null };
+  if (!authorId) {
+    return {
+      name: "Anonymous",
+      userId: null,
+      avatarUpdatedAt: null,
+    };
+  }
 
   let user = null;
 
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1, userId: 1 } }
+      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
     );
   }
 
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1, userId: 1 } }
+      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
     );
   }
-
-  // const avatarId = user?._id ? String(user._id) : null;
-  // const avatar = avatarId
-  //   ? `https://cdn.jearn.site/avatars/${avatarId}?t=${new Date().getTime()}`
-  //   : null;
 
   return {
     name: user?.name ?? "Anonymous",
     userId: user?.userId ?? null,
-    // avatar,
-    // avatarId,
+    avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
   };
 }
 
@@ -94,7 +93,7 @@ export async function GET(
       _id: id,
       authorName: author.name,
       authorUserId: author.userId,
-      authorAvatar: author.avatar,
+      authorAvatarUpdatedAt: author.avatarUpdatedAt,
       commentCount,
       categories: populatedCategories,
     });
@@ -112,8 +111,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 
@@ -183,7 +182,7 @@ export async function PUT(
       _id: String(updated?._id),
       authorName: author.name,
       authorUserId: author.userId,
-      authorAvatar: author.avatar,
+      authorAvatar: author.avatarUpdatedAt,
       categories: enrichedCategories,
       tags: updated?.tags ?? [],
     };

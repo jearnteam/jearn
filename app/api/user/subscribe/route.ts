@@ -1,3 +1,4 @@
+//@/app/api/subscribe/route.ts
 import { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/mongodb";

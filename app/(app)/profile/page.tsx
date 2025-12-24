@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import type { Post } from "@/types/post";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
+import { normalizePosts } from "@/lib/normalizePosts";
 
 /* ---------------------------------------------
  * Avatar URL helper (cache-safe)
@@ -30,6 +31,7 @@ function avatarUrl(userId: string, updatedAt?: string | Date | null) {
 
 export default function ProfilePage() {
   const { t } = useTranslation();
+  const mainRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
   const { user, loading, update } = useCurrentUser();
@@ -62,6 +64,10 @@ export default function ProfilePage() {
 
   const sessionLoading = loading || status === "loading";
 
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   /* -------------------------
       Redirect if not logged in
   -------------------------- */
@@ -91,20 +97,46 @@ export default function ProfilePage() {
   async function loadPosts() {
     if (!user?._id) return;
 
+    setPostsLoading(true);
+
     try {
-      const res = await fetch(`/api/posts/byUser/${user._id}`, {
+      const res = await fetch(`/api/posts/byUser/${user._id}?limit=10`, {
         cache: "no-store",
       });
       const data = await res.json();
 
-      const cleaned = (data.posts || []).map((p: any) => ({
-        ...p,
-        isAdmin: p.isAdmin === true,
-      }));
+      setPosts(
+        normalizePosts(data.posts ?? []).map((p: any) => ({
+          ...p,
+          isAdmin: p.isAdmin === true,
+        }))
+      );
 
-      setPosts(cleaned);
+      setCursor(data.nextCursor ?? null);
+      setHasMore(!!data.nextCursor);
     } finally {
       setPostsLoading(false);
+    }
+  }
+
+  async function loadMore() {
+    if (!hasMore || loadingMore || !cursor || !user?._id) return;
+
+    setLoadingMore(true);
+
+    try {
+      const res = await fetch(
+        `/api/posts/byUser/${user._id}?limit=10&cursor=${cursor}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json();
+
+      setPosts((prev) => [...prev, ...normalizePosts(data.posts ?? [])]);
+
+      setCursor(data.nextCursor ?? null);
+      setHasMore(!!data.nextCursor);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -253,16 +285,16 @@ export default function ProfilePage() {
 
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
         <main
+          ref={mainRef}
           className="
             absolute top-[4.3rem]
             left-0 right-0
             h-[calc(100vh-4.3rem)]
             overflow-y-auto no-scrollbar
-            px-3 md:px-6
             pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
           "
         >
-          <div className="max-w-2xl mx-auto mt-10">
+          <div className="feed-container mt-10">
             {/* PROFILE SETTINGS */}
             <h1 className="text-2xl font-bold mb-6">
               {t("profileSettings") || "Profile Settings"}
@@ -367,9 +399,13 @@ export default function ProfilePage() {
 
               <PostList
                 posts={posts}
+                hasMore={hasMore}
+                onLoadMore={loadMore}
                 onEdit={(p) => setEditingPost(p)}
                 onDelete={(id) => Promise.resolve(requestDelete(id))}
                 onUpvote={upvotePost}
+                onAnswer={() => {}}
+                scrollContainerRef={mainRef}
               />
             </div>
           </div>

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authConfig } from "@/features/auth/auth";
 import clientPromise from "@/lib/mongodb";
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authConfig);
 
   if (!session?.user) {
     return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   await db.collection("users").updateOne(
-    { email: session.user.email },
+    { email: session.user.uid },
     { $set: { language, updatedAt: new Date() } }
   );
 
