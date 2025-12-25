@@ -37,6 +37,7 @@ export default function ProfileUserClient({ userId }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  /** ✅ THIS is the scroll container used by PostList */
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   /* ---------------------------------------------
@@ -82,7 +83,7 @@ export default function ProfileUserClient({ userId }: Props) {
   }, [userId]);
 
   /* ---------------------------------------------
-   * Load more
+   * Load more (infinite scroll)
    * ------------------------------------------- */
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || !cursor) return;
@@ -121,6 +122,7 @@ export default function ProfileUserClient({ userId }: Props) {
   return (
     <div className="bg-white dark:bg-black min-h-screen pb-24">
       <div className="feed-container mt-10">
+        {/* PROFILE HEADER */}
         <div className="flex items-start gap-5 mb-8 relative">
           <Avatar id={userId} size={80} className="border" />
 
@@ -142,16 +144,23 @@ export default function ProfileUserClient({ userId }: Props) {
           )}
         </div>
 
-        <PostList
-          posts={posts}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-          onEdit={() => {}}
-          onDelete={async () => {}}
-          onUpvote={async () => ({ ok: true })}
-          onAnswer={() => {}}
-          scrollContainerRef={scrollRef}
-        />
+        {/* 🔑 SCROLL CONTAINER (THIS FIXES EVERYTHING) */}
+        <div
+          ref={scrollRef}
+          className="overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 260px)" }}
+        >
+          <PostList
+            posts={posts}
+            hasMore={hasMore}
+            onLoadMore={loadMore}
+            onEdit={() => {}}
+            onDelete={async () => {}}
+            onUpvote={async () => ({ ok: true })}
+            onAnswer={() => {}}
+            scrollContainerRef={scrollRef}
+          />
+        </div>
       </div>
     </div>
   );

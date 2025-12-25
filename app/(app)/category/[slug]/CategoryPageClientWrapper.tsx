@@ -22,7 +22,7 @@ type UICategory = {
 
 export default function CategoryPageClientWrapper({
   slug,
-  scrollContainerRef: _scrollContainerRef,
+  scrollContainerRef,
 }: {
   slug: string;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -130,6 +130,7 @@ export default function CategoryPageClientWrapper({
       count={count}
       hasMore={hasMore}
       onLoadMore={loadMore}
+      scrollContainerRef={scrollContainerRef}
     />
   );
 }

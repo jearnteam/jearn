@@ -11,9 +11,11 @@ import { useTranslation } from "react-i18next";
 export default function CommentClientSection({
   comments,
   postId,
+  scrollContainerRef,
 }: {
   comments: Post[];
   postId: string;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   const { t } = useTranslation();
 
@@ -24,12 +26,26 @@ export default function CommentClientSection({
   const handleSubmitComment = async (content: string) => {
     await addComment(content);
     setIsCommentOpen(false);
+
+    // ✅ Smooth scroll to bottom of comments (overlay-safe)
+    requestAnimationFrame(() => {
+      const el = scrollContainerRef?.current;
+      if (!el) return;
+
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: "smooth",
+      });
+    });
   };
 
   return (
     <section id="comments" className="space-y-5">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">{t("comments") || "Comments"}</h3>
+        <h3 className="text-lg font-semibold">
+          {t("comments") || "Comments"}
+        </h3>
+
         <button
           onClick={() => setIsCommentOpen(true)}
           className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"

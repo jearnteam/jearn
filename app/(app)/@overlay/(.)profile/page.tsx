@@ -9,7 +9,7 @@ export default function ProfileOverlayPage() {
 
   return (
     <PostOverlayShell onClose={() => router.back()}>
-      {(scrollRef) => <ProfilePage />}
+      {(scrollRef) => <ProfilePage scrollContainerRef={scrollRef} />}
     </PostOverlayShell>
   );
 }

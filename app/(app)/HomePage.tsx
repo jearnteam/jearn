@@ -90,20 +90,22 @@ export default function HomePage() {
     const el = scrollRef.current;
     if (!el) return;
 
-    // ✅ TAP HOME AGAIN → SMOOTH SCROLL TO TOP
+    // 🔔 clear unread when opening notifications
+    if (next === "notify") {
+      clearUnread();
+    }
+
+    // TAP HOME AGAIN → SCROLL TO TOP
     if (next === "home" && activeView === "home") {
       restoringScrollRef.current = true;
       setNavbarVisible(true);
 
-      // 🔥 IMPORTANT: wait for layout + navbar animation
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           el.scrollTo({ top: 0, behavior: "smooth" });
 
-          // 🔓 unlock ONLY after we actually reach top
           const unlock = () => {
             if (!scrollRef.current) return;
-
             if (scrollRef.current.scrollTop <= 0) {
               restoringScrollRef.current = false;
               lastScrollTop.current = 0;
@@ -119,9 +121,7 @@ export default function HomePage() {
       return;
     }
 
-    // ✅ NORMAL TAB SWITCH
     scrollPositions.current[activeView] = el.scrollTop;
-
     restoringScrollRef.current = true;
     setNavbarVisible(true);
     setActiveView(next);

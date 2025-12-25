@@ -49,7 +49,11 @@ export default function PostPage() {
       {(scrollRef) => (
         <>
           <FullPostClient initialPost={post} />
-          <CommentClientSection comments={comments} postId={post._id} />
+          <CommentClientSection
+            comments={comments}
+            postId={post._id}
+            scrollContainerRef={scrollRef}
+          />
         </>
       )}
     </PostOverlayShell>

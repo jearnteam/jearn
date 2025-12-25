@@ -16,6 +16,7 @@ interface Props {
   count: number;
   hasMore: boolean;
   onLoadMore: () => void;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function CategoryPageClient({

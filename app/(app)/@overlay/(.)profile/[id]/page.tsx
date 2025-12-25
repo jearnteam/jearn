@@ -10,7 +10,7 @@ export default function ProfileUserOverlayPage() {
 
   return (
     <PostOverlayShell onClose={() => router.back()}>
-      {(scrollRef) => (
+      {() => (
         <ProfileUserClient userId={params.id} />
       )}
     </PostOverlayShell>

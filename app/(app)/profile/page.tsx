@@ -5,6 +5,7 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
+import Image from "next/image";
 
 import PostList from "@/components/posts/PostList";
 import EditPostModal from "@/components/posts/EditPostModal";
@@ -12,6 +13,10 @@ import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import type { Post } from "@/types/post";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import { normalizePosts } from "@/lib/normalizePosts";
+
+interface Props {
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+}
 
 /* ---------------------------------------------
  * Avatar URL helper (cache-safe)
@@ -29,10 +34,11 @@ function avatarUrl(userId: string, updatedAt?: string | Date | null) {
   return `https://cdn.jearn.site/avatars/${userId}.webp?v=${ts}`;
 }
 
-export default function ProfilePage() {
+export default function ProfilePage({ scrollContainerRef }: Props) {
   const { t } = useTranslation();
   const mainRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+  const scrollRef = scrollContainerRef;
 
   const { user, loading, update } = useCurrentUser();
   const { status } = useSession();
@@ -289,7 +295,6 @@ export default function ProfilePage() {
 
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
         <main
-          ref={mainRef}
           className="
             absolute top-[4.3rem]
             left-0 right-0
@@ -320,10 +325,12 @@ export default function ProfilePage() {
                       group-hover:opacity-80 transition
                     "
                   >
-                    <img
+                    <Image
                       src={preview}
-                      className="w-full h-full object-cover"
                       alt="avatar preview"
+                      fill
+                      sizes="96px"
+                      className="object-cover"
                     />
                   </div>
 
@@ -409,7 +416,7 @@ export default function ProfilePage() {
                 onDelete={(id) => Promise.resolve(requestDelete(id))}
                 onUpvote={upvotePost}
                 onAnswer={() => {}}
-                scrollContainerRef={mainRef}
+                scrollContainerRef={scrollRef}
               />
             </div>
           </div>
