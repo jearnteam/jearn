@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
 
   // ✅ NextAuth MUST be fully public
   "/api/auth",
+  "/api/mobile",
 
   // SSE / public APIs
   "/api/stream",

@@ -16,24 +16,61 @@ export const authConfig: AuthOptions = {
           scope: "openid email profile",
         },
       },
-      allowDangerousEmailAccountLinking: true,
+      // ⚠️ Remove unless you *really* need cross-provider email merging
+      // allowDangerousEmailAccountLinking: true,
     }),
   ],
 
   secret: process.env.NEXTAUTH_SECRET,
 
-  session: { strategy: "jwt" },
+  // ✅ JWT strategy (works fine once signIn is handled correctly)
+  session: {
+    strategy: "jwt",
+  },
 
   callbacks: {
+    /* ------------------------------------------------------
+     * CREATE USER ON FIRST SIGN-IN
+     * ---------------------------------------------------- */
+    async signIn({ user, account }) {
+      if (!user.email || !account) return false;
+
+      const client = await clientPromise;
+      const db = client.db(process.env.MONGODB_DB);
+
+      const existingUser = await db.collection("users").findOne({
+        email: user.email,
+      });
+
+      if (!existingUser) {
+        await db.collection("users").insertOne({
+          name: user.name ?? "",
+          email: user.email,
+          image: user.image ?? null,
+
+          provider: account.provider,
+          provider_id: account.providerAccountId,
+
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+
+      return true;
+    },
+
+    /* ------------------------------------------------------
+     * JWT ENRICHMENT
+     * ---------------------------------------------------- */
     async jwt({ token }) {
       if (!token.email) return token;
 
       const client = await clientPromise;
       const db = client.db(process.env.MONGODB_DB);
 
-      const user = await db
-        .collection("users")
-        .findOne({ email: token.email });
+      const user = await db.collection("users").findOne({
+        email: token.email,
+      });
 
       if (user) {
         token.uid = user._id.toString();
@@ -44,12 +81,16 @@ export const authConfig: AuthOptions = {
       return token;
     },
 
+    /* ------------------------------------------------------
+     * SESSION ENRICHMENT (CLIENT ACCESS)
+     * ---------------------------------------------------- */
     async session({ session, token }) {
       if (session.user && token.uid) {
         session.user.uid = token.uid as string;
         session.user.provider = token.provider as string | null;
         session.user.provider_id = token.provider_id as string | null;
       }
+
       return session;
     },
   },
