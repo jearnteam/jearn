@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 export type Notification = {
   _id: string;
   type: "post_like" | "comment" | "mention" | "system";
+  postId?: string;
 
   lastActorName: string;
   lastActorId?: string;
@@ -58,7 +59,7 @@ export default function NotificationPage() {
   }
 
   return (
-    <div className="flex flex-col px-2 py-1">
+    <div className="flex flex-col px-2 py-1" >
       {sortedItems.map((n) => (
         <NotificationItem
           key={n._id}
@@ -98,15 +99,17 @@ function NotificationItem({
 
   function renderMessage() {
     switch (notification.type) {
-      case "post_like":
-        if (notification.count && notification.count > 1) {
-          return `${notification.lastActorName} and ${
-            notification.count - 1
-          } others ${t("upvote_noti") || "upvoted your post."}`;
+      case "post_like": {
+        const count = notification.count ?? 1;
+        if (count > 1) {
+          return `${notification.lastActorName} and ${count - 1} others ${
+            t("upvote_noti") || "upvoted your post."
+          }`;
         }
         return `${notification.lastActorName} ${
           t("upvote_noti") || "upvoted your post."
         }`;
+      }
 
       case "mention":
         return `${notification.lastActorName} ${
@@ -128,10 +131,17 @@ function NotificationItem({
     }
   }
 
+  const avatar = notification.lastActorAvatar ?? "/default-avatar.png";
+
   return (
     <div
+      onClick={() => {
+        if (notification.postId) {
+          window.location.href = `/posts/${notification.postId}`;
+        }
+      }}
       className={[
-        "flex gap-3 px-4 py-4 items-start border-b transition",
+        "cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition",
         "border-gray-200 dark:border-neutral-800",
         "hover:bg-neutral-50 dark:hover:bg-neutral-900/60",
         isNew
@@ -141,19 +151,13 @@ function NotificationItem({
     >
       {/* AVATAR */}
       <img
-        src={
-          notification.lastActorAvatar ||
-          (notification.lastActorId
-            ? `https://cdn.jearn.site/avatars/${notification.lastActorId}.webp`
-            : "/default-avatar.png")
-        }
+        src={avatar}
         alt={notification.lastActorName}
         className="w-9 h-9 rounded-full flex-shrink-0 mt-0.5"
       />
 
       {/* CONTENT */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-        {/* LINE 1 — MESSAGE (FULL WIDTH) */}
         <div className="flex items-center gap-2 min-w-0">
           {isNew && (
             <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
@@ -161,14 +165,13 @@ function NotificationItem({
           <p className="text-sm leading-tight truncate">{renderMessage()}</p>
         </div>
 
-        {/* LINE 2 — PREVIEW (LEFT) + TIME (RIGHT) */}
         <div className="flex items-center justify-between gap-3 min-w-0">
           <p className="text-[12px] text-gray-500 leading-tight truncate">
             {notification.postPreview || ""}
           </p>
 
           <span className="text-[11px] text-gray-400 leading-tight whitespace-nowrap flex-shrink-0 text-right">
-            <div>{date}</div>
+            {date}
           </span>
         </div>
       </div>

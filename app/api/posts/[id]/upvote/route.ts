@@ -9,211 +9,197 @@ import { authConfig } from "@/features/auth/auth";
 
 export const runtime = "nodejs";
 
+type Body = {
+  userId?: string;
+  txId?: string;
+};
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let postIdStr = "";
+
   try {
-    /* --------------------------------------------------------
-       AUTH
-    --------------------------------------------------------- */
-    const session = await getServerSession(authConfig);
-    if (!session?.user?.uid) {
-      return new Response("Unauthorized", { status: 401 });
+    /* --------------------------------------------------
+     * PARAMS
+     * -------------------------------------------------- */
+    const { id } = await params;
+    postIdStr = id;
+
+    console.log("🔥 UPVOTE ROUTE HIT", postIdStr);
+
+    if (!ObjectId.isValid(postIdStr)) {
+      return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
     }
 
-    const { id } = await params;
+    /* --------------------------------------------------
+     * AUTH
+     * -------------------------------------------------- */
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    const body: { userId?: string; txId?: string | null } = await req.json();
+    /* --------------------------------------------------
+     * BODY
+     * -------------------------------------------------- */
+    let body: Body = {};
+    try {
+      const text = await req.text();
+      if (text) body = JSON.parse(text);
+    } catch {}
+
     const { userId, txId } = body;
 
     if (!userId || userId !== session.user.uid) {
       return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
     }
 
-    if (!ObjectId.isValid(id)) {
-      return NextResponse.json({ error: "Invalid postId" }, { status: 400 });
-    }
-
-    /* --------------------------------------------------------
-       SETUP
-    --------------------------------------------------------- */
-    const postId = new ObjectId(id);
-    const actorObjId = new ObjectId(userId);
-
+    /* --------------------------------------------------
+     * DB
+     * -------------------------------------------------- */
     const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "jearn");
+    const db = client.db("jearn");
     const posts = db.collection("posts");
     const notifications = db.collection("notifications");
 
-    /* --------------------------------------------------------
-       ATOMIC UPSERT (RACE SAFE)
-    --------------------------------------------------------- */
+    const postId = new ObjectId(postIdStr);
+    const actorObjId = new ObjectId(userId);
+
+    /* --------------------------------------------------
+     * UPVOTE TOGGLE
+     * -------------------------------------------------- */
     const result = await posts.findOneAndUpdate(
       { _id: postId },
       [
-        {
-          $set: {
-            upvoters: { $ifNull: ["$upvoters", []] },
-            upvoteCount: { $ifNull: ["$upvoteCount", 0] },
-          },
-        },
-        {
-          $set: {
-            _alreadyUpvoted: { $in: [actorObjId, "$upvoters"] },
-          },
-        },
+        { $set: { upvoters: { $ifNull: ["$upvoters", []] }, upvoteCount: { $ifNull: ["$upvoteCount", 0] } } },
+        { $set: { _already: { $in: [actorObjId, "$upvoters"] } } },
         {
           $set: {
             upvoters: {
               $cond: [
-                "$_alreadyUpvoted",
+                "$_already",
                 { $setDifference: ["$upvoters", [actorObjId]] },
                 { $concatArrays: ["$upvoters", [actorObjId]] },
               ],
             },
             upvoteCount: {
               $cond: [
-                "$_alreadyUpvoted",
+                "$_already",
                 { $max: [{ $subtract: ["$upvoteCount", 1] }, 0] },
                 { $add: ["$upvoteCount", 1] },
               ],
             },
           },
         },
-        { $unset: "_alreadyUpvoted" },
+        { $unset: "_already" },
       ],
       { returnDocument: "after" }
     );
 
-    if (!result || !result.value) {
+    if (!result?.value) {
       return NextResponse.json({ error: "Post not found" }, { status: 404 });
     }
 
     const updated = result.value;
-
-    const upvoters = Array.isArray(updated.upvoters)
-      ? (updated.upvoters as ObjectId[])
-      : [];
-
-    const action: "added" | "removed" = upvoters.some((oid) =>
-      oid.equals(actorObjId)
+    const action: "added" | "removed" = updated.upvoters?.some((id: ObjectId) =>
+      id.equals(actorObjId)
     )
       ? "added"
       : "removed";
 
-    /* --------------------------------------------------------
-       🔔 GROUPED LIKE NOTIFICATION
-    --------------------------------------------------------- */
+    /* --------------------------------------------------
+     * 🔔 NOTIFICATION (ATOMIC, CORRECT)
+     * -------------------------------------------------- */
     if (action === "added") {
-      const postOwnerUid = updated.authorId;
+      const authorRaw = updated.authorId;
 
-      if (
-        typeof postOwnerUid === "string" &&
-        ObjectId.isValid(postOwnerUid) &&
-        postOwnerUid !== userId
-      ) {
-        const ownerObjId = new ObjectId(postOwnerUid);
-        const groupKey = `post_like:${postId.toString()}`;
-        const now = new Date();
+      if (typeof authorRaw === "string" && ObjectId.isValid(authorRaw)) {
+        const ownerObjId = new ObjectId(authorRaw);
 
-        const actorName = session.user.name ?? "Someone";
-        const actorAvatar = `${process.env.R2_PUBLIC_URL}/avatars/${userId}.webp`;
-        const preview = (updated.title ?? "").slice(0, 80).replace(/\n/g, " ");
+        if (!ownerObjId.equals(actorObjId)) {
+          const groupKey = `post_like:${postIdStr}`;
+          const now = new Date();
 
-        const pipeline = [
-          {
-            $set: {
-              userId: { $ifNull: ["$userId", ownerObjId] },
-              type: { $ifNull: ["$type", "post_like"] },
-              postId: { $ifNull: ["$postId", postId] },
-              groupKey: { $ifNull: ["$groupKey", groupKey] },
-              read: { $ifNull: ["$read", false] },
-              createdAt: { $ifNull: ["$createdAt", now] },
-              actors: { $ifNull: ["$actors", []] },
-              count: { $ifNull: ["$count", 0] },
-            },
-          },
-          {
-            $set: {
-              _already: { $in: [actorObjId, "$actors"] },
-            },
-          },
-          {
-            $set: {
-              actors: {
-                $cond: [
-                  "$_already",
-                  "$actors",
-                  { $concatArrays: ["$actors", [actorObjId]] },
-                ],
+          const actorName = session.user.name ?? "Someone";
+          const actorAvatar = `${process.env.R2_PUBLIC_URL}/avatars/${userId}.webp`;
+          const preview = (updated.title ?? "").slice(0, 80);
+
+          const notifResult = await notifications.updateOne(
+            { userId: ownerObjId, groupKey },
+            [
+              {
+                $set: {
+                  userId: ownerObjId,
+                  type: "post_like",
+                  postId,
+                  groupKey,
+                  createdAt: { $ifNull: ["$createdAt", now] },
+                  actors: { $ifNull: ["$actors", []] },
+                  count: { $ifNull: ["$count", 0] },
+                  wasRead: "$read",
+                },
               },
-              count: {
-                $cond: ["$_already", "$count", { $add: ["$count", 1] }],
+              { $set: { _already: { $in: [actorObjId, "$actors"] } } },
+              {
+                $set: {
+                  actors: {
+                    $cond: [
+                      "$_already",
+                      "$actors",
+                      { $concatArrays: ["$actors", [actorObjId]] },
+                    ],
+                  },
+                  count: {
+                    $cond: ["$_already", "$count", { $add: ["$count", 1] }],
+                  },
+                  read: false,
+                  lastActorId: actorObjId,
+                  lastActorName: actorName,
+                  lastActorAvatar: actorAvatar,
+                  postPreview: preview,
+                  updatedAt: now,
+                },
               },
-              lastActorId: actorObjId,
-              lastActorName: actorName,
-              lastActorAvatar: actorAvatar,
-              postPreview: preview,
-              updatedAt: now,
-            },
-          },
-          { $unset: "_already" },
-        ];
+              { $unset: ["_already"] },
+            ],
+            { upsert: true }
+          );
 
-        const notifResult = await notifications.updateOne(
-          { userId: ownerObjId, groupKey, read: false },
-          pipeline as unknown as object[],
-          { upsert: true }
-        );
-
-        emitNotification(postOwnerUid, {
-          type: "post_like",
-          postId: postId.toString(),
-          actorId: userId,
-          unreadDelta: notifResult.upsertedId ? 1 : 0,
-        });
+          emitNotification(ownerObjId.toString(), {
+            type: "post_like",
+            postId: postIdStr,
+            actorId: userId,
+            unreadDelta: notifResult.upsertedId ? 1 : 1,
+          });
+        }
       }
     }
 
-    /* --------------------------------------------------------
-       🔊 SSE
-    --------------------------------------------------------- */
-    const payload = {
-      postId: postId.toString(),
+    /* --------------------------------------------------
+     * 🔊 SSE
+     * -------------------------------------------------- */
+    broadcastSSE({
+      type: "upvote",
+      postId: postIdStr,
       userId,
       action,
       txId: txId ?? null,
-      parentId: typeof updated.parentId === "string" ? updated.parentId : null,
-      replyTo: typeof updated.replyTo === "string" ? updated.replyTo : null,
-    };
-
-    broadcastSSE({ type: "upvote", ...payload });
-
-    broadcastSSE({
-      type: updated.replyTo
-        ? "upvote-reply"
-        : updated.parentId
-        ? "upvote-comment"
-        : "upvote-post",
-      ...payload,
     });
 
-    /* --------------------------------------------------------
-       ✅ RESPONSE
-    --------------------------------------------------------- */
     return NextResponse.json({
       ok: true,
       action,
       txId: txId ?? null,
       post: {
-        _id: updated._id.toString(),
+        _id: postIdStr,
         upvoteCount: updated.upvoteCount,
-        upvoters: upvoters.map((oid) => oid.toString()),
+        upvoters: updated.upvoters?.map(String) ?? [],
       },
     });
   } catch (err) {
-    console.error("❌ Upvote error:", err);
+    console.error("❌ UPVOTE ROUTE ERROR", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

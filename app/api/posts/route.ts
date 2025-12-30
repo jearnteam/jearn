@@ -85,14 +85,20 @@ async function enrichCategories(
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .filter((c): c is string => typeof c === "string" && ObjectId.isValid(c))
-    .map((c) => new ObjectId(c));
+    .map((c) => {
+      if (c instanceof ObjectId) return c;
+      if (typeof c === "string" && ObjectId.isValid(c)) {
+        return new ObjectId(c);
+      }
+      return null;
+    })
+    .filter((c): c is ObjectId => c !== null);
 
   if (validIds.length === 0) return [];
 
   const docs = await categoriesColl
     .find({ _id: { $in: validIds } })
-    .project<CategoryDoc>({ name: 1, jname: 1, myname: 1 })
+    .project({ name: 1, jname: 1, myname: 1 })
     .toArray();
 
   return docs.map((c) => ({

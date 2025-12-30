@@ -10,8 +10,9 @@ const nextConfig: NextConfig = {
     "https://tamanegi.jearn.site",
     "https://www.jearn.site",
   ],
+
   experimental: {
-    scrollRestoration: true, // 🚀 Browser-native back button restore
+    scrollRestoration: true,
   },
 
   outputFileTracingRoot: path.join(__dirname),
@@ -23,6 +24,17 @@ const nextConfig: NextConfig = {
         },
       }
     : {},
+
+  /** REQUIRED FOR next/image + R2 CDN */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cdn.jearn.site",
+        pathname: "/**",
+      },
+    ],
+  },
 
   async headers() {
     return [

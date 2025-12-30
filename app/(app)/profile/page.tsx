@@ -22,23 +22,25 @@ interface Props {
  * Avatar URL helper (cache-safe)
  * ------------------------------------------- */
 function avatarUrl(userId: string, updatedAt?: string | Date | null) {
-  if (!updatedAt) {
+  if (!userId) {
     return "https://cdn.jearn.site/avatars/default.webp";
   }
 
-  const ts =
-    typeof updatedAt === "string"
-      ? new Date(updatedAt).getTime()
-      : updatedAt.getTime();
+  const ts = updatedAt
+    ? `?v=${
+        typeof updatedAt === "string"
+          ? new Date(updatedAt).getTime()
+          : updatedAt.getTime()
+      }`
+    : "";
 
-  return `https://cdn.jearn.site/avatars/${userId}.webp?v=${ts}`;
+  return `https://cdn.jearn.site/avatars/${userId}.webp${ts}`;
 }
 
 export default function ProfilePage({ scrollContainerRef }: Props) {
   const { t } = useTranslation();
-  const mainRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = scrollContainerRef ?? useRef<HTMLDivElement | null>(null);
   const router = useRouter();
-  const scrollRef = scrollContainerRef;
 
   const { user, loading, update } = useCurrentUser();
   const { status } = useSession();
@@ -50,9 +52,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
   const [userId, setUserId] = useState("");
   const [bio, setBio] = useState("");
 
-  const [preview, setPreview] = useState<string>(
-    "https://cdn.jearn.site/avatars/default.webp"
-  );
+  const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -295,6 +295,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
 
       <div className="fixed inset-0 overflow-hidden bg-white dark:bg-black">
         <main
+          ref={mainRef}
           className="
             absolute top-[4.3rem]
             left-0 right-0
@@ -326,11 +327,13 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
                     "
                   >
                     <Image
-                      src={preview}
+                      src={
+                        preview ?? "https://cdn.jearn.site/avatars/default.webp"
+                      }
                       alt="avatar preview"
                       fill
                       sizes="96px"
-                      className="object-cover"
+                      className="object-cover rounded-full"
                     />
                   </div>
 
@@ -416,7 +419,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
                 onDelete={(id) => Promise.resolve(requestDelete(id))}
                 onUpvote={upvotePost}
                 onAnswer={() => {}}
-                scrollContainerRef={scrollRef}
+                scrollContainerRef={mainRef}
               />
             </div>
           </div>

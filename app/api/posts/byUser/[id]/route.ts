@@ -3,6 +3,23 @@ import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 
+
+const CDN = process.env.R2_PUBLIC_URL;
+
+function buildAuthorAvatar(
+  authorId: string,
+  avatarUpdatedAt?: Date | null
+) {
+  if (!authorId) {
+    return `${CDN}/avatars/default.webp`;
+  }
+
+  const ts = avatarUpdatedAt
+    ? `?t=${new Date(avatarUpdatedAt).getTime()}`
+    : "";
+
+  return `${CDN}/avatars/${authorId}.webp${ts}`;
+}
 /* -------------------------------------------------------------
  * AUTHOR RESOLVER
  * ----------------------------------------------------------- */
@@ -65,10 +82,14 @@ async function enrichCategories(
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .filter(
-      (c): c is string => typeof c === "string" && ObjectId.isValid(c)
-    )
-    .map((c) => new ObjectId(c));
+    .map((c) => {
+      if (c instanceof ObjectId) return c;
+      if (typeof c === "string" && ObjectId.isValid(c)) {
+        return new ObjectId(c);
+      }
+      return null;
+    })
+    .filter((c): c is ObjectId => c !== null);
 
   if (!validIds.length) return [];
 
@@ -166,6 +187,7 @@ export async function GET(
           authorId,
           authorName: author.name,
           authorUserId: author.userId,
+          authorAvatar: buildAuthorAvatar(authorId, author.avatarUpdatedAt),
           authorAvatarUpdatedAt: author.avatarUpdatedAt,
 
           categories,

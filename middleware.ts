@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   "/api/stream",
   "/api/user/current",
 
+  "/api/posts",
   "/api/images",
   "/api/categories",
   "/api/category",
