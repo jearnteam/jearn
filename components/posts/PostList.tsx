@@ -4,12 +4,7 @@ import type { Post } from "@/types/post";
 import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useMemo } from "react";
-
-interface UpvoteResponse {
-  ok: boolean;
-  error?: string;
-  action?: "added" | "removed";
-}
+import type { UpvoteResponse } from "@/types/post";
 
 interface Props {
   posts: Post[];
@@ -17,7 +12,10 @@ interface Props {
   onLoadMore: () => void;
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
-  onUpvote: (id: string, userId: string) => Promise<UpvoteResponse>;
+
+  // 🔥 CHANGE THIS
+  onUpvote: (id: string) => Promise<void>;
+
   onAnswer: (post: Post) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -33,10 +31,7 @@ export default function PostList({
   scrollContainerRef,
 }: Props) {
   // 🔧 FIX: stable reference for hooks
-  const safePosts = useMemo(
-    () => (Array.isArray(posts) ? posts : []),
-    [posts]
-  );
+  const safePosts = useMemo(() => (Array.isArray(posts) ? posts : []), [posts]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   const restoredOnce = useRef(false);
@@ -95,14 +90,11 @@ export default function PostList({
     >
       {safePosts.map((post) => (
         <PostItem
-          key={post._id}                 // ✅ FIX: key added
+          key={post._id}
           post={post}
           onEdit={() => onEdit(post)}
           onDelete={() => onDelete(post._id)}
-          onUpvote={(id, userId, _txId) => {
-            // discard return value intentionally
-            return onUpvote(id, userId).then(() => {});
-          }}
+          onUpvote={(id) => onUpvote(id)}
           onAnswer={onAnswer}
           scrollContainerRef={scrollContainerRef}
         />

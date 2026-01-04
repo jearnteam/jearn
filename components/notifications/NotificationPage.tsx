@@ -31,24 +31,19 @@ export type Notification = {
 export default function NotificationPage() {
   const mounted = useMounted();
   const { t } = useTranslation();
-  const { items, newIds } = useNotifications();
+  const { items, fetchNotifications } = useNotifications();
 
-  // ⛔ Prevent hydration mismatch completely
+  useEffect(() => {
+    fetchNotifications(); // ✅ FETCH ON TAB OPEN
+  }, [fetchNotifications]);
+
   if (!mounted) return null;
 
   const sortedItems = [...items].sort((a, b) => {
-    const aIsNew = newIds.has(String(a._id));
-    const bIsNew = newIds.has(String(b._id));
-
-    if (aIsNew !== bIsNew) {
-      return aIsNew ? -1 : 1;
-    }
-
     const aTime = new Date(a.updatedAt ?? a.createdAt).getTime();
     const bTime = new Date(b.updatedAt ?? b.createdAt).getTime();
     return bTime - aTime;
   });
-
   if (!sortedItems.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-500">
@@ -59,13 +54,9 @@ export default function NotificationPage() {
   }
 
   return (
-    <div className="flex flex-col px-2 py-1" >
+    <div className="flex flex-col px-2 py-1">
       {sortedItems.map((n) => (
-        <NotificationItem
-          key={n._id}
-          notification={n}
-          isNew={newIds.has(String(n._id))}
-        />
+        <NotificationItem key={n._id} notification={n} />
       ))}
     </div>
   );
@@ -74,13 +65,7 @@ export default function NotificationPage() {
 /* ---------------------------------------------
  * ITEM
  * ------------------------------------------- */
-function NotificationItem({
-  notification,
-  isNew,
-}: {
-  notification: Notification;
-  isNew: boolean;
-}) {
+function NotificationItem({ notification }: { notification: Notification }) {
   const mounted = useMounted();
   const { t } = useTranslation();
 
@@ -144,9 +129,7 @@ function NotificationItem({
         "cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition",
         "border-gray-200 dark:border-neutral-800",
         "hover:bg-neutral-50 dark:hover:bg-neutral-900/60",
-        isNew
-          ? "bg-blue-50/70 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900"
-          : "bg-white dark:bg-neutral-950",
+        "bg-white dark:bg-neutral-950",
       ].join(" ")}
     >
       {/* AVATAR */}
@@ -159,9 +142,6 @@ function NotificationItem({
       {/* CONTENT */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
         <div className="flex items-center gap-2 min-w-0">
-          {isNew && (
-            <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-          )}
           <p className="text-sm leading-tight truncate">{renderMessage()}</p>
         </div>
 

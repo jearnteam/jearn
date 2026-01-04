@@ -9,7 +9,6 @@ import Navbar from "@/components/Navbar";
 import I18nProvider from "@/components/I18nProvider";
 import LanguageInitializer from "@/components/LanguageInitializer";
 import UserThemeSync from "@/components/UserThemeSync";
-import SWRegister from "./sw-register";
 import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
 
 const geistSans = Geist({
@@ -53,7 +52,6 @@ export default function RootLayout({
       >
         <Providers>
           <ClientLayout>
-            <SWRegister />
             <UserThemeSync />
             <AppNavigationBridge />
             <I18nProvider>

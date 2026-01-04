@@ -55,7 +55,7 @@ export default function HomePage() {
     loading,
   } = usePosts();
 
-  const { unreadCount, clearUnread } = useNotifications();
+  const { unreadCount, clearUnread, fetchNotifications } = useNotifications();
 
   /* ---------------------------------------------
    * SCROLL MANAGEMENT (🔥 FIX)
@@ -92,7 +92,8 @@ export default function HomePage() {
 
     // 🔔 clear unread when opening notifications
     if (next === "notify") {
-      clearUnread();
+      fetchNotifications(); // FETCH LIST HERE
+      clearUnread(); // MARK READ
     }
 
     // TAP HOME AGAIN → SCROLL TO TOP
@@ -180,34 +181,27 @@ export default function HomePage() {
   /* ---------------------------------------------
    * UPVOTE
    * ------------------------------------------- */
-  async function upvotePost(
-    id: string,
-    userId: string
-  ): Promise<{
-    ok: boolean;
-    action?: "added" | "removed";
-    error?: string;
-  }> {
-    try {
-      const res = await fetch(`/api/posts/${id}/upvote`, {
+  async function upvotePost(id: string) {
+    const res = await apiFetch(`/api/posts/${id}/upvote`, {
+      method: "POST",
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) return;
+
+    if (data.action === "added" && data.authorId) {
+      fetch("/api/notifications/emit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        return { ok: false, error: data?.error || "Upvote failed" };
-      }
-
-      if (data.action === "added" || data.action === "removed") {
-        return { ok: true, action: data.action };
-      }
-
-      return { ok: true };
-    } catch {
-      return { ok: false, error: "Network error" };
+        body: JSON.stringify({
+          userId: data.authorId,
+          payload: {
+            type: "post_like",
+            postId: id,
+          },
+        }),
+      }).catch(() => {});
     }
   }
 
@@ -418,6 +412,18 @@ function getSidebarIndicatorTop(view: HomeView) {
       return 0;
   }
 }
+
+export async function apiFetch(url: string, init?: RequestInit) {
+  return fetch(url, {
+    credentials: "include",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 /* ---------------------------------------------
  * SIDEBAR ITEM
  * ------------------------------------------- */

@@ -17,6 +17,12 @@ export const PostTypes = {
 /** Union */
 export type PostType = typeof PostTypes[keyof typeof PostTypes];
 
+export type UpvoteResponse = {
+  ok: boolean;
+  action?: "added" | "removed";
+  error?: string;
+};
+
 export interface Post {
   txId: any;
   _id: string;

@@ -1,14 +1,14 @@
-type NotificationPayload = {
-  type: string;
-  postId?: string;
-  actorId?: string;
-  unreadDelta?: number;
-  notificationId?: string;
-};
+const clients = new Map<
+  string,
+  Set<WritableStreamDefaultWriter<Uint8Array>>
+>();
 
-const clients = new Map<string, Set<WritableStreamDefaultWriter>>();
+const encoder = new TextEncoder();
 
-export function subscribe(userId: string, writer: WritableStreamDefaultWriter) {
+export function subscribe(
+  userId: string,
+  writer: WritableStreamDefaultWriter<Uint8Array>
+) {
   if (!clients.has(userId)) {
     clients.set(userId, new Set());
   }
@@ -17,7 +17,7 @@ export function subscribe(userId: string, writer: WritableStreamDefaultWriter) {
 
 export function unsubscribe(
   userId: string,
-  writer: WritableStreamDefaultWriter
+  writer: WritableStreamDefaultWriter<Uint8Array>
 ) {
   const set = clients.get(userId);
   if (!set) return;
@@ -28,16 +28,20 @@ export function unsubscribe(
   }
 }
 
-export function emitNotification(userId: string, payload: NotificationPayload) {
-  const writers = clients.get(userId);
+// 🔔 THIS is what you call after DB update
+export function notify(userId: string) {
+  const set = clients.get(userId);
+  if (!set) return;
 
-  // 🔍 DEBUG LOG (ADD THIS)
-  console.log("🔔 emit →", userId, payload);
-
-  if (!writers) return;
-
-  for (const writer of writers) {
-    writer.write(`data: ${JSON.stringify(payload)}\n\n`);
+  for (const writer of set) {
+    try {
+      writer.write(
+        encoder.encode(
+          "event: notification\ndata: {}\n\n"
+        )
+      );
+    } catch {
+      set.delete(writer);
+    }
   }
 }
-

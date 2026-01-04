@@ -15,6 +15,9 @@ const PUBLIC_PATHS = [
   "/api/stream",
   "/api/user/current",
 
+  // 🔔 NOTIFICATIONS (FIX)
+  "/api/notifications",
+
   "/api/posts",
   "/api/images",
   "/api/categories",
@@ -32,28 +35,28 @@ const ADMIN_EMAILS =
 
 // middleware.ts
 export async function middleware(req: NextRequest) {
-  if (req.method === "OPTIONS") {
+  const { pathname } = req.nextUrl;
+
+  // ✅ Always allow API routes
+  if (pathname.startsWith("/api")) {
     return NextResponse.next();
   }
 
-  const { pathname } = req.nextUrl;
-
-  // ✅ Always allow Next.js internals
+  // ✅ Allow Next.js internals
   if (pathname.startsWith("/_next")) {
     return NextResponse.next();
   }
 
-  // ✅ PUBLIC PROFILE PAGES (FIX)
+  // ✅ Public pages
   if (pathname === "/profile" || pathname.startsWith("/profile/")) {
     return NextResponse.next();
   }
 
-  // ✅ Allow all other public paths
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
 
-  // 🔐 Auth check
+  // 🔐 Page-only auth check
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
@@ -63,7 +66,7 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // 🔒 Admin-only routes
+  // 🔒 Admin-only pages
   if (pathname.startsWith("/dashboard")) {
     const email = token.email?.toLowerCase();
     if (!email || !ADMIN_EMAILS.includes(email)) {

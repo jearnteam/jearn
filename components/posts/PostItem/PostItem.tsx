@@ -28,7 +28,7 @@ export default function PostItem({
   onEdit?: () => Promise<void> | void;
   onDelete?: () => Promise<void> | void;
 
-  onUpvote?: (id: string, userId: string, txId?: string) => Promise<void>;
+  onUpvote?: (id: string) => Promise<void>;
 
   onAnswer?: (post: Post) => void;
   onShare?: () => void;
@@ -126,7 +126,9 @@ export default function PostItem({
           <PostFooter
             post={post}
             setPost={setPost}
-            onUpvote={onUpvote}
+            onUpvote={async (id) => {
+              await onUpvote?.(id);
+            }}
             isSingle={isSingle}
             onShare={() => {
               if (onShare) onShare(); // ✅ external hook

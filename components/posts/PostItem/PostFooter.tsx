@@ -49,6 +49,7 @@ export default function PostFooter({
   const safeAnswer = useCallback(() => {
     if (onAnswer) onAnswer();
   }, [onAnswer]);
+  
 
   /* -------------------------------------------------
    * LOCAL RENDER STATE (optimistic)

@@ -1,9 +1,9 @@
-// app/api/notifications/stream/route.ts
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { subscribe, unsubscribe } from "@/lib/notificationHub";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const session = await getServerSession(authConfig);
@@ -13,24 +13,39 @@ export async function GET(request: Request) {
 
   const userId = session.user.uid;
 
-  const stream = new TransformStream();
+  const stream = new TransformStream<Uint8Array, Uint8Array>();
   const writer = stream.writable.getWriter();
   const encoder = new TextEncoder();
 
   subscribe(userId, writer);
 
-  // 🔑 keep connection alive
-  writer.write(encoder.encode("retry: 3000\n\n"));
+  // initial connection event
+  await writer.write(
+    encoder.encode("event: connected\ndata: {}\n\n")
+  );
 
-  // ✅ CORRECT abort handling
+  // retry hint
+  await writer.write(
+    encoder.encode("retry: 3000\n\n")
+  );
+
+  // keepalive ping
+  const ping = setInterval(() => {
+    writer.write(encoder.encode(": ping\n\n")).catch(() => {});
+  }, 15000);
+
   request.signal.addEventListener("abort", () => {
+    clearInterval(ping);
     unsubscribe(userId, writer);
+    try {
+      writer.close();
+    } catch {}
   });
 
   return new Response(stream.readable, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
     },
   });

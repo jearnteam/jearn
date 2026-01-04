@@ -6,7 +6,6 @@ import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { PostTypes } from "@/types/post";
-import { emitNotification } from "@/lib/notificationHub";
 
 export const runtime = "nodejs";
 
@@ -127,16 +126,18 @@ export async function GET(req: Request) {
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     const query: Record<string, unknown> = {
-      parentId: null,
-      postType: { $ne: PostTypes.COMMENT },
+      $and: [
+        { postType: { $ne: PostTypes.COMMENT } },
+        {
+          $or: [{ parentId: null }, { parentId: { $exists: false } }],
+        },
+      ],
     };
-
-    const andConditions: Record<string, unknown>[] = [];
 
     if (cursor) {
       const [createdAt, id] = cursor.split("|");
 
-      andConditions.push({
+      (query.$and as Record<string, unknown>[]).push({
         $or: [
           { createdAt: { $lt: new Date(createdAt) } },
           {
@@ -145,10 +146,6 @@ export async function GET(req: Request) {
           },
         ],
       });
-    }
-
-    if (andConditions.length > 0) {
-      query.$and = andConditions;
     }
 
     const docs = await posts
