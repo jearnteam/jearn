@@ -47,6 +47,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // ✅ Public post pages (🔑 ADD THIS)
+  if (pathname === "/posts" || pathname.startsWith("/posts/")) {
+    return NextResponse.next();
+  }
+
   // ✅ Public pages
   if (pathname === "/profile" || pathname.startsWith("/profile/")) {
     return NextResponse.next();
