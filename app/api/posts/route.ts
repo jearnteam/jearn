@@ -31,6 +31,7 @@ type CategoryDoc = {
 
 async function enrichPost(post: RawPost, usersColl: Collection) {
   const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
+  const DEFAULT_AVATAR = "/default-avatar.png";
 
   // 🔒 System posts
   if (post.authorId === "system") {
@@ -45,7 +46,6 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
 
   let user = null;
 
-  // Try resolving user by ObjectId
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
@@ -53,7 +53,6 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     );
   }
 
-  // 🔑 DO NOT DESTROY EXISTING DATA
   const authorName = post.authorName ?? user?.name ?? "Unknown";
   const avatarId = user?._id?.toString() ?? post.authorId;
 
@@ -61,8 +60,11 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
     : "";
 
+  const cdnAvatar = `${CDN}/avatars/${avatarId}.webp${timestamp}`;
+
   const authorAvatar =
-    post.authorAvatar ?? `${CDN}/avatars/${avatarId}.webp${timestamp}`;
+    post.authorAvatar ??
+    (avatarId ? cdnAvatar : DEFAULT_AVATAR);
 
   return {
     ...post,
@@ -72,6 +74,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     authorAvatar,
   };
 }
+
 
 /* -------------------------------------------------------------------------- */
 /*                        ENRICH CATEGORY OBJECTS (FULL)                      */

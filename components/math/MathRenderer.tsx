@@ -11,53 +11,70 @@ function setupLazyImages(container: HTMLElement) {
   const nodes = container.querySelectorAll("[data-type='image-placeholder']");
 
   nodes.forEach((node) => {
-    const el = node as HTMLElement;
-    const id = el.dataset.id!;
-    const width = Number(el.dataset.width ?? 0);
-    const height = Number(el.dataset.height ?? 0);
+    const imgEl = node as HTMLImageElement;
+    const id = imgEl.dataset.id;
+    if (!id) return;
 
-    // Reset automatically on full page reload
-    const FAILED_IMAGE_CACHE = new Set<string>();
-
-    // Calculate preview height but DO NOT render any padding box.
+    const height = Number(imgEl.dataset.height ?? 0);
     const previewHeight = height > 0 ? Math.min(height, 400) : 400;
 
-    // Tell PostItem a preview height exists
-    el.dispatchEvent(
+    imgEl.dispatchEvent(
       new CustomEvent("image-height", {
         detail: { height: previewHeight },
         bubbles: true,
       })
     );
 
-    // Initially empty. No skeleton, no border, no padding.
-    el.innerHTML = "";
+    // 🔥 Replace <img> with a wrapper <div>
+    const wrapper = document.createElement("div");
+    wrapper.style.width = "100%";
+    wrapper.style.overflow = "hidden";
+    wrapper.style.display = "block";
 
-    // Prepare the box as auto height
-    const box = document.createElement("div");
-    box.style.width = "100%";
-    box.style.overflow = "hidden";
-    box.style.display = "block";
-    box.className = "lazy-image-box"; // optional
-    el.appendChild(box);
+    imgEl.replaceWith(wrapper);
 
-    // Build URLs
     const r2Base = `https://cdn.jearn.site/posts/${id}`;
-    const trySources = [`${r2Base}.jpg`, `${r2Base}.png`, `${r2Base}.webp`];
+    const FAILED = new Set<string>();
 
-    let loaded = false;
+    /* ---------------- VIDEO FIRST ---------------- */
+    const videoSrcs = [`${r2Base}.mp4`, `${r2Base}.webm`];
 
-    function tryLoad(i: number) {
-      if (i >= trySources.length) {
-        box.innerHTML = "";
+    function tryVideo(i: number) {
+      if (i >= videoSrcs.length) {
+        tryImage(0);
         return;
       }
 
-      const src = trySources[i];
+      const video = document.createElement("video");
+      video.src = videoSrcs[i];
+      video.controls = true;
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
 
-      // 🚫 already failed in this session → skip silently
-      if (FAILED_IMAGE_CACHE.has(src)) {
-        tryLoad(i + 1);
+      video.style.maxWidth = "100%";
+      video.style.maxHeight = "400px";
+      video.style.display = "block";
+      video.style.margin = "0 auto";
+      video.style.borderRadius = "8px";
+
+      video.onloadedmetadata = () => {
+        wrapper.innerHTML = "";
+        wrapper.appendChild(video);
+      };
+
+      video.onerror = () => tryVideo(i + 1);
+    }
+
+    /* ---------------- IMAGE FALLBACK ---------------- */
+    const imageSrcs = [`${r2Base}.jpg`, `${r2Base}.png`, `${r2Base}.webp`];
+
+    function tryImage(i: number) {
+      if (i >= imageSrcs.length) return;
+
+      const src = imageSrcs[i];
+      if (FAILED.has(src)) {
+        tryImage(i + 1);
         return;
       }
 
@@ -66,34 +83,25 @@ function setupLazyImages(container: HTMLElement) {
       img.src = src;
 
       img.onload = () => {
-        if (loaded) return;
-        loaded = true;
+        wrapper.innerHTML = "";
 
-        box.innerHTML = "";
-
-        img.style.width = "auto";
-        img.style.height = "auto";
         img.style.maxHeight = "400px";
-        img.style.objectFit = "unset";
         img.style.display = "block";
-        img.style.borderRadius = "8px";
         img.style.margin = "0 auto";
+        img.style.borderRadius = "8px";
         img.className = "opacity-0 transition-opacity duration-300";
 
-        box.appendChild(img);
-
-        requestAnimationFrame(() => {
-          img.style.opacity = "1";
-        });
+        wrapper.appendChild(img);
+        requestAnimationFrame(() => (img.style.opacity = "1"));
       };
 
       img.onerror = () => {
-        FAILED_IMAGE_CACHE.add(src); // 🧠 remember for this page only
-        tryLoad(i + 1);
+        FAILED.add(src);
+        tryImage(i + 1);
       };
     }
 
-    tryLoad(0);
+    tryVideo(0);
   });
 }
 
@@ -218,23 +226,47 @@ function setupMentions(el: HTMLElement) {
 
       if (!popup) return;
 
-      popup.innerHTML = `
-        <div class="flex items-center gap-3">
-          <img src="${user?.picture ?? "/default-avatar.png"}"
-               class="w-10 h-10 rounded-full object-cover"/>
-          <div class="flex flex-col">
-            <span class="font-semibold">@${user?.userId ?? userId}</span>
-            <span class="text-gray-600 dark:text-gray-300 text-xs">
-              ${user?.name ?? "Unknown"}
-            </span>
-          </div>
-        </div>
-        ${
-          user?.bio
-            ? `<div class="mt-2 text-xs text-gray-700 dark:text-gray-300">${user.bio}</div>`
-            : ""
-        }
-      `;
+      popup.innerHTML = ""; // clear skeleton
+
+      const row = document.createElement("div");
+      row.className = "flex items-center gap-3";
+
+      // avatar
+      const img = document.createElement("img");
+      img.className = "w-10 h-10 rounded-full object-cover";
+      img.src = user?.picture?.trim() || "/default-avatar.png";
+
+      img.onerror = () => {
+        img.onerror = null; // prevent loop
+        img.src = "/default-avatar.png";
+      };
+
+      // text container
+      const text = document.createElement("div");
+      text.className = "flex flex-col";
+
+      const handle = document.createElement("span");
+      handle.className = "font-semibold";
+      handle.textContent = `@${user?.userId ?? userId}`;
+
+      const name = document.createElement("span");
+      name.className = "text-gray-600 dark:text-gray-300 text-xs";
+      name.textContent = user?.name ?? "Unknown";
+
+      text.appendChild(handle);
+      text.appendChild(name);
+
+      row.appendChild(img);
+      row.appendChild(text);
+      popup.appendChild(row);
+
+      // bio (optional)
+      if (user?.bio) {
+        const bio = document.createElement("div");
+        bio.className = "mt-2 text-xs text-gray-700 dark:text-gray-300";
+        bio.textContent = user.bio;
+        popup.appendChild(bio);
+      }
     });
 
     mentionEl.addEventListener("mouseleave", destroy);
@@ -272,6 +304,34 @@ function setupTags(el: HTMLElement) {
 }
 
 /* ----------------------------------------------------------
+ *  VIDEO HANDLER
+ * ---------------------------------------------------------- */
+function setupVideos(container: HTMLElement) {
+  const videos = container.querySelectorAll("video");
+
+  videos.forEach((video) => {
+    // ✅ required for desktop autoplay
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+
+    // ✅ allow user to interact
+    video.controls = true;
+
+    // ✅ ensure visible layout
+    video.style.maxWidth = "100%";
+    video.style.borderRadius = "8px";
+    video.style.display = "block";
+
+    // Optional: prevent layout jump
+    video.preload = "metadata";
+
+    // Safety: force reload if browser blocked initial load
+    video.load();
+  });
+}
+
+/* ----------------------------------------------------------
  *  MAIN RENDERER
  * ---------------------------------------------------------- */
 function MathRendererBase({ html }: { html: string }) {
@@ -286,6 +346,7 @@ function MathRendererBase({ html }: { html: string }) {
     setupMentions(el);
     setupTags(el);
     setupLazyImages(el);
+    setupVideos(el);
 
     return () => {
       document.querySelectorAll(".mention-popup").forEach((p) => p.remove());

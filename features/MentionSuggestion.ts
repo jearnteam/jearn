@@ -141,15 +141,26 @@ export const MentionSuggestion = Extension.create({
 
               row.onclick = () => lastProps?.command(u);
 
-              row.innerHTML = `
-                <img src="${avatar(
-                  u
-                )}" class="w-6 h-6 rounded-full object-cover" />
-                <span>@${u.userId} — ${u.name}</span>
-              `;
-              if (!root) return;
+              // ✅ avatar <img> with fallback
+              const img = document.createElement("img");
+              img.className = "w-6 h-6 rounded-full object-cover";
+              img.referrerPolicy = "no-referrer"; // optional, helps with some external pictures
 
-              root.appendChild(row);
+              const src = avatar(u); // your helper
+              img.src = src;
+
+              img.onerror = () => {
+                img.onerror = null; // prevent infinite loop if default missing
+                img.src = "/default-avatar.png";
+              };
+
+              const label = document.createElement("span");
+              label.textContent = `@${u.userId} — ${u.name}`;
+
+              row.appendChild(img);
+              row.appendChild(label);
+
+              root!.appendChild(row);
             });
           };
 

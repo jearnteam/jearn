@@ -25,21 +25,14 @@ export default function PostHeader({
   const { user } = useCurrentUser();
 
   const isSelf = Boolean(
-    user?._id &&
-    post.authorId &&
-    user._id === post.authorId
+    user?._id && post.authorId && user._id === post.authorId
   );
 
   // ✅ NEVER force logout
-  const profileHref = isSelf
-    ? "/profile"
-    : `/profile/${post.authorId}`;
+  const profileHref = isSelf ? "/profile" : `/profile/${post.authorId}`;
 
   // ✅ Always safe avatar
-  const avatar =
-    post.authorAvatar?.startsWith("http")
-      ? post.authorAvatar
-      : "https://cdn.jearn.site/avatars/default.webp";
+  const avatar = post.authorAvatar ?? "/default-avatar.png";
 
   const authorName = post.authorName || "Unknown";
 
@@ -49,6 +42,9 @@ export default function PostHeader({
         <div className="flex items-center gap-3">
           <img
             src={avatar}
+            onError={(e) => {
+              e.currentTarget.src = "/default-avatar.png";
+            }}
             className="w-8 h-8 rounded-full object-cover"
             loading="lazy"
             decoding="async"
