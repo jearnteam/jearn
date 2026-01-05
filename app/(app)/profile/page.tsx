@@ -230,17 +230,30 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
     }
   }
 
-  async function upvotePost(postId: string, userId: string) {
-    const res = await fetch(`/api/posts/${postId}/upvote`, {
+  async function upvotePost(id: string) {
+    const res = await fetch(`/api/posts/${id}/upvote`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
+      credentials: "include",
     });
 
+    if (!res.ok) return;
+
     const data = await res.json();
-    return res.ok
-      ? { ok: true, action: data.action }
-      : { ok: false, error: data.error };
+
+    // optional: emit notification (same logic as HomePage)
+    if (data.action === "added" && data.authorId) {
+      fetch("/api/notifications/emit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.authorId,
+          payload: {
+            type: "post_like",
+            postId: id,
+          },
+        }),
+      }).catch(() => {});
+    }
   }
 
   /* -------------------------

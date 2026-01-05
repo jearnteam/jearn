@@ -16,6 +16,9 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import FollowButton from "@/components/follow/FollowButton";
 import { normalizePosts } from "@/lib/normalizePosts";
 
+/* ---------------------------------------------
+ * TYPES
+ * ------------------------------------------- */
 type ApiUser = {
   _id: string;
   userId?: string;
@@ -35,6 +38,9 @@ type UIUserPost = Post & {
   isAdmin?: boolean;
 };
 
+/* ---------------------------------------------
+ * PAGE
+ * ------------------------------------------- */
 export default function UserPage() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
@@ -54,9 +60,9 @@ export default function UserPage() {
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  /* ------------------------------------------------------
-     Load user + posts
-  ------------------------------------------------------ */
+  /* ---------------------------------------------
+   * LOAD USER + POSTS
+   * ------------------------------------------- */
   async function loadAll() {
     setLoading(true);
     try {
@@ -99,9 +105,9 @@ export default function UserPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  /* ------------------------------------------------------
-     Pull to refresh
-  ------------------------------------------------------ */
+  /* ---------------------------------------------
+   * PULL TO REFRESH
+   * ------------------------------------------- */
   usePullToRefresh(mainRef, async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -112,9 +118,9 @@ export default function UserPage() {
     }
   });
 
-  /* ------------------------------------------------------
-     Delete
-  ------------------------------------------------------ */
+  /* ---------------------------------------------
+   * DELETE
+   * ------------------------------------------- */
   function requestDelete(id: string) {
     setDeletePostId(id);
     setConfirmDeleteOpen(true);
@@ -133,26 +139,55 @@ export default function UserPage() {
     }
   }
 
-  async function upvotePost(postId: string, userId: string) {
-    const res = await fetch(`/api/posts/${postId}/upvote`, {
+  /* ---------------------------------------------
+   * UPVOTE (HomePage-style)
+   * ------------------------------------------- */
+  async function upvotePost(id: string): Promise<void> {
+    const res = await fetch(`/api/posts/${id}/upvote`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId }),
+      credentials: "include",
     });
+
+    if (!res.ok) return;
+
     const data = await res.json();
-    return res.ok
-      ? { ok: true, action: data.action }
-      : { ok: false, error: data.error };
+
+    if (data.action === "added" && data.authorId) {
+      fetch("/api/notifications/emit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.authorId,
+          payload: {
+            type: "post_like",
+            postId: id,
+          },
+        }),
+      }).catch(() => {});
+    }
   }
 
-  if (loading) return <FullScreenLoader text={t("loadingUser")} />;
-  if (!user)
+  /* ---------------------------------------------
+   * LOADING / NOT FOUND
+   * ------------------------------------------- */
+  if (loading) {
+    return <FullScreenLoader text={t("loadingUser")} />;
+  }
+
+  if (!user) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         {t("userNotFound") || "User not found"}
       </div>
     );
+  }
 
+  // 🔐 TS-safe non-null alias
+  const safeUser = user;
+
+  /* ---------------------------------------------
+   * RENDER
+   * ------------------------------------------- */
   return (
     <>
       {editingPost && (
@@ -186,21 +221,23 @@ export default function UserPage() {
         <main
           ref={mainRef}
           className="
-            absolute top-[4.3rem] left-0 right-0 bottom-0
-            overflow-y-auto no-scrollbar
-            pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-          "
+      absolute top-[4.3rem] left-0 right-0 bottom-0
+      overflow-y-auto no-scrollbar
+      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+    "
         >
           <div className="feed-container mt-10">
+            {/* PROFILE HEADER */}
             <div className="flex items-start gap-4 border-b pb-4">
               <Avatar id={id} size={80} className="border" />
 
               <div className="flex-1 relative">
-                <h1 className="text-2xl font-bold">{user.name}</h1>
-                <p className="text-gray-500">
-                  {user.userId ? "@" + user.userId : ""}
-                </p>
-                <p className="text-gray-500">{user.bio}</p>
+                <h1 className="text-2xl font-bold">{safeUser.name}</h1>
+                <p className="text-gray-500">@{safeUser.userId}</p>
+
+                {safeUser.bio && (
+                  <p className="text-gray-500">{safeUser.bio}</p>
+                )}
 
                 {currentUser?._id !== id && (
                   <div className="absolute bottom-2 right-2">
@@ -210,6 +247,7 @@ export default function UserPage() {
               </div>
             </div>
 
+            {/* POSTS — NO WRAPPER */}
             <PostList
               posts={posts}
               hasMore={false}

@@ -27,6 +27,31 @@ type UIUser = {
   bio: string;
 };
 
+async function upvotePost(id: string): Promise<void> {
+  const res = await fetch(`/api/posts/${id}/upvote`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  if (!res.ok) return;
+
+  const data = await res.json();
+
+  if (data.action === "added" && data.authorId) {
+    fetch("/api/notifications/emit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: data.authorId,
+        payload: {
+          type: "post_like",
+          postId: id,
+        },
+      }),
+    }).catch(() => {});
+  }
+}
+
 export default function ProfileUserClient({ userId }: Props) {
   const { user: currentUser } = useCurrentUser();
 
@@ -144,23 +169,17 @@ export default function ProfileUserClient({ userId }: Props) {
           )}
         </div>
 
-        {/* 🔑 SCROLL CONTAINER (THIS FIXES EVERYTHING) */}
-        <div
-          ref={scrollRef}
-          className="overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 260px)" }}
-        >
-          <PostList
-            posts={posts}
-            hasMore={hasMore}
-            onLoadMore={loadMore}
-            onEdit={() => {}}
-            onDelete={async () => {}}
-            onUpvote={async () => ({ ok: true })}
-            onAnswer={() => {}}
-            scrollContainerRef={scrollRef}
-          />
-        </div>
+        {/* POSTS — NO WRAPPER */}
+        <PostList
+          posts={posts}
+          hasMore={hasMore}
+          onLoadMore={loadMore}
+          onEdit={() => {}}
+          onDelete={async () => {}}
+          onUpvote={upvotePost}
+          onAnswer={() => {}}
+          /* no scrollContainerRef */
+        />
       </div>
     </div>
   );
