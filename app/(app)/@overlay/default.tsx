@@ -1,3 +1,3 @@
-export default function OverlayDefault() {
+export default function EmptyOverlay() {
   return null;
 }

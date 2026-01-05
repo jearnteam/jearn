@@ -5,11 +5,9 @@ import "@/globals.css";
 
 import Providers from "./providers";
 import ClientLayout from "./ClientLayout";
-import Navbar from "@/components/Navbar";
 import I18nProvider from "@/components/I18nProvider";
 import LanguageInitializer from "@/components/LanguageInitializer";
 import UserThemeSync from "@/components/UserThemeSync";
-import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,16 +51,12 @@ export default function RootLayout({
         <Providers>
           <ClientLayout>
             <UserThemeSync />
-            <AppNavigationBridge />
             <I18nProvider>
               <LanguageInitializer />
 
-              <Navbar />
+              {/* ⬇️ NOTHING APP-SPECIFIC HERE */}
+              {children}
 
-              {/* ⚠️ children will now include (app) or (protected) */}
-              <div className="pt-[4.3rem] min-h-screen bg-background text-foreground">
-                {children}
-              </div>
             </I18nProvider>
           </ClientLayout>
         </Providers>
