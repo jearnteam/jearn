@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Bell } from "lucide-react";
 import { useNotifications } from "@/features/notifications/useNotifications";
 import { useTranslation } from "react-i18next";
+import { useRouter } from "next/navigation";
 
 /* ---------------------------------------------
  * TYPES
@@ -31,11 +32,30 @@ export type Notification = {
 export default function NotificationPage() {
   const mounted = useMounted();
   const { t } = useTranslation();
+  const router = useRouter();
+
   const { items, fetchNotifications } = useNotifications();
 
+  /* ---------------------------------------------
+   * FETCH ON OPEN
+   * ------------------------------------------- */
   useEffect(() => {
-    fetchNotifications(); // ✅ FETCH ON TAB OPEN
+    fetchNotifications();
   }, [fetchNotifications]);
+
+  /* ---------------------------------------------
+   * OVERLAY NAVIGATION (🔑 KEY FIX)
+   * ------------------------------------------- */
+  const openPostOverlay = useCallback(
+    (postId: string) => {
+      // mark this navigation as overlay-intent
+      sessionStorage.setItem("from-navigation", "true");
+      sessionStorage.setItem("restore-post-id", postId);
+
+      router.push(`/posts/${postId}`);
+    },
+    [router]
+  );
 
   if (!mounted) return null;
 
@@ -44,11 +64,14 @@ export default function NotificationPage() {
     const bTime = new Date(b.updatedAt ?? b.createdAt).getTime();
     return bTime - aTime;
   });
+
   if (!sortedItems.length) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-500">
         <Bell className="w-10 h-10 mb-3 opacity-50" />
-        <p className="text-sm">{t("no_noti_yet") || "No notifications yet"}</p>
+        <p className="text-sm">
+          {t("no_noti_yet") || "No notifications yet"}
+        </p>
       </div>
     );
   }
@@ -56,7 +79,11 @@ export default function NotificationPage() {
   return (
     <div className="flex flex-col px-2 py-1">
       {sortedItems.map((n) => (
-        <NotificationItem key={n._id} notification={n} />
+        <NotificationItem
+          key={n._id}
+          notification={n}
+          onOpenPost={openPostOverlay}
+        />
       ))}
     </div>
   );
@@ -65,7 +92,13 @@ export default function NotificationPage() {
 /* ---------------------------------------------
  * ITEM
  * ------------------------------------------- */
-function NotificationItem({ notification }: { notification: Notification }) {
+function NotificationItem({
+  notification,
+  onOpenPost,
+}: {
+  notification: Notification;
+  onOpenPost: (postId: string) => void;
+}) {
   const mounted = useMounted();
   const { t } = useTranslation();
 
@@ -108,7 +141,9 @@ function NotificationItem({ notification }: { notification: Notification }) {
 
       case "system":
         return (
-          notification.postPreview ?? t("system_noti") ?? "System notification"
+          notification.postPreview ??
+          t("system_noti") ??
+          "System notification"
         );
 
       default:
@@ -122,7 +157,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
     <div
       onClick={() => {
         if (notification.postId) {
-          window.location.href = `/posts/${notification.postId}`;
+          onOpenPost(notification.postId);
         }
       }}
       className={[

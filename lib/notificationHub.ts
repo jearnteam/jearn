@@ -5,16 +5,25 @@ const clients = new Map<
 
 const encoder = new TextEncoder();
 
+/* ---------------------------------------------
+ * SUBSCRIBE
+ * ------------------------------------------- */
 export function subscribe(
   userId: string,
   writer: WritableStreamDefaultWriter<Uint8Array>
 ) {
-  if (!clients.has(userId)) {
-    clients.set(userId, new Set());
+  let set = clients.get(userId);
+  if (!set) {
+    set = new Set();
+    clients.set(userId, set);
   }
-  clients.get(userId)!.add(writer);
+
+  set.add(writer);
 }
 
+/* ---------------------------------------------
+ * UNSUBSCRIBE
+ * ------------------------------------------- */
 export function unsubscribe(
   userId: string,
   writer: WritableStreamDefaultWriter<Uint8Array>
@@ -23,25 +32,54 @@ export function unsubscribe(
   if (!set) return;
 
   set.delete(writer);
+
   if (set.size === 0) {
     clients.delete(userId);
   }
 }
 
-// 🔔 THIS is what you call after DB update
-export function notify(userId: string) {
-  const set = clients.get(userId);
-  if (!set) return;
+/* ---------------------------------------------
+ * NOTIFICATION DISPATCH
+ * ------------------------------------------- */
 
-  for (const writer of set) {
-    try {
-      writer.write(
-        encoder.encode(
-          "event: notification\ndata: {}\n\n"
+/**
+ * Debounce map:
+ * Prevents notification spam when many DB updates happen at once.
+ */
+const pending = new Set<string>();
+const NOTIFY_DEBOUNCE_MS = 300;
+
+/**
+ * Call this AFTER DB update
+ */
+export function notify(userId: string) {
+  // 🔕 Already scheduled → skip
+  if (pending.has(userId)) return;
+
+  pending.add(userId);
+
+  setTimeout(() => {
+    pending.delete(userId);
+
+    const set = clients.get(userId);
+    if (!set) return;
+
+    for (const writer of Array.from(set)) {
+      writer
+        .write(
+          encoder.encode(
+            "event: notification\ndata: {}\n\n"
+          )
         )
-      );
-    } catch {
-      set.delete(writer);
+        .catch(() => {
+          // 🧹 Writer is dead → remove it
+          set.delete(writer);
+        });
     }
-  }
+
+    // 🧹 Cleanup empty sets
+    if (set.size === 0) {
+      clients.delete(userId);
+    }
+  }, NOTIFY_DEBOUNCE_MS);
 }
