@@ -63,8 +63,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
   const cdnAvatar = `${CDN}/avatars/${avatarId}.webp${timestamp}`;
 
   const authorAvatar =
-    post.authorAvatar ??
-    (avatarId ? cdnAvatar : DEFAULT_AVATAR);
+    post.authorAvatar ?? (avatarId ? cdnAvatar : DEFAULT_AVATAR);
 
   return {
     ...post,
@@ -74,7 +73,6 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     authorAvatar,
   };
 }
-
 
 /* -------------------------------------------------------------------------- */
 /*                        ENRICH CATEGORY OBJECTS (FULL)                      */
@@ -411,6 +409,58 @@ export async function PUT(req: Request) {
     return NextResponse.json({ ok: true, post: final });
   } catch (err) {
     console.error("🔥 PUT /api/posts failed:", err);
+    return new Response("Internal Server Error", { status: 500 });
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                DELETE POST                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function DELETE(req: Request) {
+  try {
+    const session = await getServerSession(authConfig);
+    if (!session?.user?.uid) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const { id, txId = null } = await req.json();
+
+    if (!id || !ObjectId.isValid(id)) {
+      return new Response("Invalid post id", { status: 400 });
+    }
+
+    const client = await clientPromise;
+    const db = client.db("jearn");
+    const posts = db.collection("posts");
+
+    const existing = await posts.findOne({ _id: new ObjectId(id) });
+    if (!existing) {
+      return new Response("Post not found", { status: 404 });
+    }
+
+    if (existing.authorId !== session.user.uid) {
+      return new Response("Forbidden", { status: 403 });
+    }
+
+    /* ---------------- DELETE POST + COMMENTS ---------------- */
+    await posts.deleteMany({
+      $or: [
+        { _id: new ObjectId(id) },
+        { parentId: id }, // delete comments
+      ],
+    });
+
+    /* ---------------- SSE ---------------- */
+    broadcastSSE({
+      type: existing.parentId ? "delete-comment" : "delete-post",
+      txId,
+      postId: id,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("🔥 DELETE /api/posts failed:", err);
     return new Response("Internal Server Error", { status: 500 });
   }
 }

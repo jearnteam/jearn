@@ -4,49 +4,36 @@ import { memo, useEffect, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
-/* ----------------------------------------------------------
- *  AUTO-LOADING R2 IMAGE PLACEHOLDER
- * ---------------------------------------------------------- */
-function setupLazyImages(container: HTMLElement) {
-  const nodes = container.querySelectorAll("[data-type='image-placeholder']");
+function setupMedia(container: HTMLElement) {
+  const mediaNodes = container.querySelectorAll("[data-type='media']");
 
-  nodes.forEach((node) => {
-    const imgEl = node as HTMLImageElement;
-    const id = imgEl.dataset.id;
-    if (!id) return;
+  mediaNodes.forEach((node) => {
+    const el = node as HTMLElement;
+    const raw = el.dataset.media;
+    if (!raw) return;
 
-    const height = Number(imgEl.dataset.height ?? 0);
-    const previewHeight = height > 0 ? Math.min(height, 400) : 400;
+    let media: { url: string; kind?: string };
+    try {
+      media = JSON.parse(raw);
+    } catch {
+      return;
+    }
 
-    imgEl.dispatchEvent(
-      new CustomEvent("image-height", {
-        detail: { height: previewHeight },
-        bubbles: true,
-      })
-    );
-
-    // 🔥 Replace <img> with a wrapper <div>
     const wrapper = document.createElement("div");
-    wrapper.style.width = "100%";
-    wrapper.style.overflow = "hidden";
+    wrapper.style.maxWidth = "100%";
     wrapper.style.display = "block";
+    wrapper.style.margin = "0 auto";
 
-    imgEl.replaceWith(wrapper);
+    el.replaceWith(wrapper);
 
-    const r2Base = `https://cdn.jearn.site/posts/${id}`;
-    const FAILED = new Set<string>();
-
-    /* ---------------- VIDEO FIRST ---------------- */
-    const videoSrcs = [`${r2Base}.mp4`, `${r2Base}.webm`];
-
-    function tryVideo(i: number) {
-      if (i >= videoSrcs.length) {
-        tryImage(0);
-        return;
-      }
-
+    // 🔥 VIDEO
+    if (
+      media.kind === "video" ||
+      media.url.endsWith(".mp4") ||
+      media.url.endsWith(".webm")
+    ) {
       const video = document.createElement("video");
-      video.src = videoSrcs[i];
+      video.src = media.url;
       video.controls = true;
       video.muted = true;
       video.playsInline = true;
@@ -54,54 +41,42 @@ function setupLazyImages(container: HTMLElement) {
 
       video.style.maxWidth = "100%";
       video.style.maxHeight = "400px";
-      video.style.display = "block";
-      video.style.margin = "0 auto";
       video.style.borderRadius = "8px";
 
-      video.onloadedmetadata = () => {
-        wrapper.innerHTML = "";
-        wrapper.appendChild(video);
-      };
-
-      video.onerror = () => tryVideo(i + 1);
+      wrapper.appendChild(video);
+      return;
     }
 
-    /* ---------------- IMAGE FALLBACK ---------------- */
-    const imageSrcs = [`${r2Base}.jpg`, `${r2Base}.png`, `${r2Base}.webp`];
+    // 🖼 IMAGE / GIF
+    const img = document.createElement("img");
+    img.src = media.url;
+    img.loading = "lazy";
+    img.decoding = "async";
 
-    function tryImage(i: number) {
-      if (i >= imageSrcs.length) return;
+    img.style.maxWidth = "100%";
+    img.style.maxHeight = "400px";
+    img.style.display = "block";
+    img.style.margin = "0 auto";
+    img.style.borderRadius = "8px";
 
-      const src = imageSrcs[i];
-      if (FAILED.has(src)) {
-        tryImage(i + 1);
-        return;
-      }
+    wrapper.appendChild(img);
+  });
+}
 
-      const img = new Image();
-      img.decoding = "async";
-      img.src = src;
+function setupLegacyImages(container: HTMLElement) {
+  const imgs = container.querySelectorAll("img[data-type='image-placeholder']");
 
-      img.onload = () => {
-        wrapper.innerHTML = "";
+  imgs.forEach((img) => {
+    const imgEl = img as HTMLImageElement;
+    if (!imgEl.src) return;
 
-        img.style.maxHeight = "400px";
-        img.style.display = "block";
-        img.style.margin = "0 auto";
-        img.style.borderRadius = "8px";
-        img.className = "opacity-0 transition-opacity duration-300";
-
-        wrapper.appendChild(img);
-        requestAnimationFrame(() => (img.style.opacity = "1"));
-      };
-
-      img.onerror = () => {
-        FAILED.add(src);
-        tryImage(i + 1);
-      };
-    }
-
-    tryVideo(0);
+    imgEl.loading = "lazy";
+    imgEl.decoding = "async";
+    imgEl.style.maxWidth = "100%";
+    imgEl.style.maxHeight = "400px";
+    imgEl.style.display = "block";
+    imgEl.style.margin = "0 auto";
+    imgEl.style.borderRadius = "8px";
   });
 }
 
@@ -345,8 +320,8 @@ function MathRendererBase({ html }: { html: string }) {
     styleMentions(el);
     setupMentions(el);
     setupTags(el);
-    setupLazyImages(el);
-    setupVideos(el);
+    setupMedia(el);
+    setupLegacyImages(el);
 
     return () => {
       document.querySelectorAll(".mention-popup").forEach((p) => p.remove());
