@@ -12,47 +12,64 @@ function setupMedia(container: HTMLElement) {
     const raw = el.dataset.media;
     if (!raw) return;
 
+    const decoded = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
     let media: { url: string; kind?: string };
+
     try {
-      media = JSON.parse(raw);
+      media = JSON.parse(decoded);
     } catch {
+      console.error("Invalid media JSON:", decoded);
       return;
     }
 
     const wrapper = document.createElement("div");
+    wrapper.style.width = "100%";
     wrapper.style.maxWidth = "100%";
+    wrapper.style.margin = "16px auto";
     wrapper.style.display = "block";
-    wrapper.style.margin = "0 auto";
+    wrapper.style.background = "#111";
+    wrapper.style.border = "2px solid red"; // 🔥 DEBUG BORDER
+    wrapper.style.height = "225px"; // 🔥 FORCE HEIGHT (16:9)
+    wrapper.style.borderRadius = "8px";
+    wrapper.style.overflow = "hidden";
 
     el.replaceWith(wrapper);
 
-    // 🔥 VIDEO
-    if (
+    const isVideo =
       media.kind === "video" ||
       media.url.endsWith(".mp4") ||
-      media.url.endsWith(".webm")
-    ) {
+      media.url.endsWith(".webm");
+
+    if (isVideo) {
       const video = document.createElement("video");
       video.src = media.url;
+
       video.controls = true;
       video.muted = true;
       video.playsInline = true;
       video.preload = "metadata";
 
-      video.style.maxWidth = "100%";
-      video.style.maxHeight = "400px";
-      video.style.borderRadius = "8px";
+      video.style.width = "100%";
+      video.style.height = "100%";
+      video.style.display = "block";
+      video.style.background = "black";
+
+      // 🔥 HARD DEBUG
+      video.addEventListener("error", () => {
+        console.error("VIDEO ERROR", video.error, media.url);
+      });
+
+      video.addEventListener("loadedmetadata", () => {
+        console.log("VIDEO OK", media.url, video.videoWidth, video.videoHeight);
+      });
 
       wrapper.appendChild(video);
       return;
     }
 
-    // 🖼 IMAGE / GIF
+    // Image fallback
     const img = document.createElement("img");
     img.src = media.url;
-    img.loading = "lazy";
-    img.decoding = "async";
-
     img.style.maxWidth = "100%";
     img.style.maxHeight = "400px";
     img.style.display = "block";
@@ -68,8 +85,80 @@ function setupLegacyImages(container: HTMLElement) {
 
   imgs.forEach((img) => {
     const imgEl = img as HTMLImageElement;
-    if (!imgEl.src) return;
+    const src = imgEl.src;
+    if (!src) return;
 
+    const isVideo =
+      src.endsWith(".mp4") ||
+      src.endsWith(".webm") ||
+      src.includes(".mp4?") ||
+      src.includes(".webm?");
+
+    /* --------------------------------------------------
+     * 🎬 LEGACY VIDEO (AUTO ORIENTATION)
+     * -------------------------------------------------- */
+    if (isVideo) {
+      const wrapper = document.createElement("div");
+
+      // Initial safe layout
+      wrapper.style.width = "100%";
+      wrapper.style.margin = "12px auto";
+      wrapper.style.background = "black";
+      wrapper.style.borderRadius = "10px";
+      wrapper.style.overflow = "hidden";
+      wrapper.style.aspectRatio = "16 / 9"; // placeholder
+
+      // Desktop cap only
+      if (window.innerWidth >= 768) {
+        wrapper.style.maxHeight = "420px";
+      }
+
+      const video = document.createElement("video");
+      video.src = src;
+
+      video.muted = true;
+      video.playsInline = true;
+      video.controls = true;
+      video.preload = "metadata";
+
+      video.style.width = "100%";
+      video.style.height = "100%";
+      video.style.display = "block";
+      video.style.objectFit = "contain";
+
+      // 🔥 AUTO DETECT ORIENTATION
+      video.addEventListener("loadedmetadata", () => {
+        const w = video.videoWidth;
+        const h = video.videoHeight;
+
+        if (!w || !h) return;
+
+        // Portrait (TikTok / Shorts)
+        if (h > w * 1.1) {
+          wrapper.style.aspectRatio = "9 / 16";
+
+          if (window.innerWidth >= 768) {
+            wrapper.style.maxHeight = "560px";
+          }
+        }
+        // Square (Instagram)
+        else if (Math.abs(w - h) < 50) {
+          wrapper.style.aspectRatio = "1 / 1";
+        }
+        // Landscape (default)
+        else {
+          wrapper.style.aspectRatio = "16 / 9";
+        }
+      });
+
+      wrapper.appendChild(video);
+      imgEl.replaceWith(wrapper);
+      return;
+    }
+
+    /* --------------------------------------------------
+     * 🖼 LEGACY IMAGE
+     * -------------------------------------------------- */
     imgEl.loading = "lazy";
     imgEl.decoding = "async";
     imgEl.style.maxWidth = "100%";
@@ -279,34 +368,6 @@ function setupTags(el: HTMLElement) {
 }
 
 /* ----------------------------------------------------------
- *  VIDEO HANDLER
- * ---------------------------------------------------------- */
-function setupVideos(container: HTMLElement) {
-  const videos = container.querySelectorAll("video");
-
-  videos.forEach((video) => {
-    // ✅ required for desktop autoplay
-    video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
-
-    // ✅ allow user to interact
-    video.controls = true;
-
-    // ✅ ensure visible layout
-    video.style.maxWidth = "100%";
-    video.style.borderRadius = "8px";
-    video.style.display = "block";
-
-    // Optional: prevent layout jump
-    video.preload = "metadata";
-
-    // Safety: force reload if browser blocked initial load
-    video.load();
-  });
-}
-
-/* ----------------------------------------------------------
  *  MAIN RENDERER
  * ---------------------------------------------------------- */
 function MathRendererBase({ html }: { html: string }) {
@@ -331,7 +392,7 @@ function MathRendererBase({ html }: { html: string }) {
   return (
     <div
       ref={ref}
-      className="math-content whitespace-pre-line break-words"
+      className="math-content break-words"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
