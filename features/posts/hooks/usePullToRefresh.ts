@@ -6,9 +6,11 @@ export function usePullToRefresh(
   threshold = 80
 ) {
   const startY = useRef<number | null>(null);
+  const isTouchingRef = useRef(false); // ← 追加
   const [pullY, setPullY] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const locked = useRef(false);
+  const hitThresholdRef = useRef(false);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -29,25 +31,43 @@ export function usePullToRefresh(
     };
 
     const onTouchStart = (e: TouchEvent) => {
-      if (el.scrollTop === 0 && !refreshing) {
-        startY.current = e.touches[0].clientY;
-      }
+      isTouchingRef.current = true;
+
+      startY.current = e.touches[0].clientY;
     };
 
     const onTouchMove = (e: TouchEvent) => {
+      if (!isTouchingRef.current) return;
       if (startY.current === null || refreshing) return;
 
-      const delta = e.touches[0].clientY - startY.current;
-      if (delta <= 0) return;
+      const rawDelta = e.touches[0].clientY - startY.current;
+      if (rawDelta > 0 && el.scrollTop <= 1) {
+        lockScroll();
 
-      // 🔑 ゴム引きモードへ強制遷移
-      lockScroll();
+        const dampedDelta = threshold * Math.log1p(rawDelta / threshold);
 
-      setPullY(Math.min(delta, threshold + 60));
+        const clamped = Math.min(dampedDelta, threshold + 40);
+        setPullY(clamped);
+
+        // 🔑 threshold 到達の瞬間
+        if (!hitThresholdRef.current && clamped >= threshold) {
+          hitThresholdRef.current = true;
+
+          if ("vibrate" in navigator) {
+            navigator.vibrate(6);
+          }
+        }
+      }
     };
 
     const onTouchEnd = async () => {
-      if (pullY >= threshold && !refreshing) {
+      const shouldRefresh =
+        isTouchingRef.current && pullY >= threshold && !refreshing;
+
+      // 🔑 先に「指を離した」ことを確定
+      isTouchingRef.current = false;
+
+      if (shouldRefresh) {
         setRefreshing(true);
         await onRefresh();
         setRefreshing(false);

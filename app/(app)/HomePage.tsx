@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { PostList } from "@/components/posts";
 import { usePosts } from "@/features/posts/hooks/usePosts";
+import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/common/PullToRefreshIndicator";
 import type { Post } from "@/types/post";
 
 import NotificationPage from "@/components/notifications/NotificationPage";
@@ -48,6 +50,7 @@ export default function HomePage() {
     posts,
     hasMore,
     fetchNext,
+    refresh,
     addPost,
     addAnswer,
     editPost,
@@ -127,6 +130,15 @@ export default function HomePage() {
     setNavbarVisible(true);
     setActiveView(next);
   }
+
+  /* ---------------------------------------------
+   * PULL TO REFRESH
+   * ------------------------------------------- */
+
+  const { pullY, refreshing } = usePullToRefresh(scrollRef, async () => {
+    if (activeView !== "home") return;
+    await refresh();
+  });
 
   /* ---------------------------------------------
    * DELETE
@@ -326,8 +338,14 @@ export default function HomePage() {
           <main
             ref={scrollRef}
             onScroll={onScroll}
+            
             className="flex-1 overflow-y-auto no-scrollbar pb-[72px]"
+            style={{
+              transform: `translateY(${pullY}px)`,
+              transition: refreshing ? "transform 0.2s ease" : "none",
+            }}
           >
+            <PullToRefreshIndicator pullY={pullY} refreshing={refreshing} />
             {/* HOME */}
             <div
               className={
