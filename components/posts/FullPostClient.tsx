@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import { apiFetch } from "@/app/(app)/HomePage";
 
 interface Props {
   initialPost: Post;
@@ -68,20 +69,29 @@ export default function FullPostClient({ initialPost }: Props) {
   /* ---------------------------------------------------------
    * Upvote
    * --------------------------------------------------------- */
-  const handleUpvote = useCallback(
-    async (id: string, userId: string, _txId?: string) => {
-      if (!userId || !id) return;
+  const handleUpvote = useCallback(async (id: string) => {
+    const res = await apiFetch(`/api/posts/${id}/upvote`, {
+      method: "POST",
+    });
 
-      const res = await fetch(`/api/posts/${id}/upvote`, {
+    const data = await res.json();
+
+    if (!res.ok) return;
+
+    if (data.action === "added" && data.authorId) {
+      fetch("/api/notifications/emit", {
         method: "POST",
-        body: JSON.stringify({ userId }),
         headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) console.error("❌ Upvote error", await res.text());
-    },
-    []
-  );
+        body: JSON.stringify({
+          userId: data.authorId,
+          payload: {
+            type: "post_like",
+            postId: id,
+          },
+        }),
+      }).catch(() => {});
+    }
+  }, []);
 
   /* ---------------------------------------------------------
    * Share
@@ -173,7 +183,7 @@ export default function FullPostClient({ initialPost }: Props) {
     <>
       <PostItem
         post={post}
-        setPost={setPost}          // ✅ now type-compatible
+        setPost={setPost} // ✅ now type-compatible
         isSingle={true}
         onUpvote={handleUpvote}
         onShare={handleShare}

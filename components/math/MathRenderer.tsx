@@ -4,6 +4,10 @@ import { memo, useEffect, useRef } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 
+/**
+ * @deprecated
+ * @param container 
+ */
 function setupMedia(container: HTMLElement) {
   const mediaNodes = container.querySelectorAll("[data-type='media']");
 
