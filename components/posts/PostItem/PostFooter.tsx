@@ -49,7 +49,6 @@ export default function PostFooter({
   const safeAnswer = useCallback(() => {
     if (onAnswer) onAnswer();
   }, [onAnswer]);
-  
 
   /* -------------------------------------------------
    * LOCAL RENDER STATE (optimistic)
@@ -84,8 +83,7 @@ export default function PostFooter({
 
         return {
           ...prev,
-          upvoteCount:
-            (prev.upvoteCount ?? 0) + (hasUpvoted ? -1 : 1),
+          upvoteCount: (prev.upvoteCount ?? 0) + (hasUpvoted ? -1 : 1),
           upvoters: hasUpvoted
             ? upvoters.filter((id) => id !== userId)
             : [...upvoters, userId],
@@ -117,48 +115,42 @@ export default function PostFooter({
           </button>
 
           {/* COMMENTS */}
-          {!isSingle &&
-            !post.parentId &&
-            post.postType !== PostTypes.QUESTION && (
-              <Link
-                href={`/posts/${post._id}?focus=comments`}
-                scroll={false}
-                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MessageCircle size={18} />
-                <span>{post.commentCount ?? 0}</span>
-              </Link>
-            )}
+          {!isSingle && post.postType !== PostTypes.QUESTION && (
+            <Link
+              href={`/posts/${post._id}?focus=comments`}
+              scroll={false}
+              className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MessageCircle size={18} />
+              <span>{post.commentCount ?? 0}</span>
+            </Link>
+          )}
 
           {/* ANSWERS */}
-          {!isSingle &&
-            !post.parentId &&
-            post.postType === PostTypes.QUESTION && (
-              <Link
-                href={`/posts/${post._id}`}
-                scroll={false}
-                className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MessageSquarePlus size={18} color="#c44" />
-                <span>{post.commentCount ?? 0}</span>
-              </Link>
-            )}
+          {!isSingle && post.postType === PostTypes.QUESTION && (
+            <Link
+              href={`/posts/${post._id}`}
+              scroll={false}
+              className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <MessageSquarePlus size={18} color="#c44" />
+              <span>{post.commentCount ?? 0}</span>
+            </Link>
+          )}
 
           {/* SHARE */}
-          {!post.parentId && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                safeShare();
-              }}
-              className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-            >
-              <Share2 size={18} />
-              <span>{t("share") || "Share"}</span>
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              safeShare();
+            }}
+            className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+          >
+            <Share2 size={18} />
+            <span>{t("share") || "Share"}</span>
+          </button>
         </div>
 
         {/* CENTER: ANSWER */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PostTypes, type Post } from "@/types/post";
 import PostHeader from "./PostHeader";
 import PostContent from "./PostContent";
@@ -10,6 +10,9 @@ import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
 import Link from "next/link";
 
+/**
+ * @param isSingle 全画面表示か
+ */
 export default function PostItem({
   post,
   setPost,

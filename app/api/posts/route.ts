@@ -130,7 +130,11 @@ export async function GET(req: Request) {
       $and: [
         { postType: { $ne: PostTypes.COMMENT } },
         {
-          $or: [{ parentId: null }, { parentId: { $exists: false } }],
+          $or: [
+            { parentId: null },
+            { parentId: { $exists: false } },
+            { postType: PostTypes.ANSWER },
+          ],
         },
       ],
     };
