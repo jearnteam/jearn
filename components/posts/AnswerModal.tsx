@@ -15,6 +15,7 @@ interface AnswerModalProps {
   onClose: () => void;
   onSubmit: (
     postType: PostType,
+    title: string,
     content: string,
     authorId: string | null,
     tags: string[],
@@ -95,6 +96,7 @@ export default function AnswerModal({
                       // PostForm からのデータを Answer 用に変換して送信
                       await onSubmit(
                         data.postType,
+                        data.title,
                         data.content,
                         data.authorId,
                         data.tags,

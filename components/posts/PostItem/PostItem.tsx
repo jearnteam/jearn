@@ -61,11 +61,14 @@ export default function PostItem({
           />
 
           {/* 🔹 CATEGORIES */}
-          {Array.isArray(post.categories) && post.categories.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {post.categories.map((cat) => {
+          <div className="flex flex-wrap gap-2 mb-2">
+            {(() => {
+              const categories =
+                Array.isArray(post.categories) && post.categories.length > 0
+                  ? post.categories
+                  : post.parentPost?.categories;
+              return categories?.map((cat) => {
                 const label = cat.name || cat.jname || cat.myname || "Category";
-
                 return (
                   <span
                     key={cat.id}
@@ -86,38 +89,54 @@ export default function PostItem({
                     {label}
                   </span>
                 );
-              })}
-            </div>
-          )}
+              });
+            })()}
+          </div>
 
           {/* TITLE */}
-          {post.title && (
-            <h2 className="font-semibold text-lg text-gray-800 dark:text-gray-100 break-words">
-              {post.postType === PostTypes.QUESTION && (
-                <span className="text-red-500">Q. </span>
-              )}
-              <Link
-                href={`/posts/${post._id}`}
-                scroll={false}
-                className="hover:underline"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {post.title}
-              </Link>
-            </h2>
-          )}
-
-          {!post.title && post.postType === PostTypes.ANSWER && (
+          {post.title && post.postType !== PostTypes.ANSWER && (
             <h2
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 router.push(`/posts/${post._id}`, { scroll: false });
               }}
-              className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline"
+              className="font-semibold text-lg text-gray-800 dark:text-gray-100 break-words w-fit"
             >
-              <span className="text-blue-500">A. </span>
+              {post.postType === PostTypes.QUESTION && (
+                <span className="text-red-500">Q. </span>
+              )}
+              {post.title}
             </h2>
+          )}
+
+          {post.postType === PostTypes.ANSWER && (
+            <>
+              <h2
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/posts/${post.parentPost?._id}`, {
+                    scroll: false,
+                  });
+                }}
+                className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
+              >
+                <span className="text-red-500">Q. </span>
+                {post.parentPost?.title}
+              </h2>
+              <h2
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(`/posts/${post._id}`, { scroll: false });
+                }}
+                className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
+              >
+                <span className="text-blue-500">A. </span>
+                {post?.title}
+              </h2>
+            </>
           )}
 
           <PostContent

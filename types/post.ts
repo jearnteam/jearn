@@ -12,7 +12,8 @@ export const PostTypes = {
   POST: "Post",
   QUESTION: "Question",
   ANSWER: "Answer",
-  COMMENT: "Comment"
+  COMMENT: "Comment",
+  VIDEO: "VIDEO",
 } as const;
 /** Union */
 export type PostType = typeof PostTypes[keyof typeof PostTypes];
@@ -49,6 +50,7 @@ export interface Post {
 
   parentId: string | null;
   replyTo?: string | null;
+  parentPost?: Post;
 
   upvoteCount: number;
   upvoters: string[];

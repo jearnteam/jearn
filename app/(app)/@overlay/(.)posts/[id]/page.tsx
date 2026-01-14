@@ -6,7 +6,7 @@ import PostOverlayShell from "@/app/(app)/posts/[id]/PostOverlayShell";
 import FullPostClient from "@/components/posts/FullPostClient";
 import CommentClientSection from "@/components/comments/CommentClientSection";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
-import type { Post } from "@/types/post";
+import { PostTypes, type Post } from "@/types/post";
 
 export default function OverlayPostPage() {
   const { id } = useParams() as { id: string };
@@ -72,10 +72,11 @@ export default function OverlayPostPage() {
       {() => (
         <>
           <FullPostClient initialPost={post} />
-          <CommentClientSection
-            comments={comments}
-            postId={post._id}
-          />
+          {post.postType !== PostTypes.QUESTION ? (
+            <CommentClientSection comments={comments} postId={post._id} />
+          ) : (
+            <></>
+          )}
         </>
       )}
     </PostOverlayShell>

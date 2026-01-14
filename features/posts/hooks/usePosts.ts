@@ -48,6 +48,38 @@ export function usePosts() {
   }, [cursor, hasMore]);
 
   /* -------------------------------------------------------------------------- */
+  /*                               PULL TO REFRESH                               */
+  /* -------------------------------------------------------------------------- */
+  const refresh = useCallback(async () => {
+    if (fetchingRef.current) return;
+
+    fetchingRef.current = true;
+    setLoading(true);
+
+    try {
+      const params = new URLSearchParams();
+      params.set("limit", "10");
+
+      const res = await fetch(`/api/posts?${params.toString()}`, {
+        cache: "no-store",
+      });
+
+      if (!res.ok) throw new Error("Failed to refresh posts");
+
+      const data = await res.json();
+
+      // 🔑 状態をすべて初期化
+      setPosts(data.items);
+      setCursor(data.nextCursor);
+      setHasMore(Boolean(data.nextCursor));
+    } catch (err) {
+      console.error("❌ refresh failed:", err);
+    } finally {
+      fetchingRef.current = false;
+      setLoading(false);
+    }
+  }, []);
+  /* -------------------------------------------------------------------------- */
   /*                               INITIAL LOAD                                  */
   /* -------------------------------------------------------------------------- */
   useEffect(() => {
@@ -160,6 +192,7 @@ export function usePosts() {
   const addAnswer = useCallback(
     async (
       _postType: PostType,
+      title: string,
       content: string,
       authorId: string | null,
       tags: string[],
@@ -172,6 +205,7 @@ export function usePosts() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           postType: PostTypes.ANSWER,
+          title,
           content,
           authorId,
           tags,
@@ -183,7 +217,22 @@ export function usePosts() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /*                               EDIT POST                                     */
+  /*                               EDIT POST                                    */
+  /* -------------------------------------------------------------------------- */
+  /* helper */
+  function extractCdnImages(html: string): Set<string> {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    return new Set(
+      Array.from(doc.querySelectorAll("img"))
+        .map((img) => img.getAttribute("src"))
+        .filter(
+          (src): src is string =>
+            !!src && src.startsWith("https://cdn.jearn.site/")
+        )
+    );
+  }
+
   /* -------------------------------------------------------------------------- */
   const editPost = useCallback(
     async (
@@ -193,6 +242,27 @@ export function usePosts() {
       categories?: string[],
       tags?: string[]
     ) => {
+      let originalContent: string | null = null;
+
+      // 🔎 capture original content safely
+      setPosts((prev) => {
+        const target = prev.find((p) => p._id === id);
+        originalContent = target?.content ?? null;
+        return prev;
+      });
+
+      if (!originalContent) {
+        console.error("❌ editPost: original post not found");
+        return;
+      }
+
+      // 🧮 compute removed images
+      const oldImages = extractCdnImages(originalContent);
+      const newImages = extractCdnImages(content);
+
+      const removedImages = [...oldImages].filter((url) => !newImages.has(url));
+
+      // ⚡ optimistic update
       setPosts((prev) =>
         prev.map((p) =>
           p._id === id
@@ -207,10 +277,17 @@ export function usePosts() {
         )
       );
 
-      const res = await fetch("/api/posts", {
+      // 🌐 API request
+      const res = await fetch(`/api/posts/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, title, content, categories, tags }),
+        body: JSON.stringify({
+          title,
+          content,
+          categories,
+          tags,
+          removedImages,
+        }),
       });
 
       if (!res.ok) {
@@ -245,6 +322,7 @@ export function usePosts() {
     loading,
     hasMore,
     fetchNext,
+    refresh,
     addPost,
     addAnswer,
     editPost,
