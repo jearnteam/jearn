@@ -5,12 +5,14 @@ export function useFollow(targetUserId: string) {
   const [loading, setLoading] = useState(true);
 
   // 初期状態を取得
+  // 初期状態を取得
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const res = await fetch(`/api/follow/status/${targetUserId}`, {
           cache: "no-store",
+          credentials: "include", 
         });
         const data = await res.json();
         if (alive) setFollowing(!!data.following);

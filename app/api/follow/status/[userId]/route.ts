@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = "nodejs";
+
 export async function GET(
   _: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -17,12 +19,14 @@ export async function GET(
   }
 
   const client = await clientPromise;
-  const db = client.db();
+
+  // ✅ FIX: use the SAME DB as POST
+  const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const exists = await db.collection("follow").findOne({
     followerId: session.user.uid,
     followingId: userId,
   });
 
-  return NextResponse.json({ following: !!exists });
+  return NextResponse.json({ following: Boolean(exists) });
 }

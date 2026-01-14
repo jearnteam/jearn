@@ -7,6 +7,7 @@ import { usePosts } from "@/features/posts/hooks/usePosts";
 import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/common/PullToRefreshIndicator";
 import type { Post } from "@/types/post";
+import { useFollowingPosts } from "@/features/posts/hooks/useFollowingPosts";
 
 import NotificationPage from "@/components/notifications/NotificationPage";
 import { useNotifications } from "@/features/notifications/useNotifications";
@@ -57,6 +58,13 @@ export default function HomePage() {
     deletePost,
     loading,
   } = usePosts();
+
+  const {
+    posts: followingPosts,
+    hasMore: followingHasMore,
+    loading: followingLoading,
+    fetchNext: fetchFollowingNext,
+  } = useFollowingPosts();
 
   const { unreadCount, clearUnread, fetchNotifications } = useNotifications();
 
@@ -338,7 +346,6 @@ export default function HomePage() {
           <main
             ref={scrollRef}
             onScroll={onScroll}
-            
             className="flex-1 overflow-y-auto no-scrollbar pb-[72px]"
             style={{
               transform: `translateY(${pullY}px)`,
@@ -367,6 +374,7 @@ export default function HomePage() {
             </div>
 
             {/* USERS */}
+            {/* USERS（フォロー中） */}
             <div
               className={
                 activeView === "users"
@@ -374,7 +382,27 @@ export default function HomePage() {
                   : "invisible h-0 overflow-hidden"
               }
             >
-              <div className="p-4 text-center text-gray-500">👥 Users</div>
+              {followingLoading && (
+                <div className="p-4 text-center text-gray-500">読み込み中…</div>
+              )}
+
+              {!followingLoading && followingPosts.length === 0 && (
+                <div className="p-4 text-center text-gray-500">
+                  フォロー中のユーザーはいません
+                </div>
+              )}
+
+              <PostList
+                posts={followingPosts}
+                hasMore={followingHasMore}
+                onLoadMore={fetchFollowingNext}
+                /* ▼ PostList が要求する Props をすべて満たす */
+                onEdit={async (_post) => {}}
+                onDelete={async (_id: string) => {}}
+                onUpvote={async (_id: string) => {}}
+                onAnswer={(_post) => {}}
+                scrollContainerRef={scrollRef}
+              />
             </div>
 
             {/* NOTIFICATIONS */}

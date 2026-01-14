@@ -11,40 +11,47 @@ interface FollowButtonProps {
 export default function FollowButton({ targetUserId }: FollowButtonProps) {
   const { following, loading, toggleFollow } = useFollow(targetUserId);
 
+  // 🔴 status 確定前は何も判断しない
+  if (loading) {
+    return (
+      <div className="px-4 h-9 rounded-full border border-gray-300 flex items-center justify-center">
+        <Spinner />
+      </div>
+    );
+  }
+
   return (
     <motion.button
       onClick={toggleFollow}
-      disabled={loading}
       whileTap={{ scale: 0.94 }}
-      whileHover={!loading ? { scale: 1.06 } : undefined}
+      whileHover={{ scale: 1.06 }}
       transition={{ type: "spring", stiffness: 420, damping: 28 }}
       className={[
         "group relative inline-flex items-center gap-2",
         "px-4 h-9 rounded-full text-sm font-semibold select-none",
         "transition-colors duration-300 ease-out",
-        "disabled:opacity-60 disabled:cursor-not-allowed",
         following
           ? "bg-blue-600 text-white hover:bg-red-600"
           : "border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40",
       ].join(" ")}
     >
-      {!loading && !following && <UserPlus size={16} />}
-      {!loading && following && (
+      {!following && <UserPlus size={16} />}
+
+      {following && (
         <>
           <Check size={16} className="group-hover:hidden" />
           <HelpCircle size={16} className="hidden group-hover:inline" />
         </>
       )}
-      {loading && <Spinner />}
-      <span className="relative">
-        {!loading && !following && "Follow"}
-        {!loading && following && (
+
+      <span>
+        {!following && "Follow"}
+        {following && (
           <>
             <span className="group-hover:hidden">Following</span>
             <span className="hidden group-hover:inline">Unfollow</span>
           </>
         )}
-        {loading && "Processing"}
       </span>
     </motion.button>
   );
