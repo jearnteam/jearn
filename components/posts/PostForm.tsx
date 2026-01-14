@@ -62,6 +62,9 @@ export default function PostForm({
   const [title, setTitle] = useState(initialTitle);
   const [resetKey, setResetKey] = useState(0);
 
+  const editorRef = useRef<PostEditorWrapperRef>(null);
+  const pendingImagesRef = useRef<Map<string, File>>(new Map());
+  const localBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
 
@@ -81,7 +84,6 @@ export default function PostForm({
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
 
-  const editorRef = useRef<PostEditorWrapperRef>(null);
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
 
@@ -177,13 +179,61 @@ export default function PostForm({
     if (mode !== PostTypes.ANSWER && selected.length === 0)
       return alert("Choose a category.");
 
-    let html = editorRef.current?.getHTML() ?? "";
-    html = removeZWSP(html);
-
-    const tags = extractTagsFromHTML(html);
-
     setSubmitting(true);
+
     try {
+      let html = editorRef.current?.getHTML() ?? "";
+      html = removeZWSP(html);
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+
+      // ✅ ONLY local placeholder images
+      const images = Array.from(
+        doc.querySelectorAll(
+          "img[data-type='image-placeholder'][data-status='local']"
+        )
+      );
+
+      for (const img of images) {
+        const localId = img.getAttribute("data-id");
+        if (!localId) continue;
+
+        const file = pendingImagesRef.current.get(localId);
+        if (!file) continue;
+
+        const form = new FormData();
+        form.append("file", file);
+
+        const res = await fetch("/api/media/upload", {
+          method: "POST",
+          body: form,
+        });
+
+        if (!res.ok) throw new Error("Image upload failed");
+
+        const { url, width, height } = await res.json();
+
+        // replace blob with CDN
+        img.setAttribute("src", url);
+        img.removeAttribute("data-status");
+
+        if (width) img.setAttribute("data-width", String(width));
+        if (height) img.setAttribute("data-height", String(height));
+
+        // 🧹 memory cleanup
+        const blobUrl = localBlobUrlsRef.current.get(localId);
+        if (blobUrl) {
+          URL.revokeObjectURL(blobUrl);
+          localBlobUrlsRef.current.delete(localId);
+        }
+      }
+
+      // ✅ FINAL HTML
+      html = doc.body.innerHTML;
+
+      const tags = extractTagsFromHTML(html);
+
       await onSubmit({
         postType: mode,
         title,
@@ -193,12 +243,13 @@ export default function PostForm({
         tags,
       });
 
-      // 新規作成時のみフォームをクリア
+      // 🧹 reset only on new post
       if (!initialContent) {
         editorRef.current?.clearEditor();
-        setCategories([]);
-        setSelected([]);
+        pendingImagesRef.current.clear();
         setTitle("");
+        setSelected([]);
+        setCategories([]);
         setResetKey((k) => k + 1);
         setContentChanged(true);
       }
@@ -228,44 +279,42 @@ export default function PostForm({
       className="flex flex-col h-full space-y-4 bg-white dark:bg-neutral-900 p-4 rounded-lg"
     >
       {/* ------------------------------ Title ------------------------------ */}
-      {mode !== PostTypes.ANSWER && (
-        <>
-          <motion.div
-            animate={{
-              boxShadow: isTitleFocused
-                ? "0px 0px 12px rgba(0,0,0,0.15)"
-                : "0px 0px 0px rgba(0,0,0,0)",
+      <>
+        <motion.div
+          animate={{
+            boxShadow: isTitleFocused
+              ? "0px 0px 12px rgba(0,0,0,0.15)"
+              : "0px 0px 0px rgba(0,0,0,0)",
+          }}
+          className={`rounded-lg border transition ${
+            isTitleFocused
+              ? "border-black dark:border-white"
+              : "border-gray-300 dark:border-gray-500"
+          }`}
+        >
+          <input
+            type="text"
+            placeholder={
+              mode === PostTypes.QUESTION
+                ? t("questionEnter") || "Question"
+                : t("title") || "Title"
+            }
+            value={title}
+            maxLength={200}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setContentChanged(true);
             }}
-            className={`rounded-lg border transition ${
-              isTitleFocused
-                ? "border-black dark:border-white"
-                : "border-gray-300 dark:border-gray-500"
-            }`}
-          >
-            <input
-              type="text"
-              placeholder={
-                mode === PostTypes.QUESTION
-                  ? t("questionEnter") || "Question"
-                  : t("title") || "Title"
-              }
-              value={title}
-              maxLength={200}
-              onChange={(e) => {
-                setTitle(e.target.value);
-                setContentChanged(true);
-              }}
-              onFocus={() => setIsTitleFocused(true)}
-              onBlur={() => setIsTitleFocused(false)}
-              className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
-              autoComplete="off"
-            />
-          </motion.div>
-          <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
-            {title.length}/200
-          </p>
-        </>
-      )}
+            onFocus={() => setIsTitleFocused(true)}
+            onBlur={() => setIsTitleFocused(false)}
+            className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
+            autoComplete="off"
+          />
+        </motion.div>
+        <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
+          {title.length}/200
+        </p>
+      </>
 
       {/* ------------------------------ Editor ------------------------------ */}
       <div className="flex-1 overflow-y-auto rounded-md">
@@ -416,22 +465,32 @@ export default function PostForm({
                 const input = document.createElement("input");
                 input.type = "file";
                 input.accept = "image/*";
+
                 input.onchange = async () => {
                   const file = input.files?.[0];
                   if (!file) return;
-                  const form = new FormData();
-                  form.append("file", file);
-                  const res = await fetch("/api/images/uploadImage", {
-                    method: "POST",
-                    body: form,
-                  });
-                  const { id, url, width, height } = await res.json();
+
+                  // 🔹 create local preview
+                  const localUrl = URL.createObjectURL(file);
+                  const localId = crypto.randomUUID();
+
+                  // 🔹 INSERT PREVIEW ONLY (NO UPLOAD)
                   editorRef.current?.editor
                     ?.chain()
                     .focus()
-                    .insertImagePlaceholder(id, url, width, height)
+                    .insertImagePlaceholder(
+                      localId,
+                      localUrl, // blob: URL
+                      undefined,
+                      undefined
+                    )
                     .run();
+
+                  // 🔹 STORE references for later submit
+                  pendingImagesRef.current.set(localId, file);
+                  localBlobUrlsRef.current.set(localId, localUrl);
                 };
+
                 input.click();
               }}
               className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"

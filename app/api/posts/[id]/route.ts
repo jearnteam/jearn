@@ -5,6 +5,8 @@ import { ObjectId, Collection } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
+import { PostTypes } from "@/types/post";
+import { deleteMediaUrls } from "@/lib/media/deleteMedia";
 
 export const runtime = "nodejs";
 
@@ -106,6 +108,16 @@ export async function GET(
 
     const commentCount = await posts.countDocuments({ parentId: id });
 
+    // ✅ PARENT POST RESOLUTION (for Answers)
+    let parentPost = undefined;
+    if (
+      post.postType === PostTypes.ANSWER &&
+      post.parentId &&
+      ObjectId.isValid(post.parentId)
+    ) {
+      parentPost = await posts.findOne({ _id: new ObjectId(post.parentId) });
+    }
+
     return NextResponse.json({
       ...post,
       _id: id,
@@ -114,6 +126,7 @@ export async function GET(
       authorAvatarUpdatedAt: author.avatarUpdatedAt,
       commentCount,
       categories: populatedCategories,
+      parentPost,
     });
   } catch (err) {
     console.error("❌ GET /api/posts/[id]:", err);
@@ -135,12 +148,19 @@ export async function PUT(
     }
 
     const { id } = await params;
-
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const { title, content, categories, tags, txId = null } = await req.json();
+    /* -------------------- BODY -------------------- */
+    const {
+      title,
+      content,
+      categories,
+      tags,
+      removedImages = [],
+      txId = null,
+    } = await req.json();
 
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
@@ -158,6 +178,7 @@ export async function PUT(
       return new Response("Forbidden", { status: 403 });
     }
 
+    /* ---------------- UPDATE ---------------- */
     const updateFields: Record<string, unknown> = {};
 
     if (title !== undefined) updateFields.title = title;
@@ -180,15 +201,22 @@ export async function PUT(
     updateFields.editedAt = new Date();
 
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
+    console.error("🔥 SERVER removedImages:", removedImages);
+    /* ---------------- DELETE REMOVED MEDIA ---------------- */
+    if (Array.isArray(removedImages) && removedImages.length > 0) {
+      try {
+        await deleteMediaUrls(removedImages);
+      } catch (err) {
+        console.error("⚠️ Media cleanup failed:", err);
+      }
+    }
 
+    /* ---------------- ENRICH ---------------- */
     const updated = await posts.findOne({ _id: new ObjectId(id) });
 
-    /* ----------- Enrich author ----------- */
     const author = await resolveAuthor(users, updated?.authorId);
 
-    /* ----------- Enrich categories ----------- */
     let enrichedCategories: EnrichedCategory[] = [];
-
     if (Array.isArray(updated?.categories)) {
       const catDocs = await categoriesColl
         .find({
@@ -221,7 +249,7 @@ export async function PUT(
       tags: updated?.tags ?? [],
     };
 
-    /* ----------- choose SSE type ----------- */
+    /* ---------------- SSE ---------------- */
     const type = existing.replyTo
       ? "update-reply"
       : existing.parentId

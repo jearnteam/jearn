@@ -13,13 +13,17 @@ export const ImagePlaceholder = Node.create({
   addAttributes() {
     return {
       id: { default: null },
-      // optional fields kept for future compatibility
+
+      // image src (blob:... OR CDN url)
       url: { default: null },
+
+      // 👇 NEW: local | uploaded
+      status: { default: null },
+
       width: { default: null },
       height: { default: null },
     };
   },
-
   parseHTML() {
     return [
       {
@@ -27,6 +31,7 @@ export const ImagePlaceholder = Node.create({
         getAttrs: (node: any) => ({
           id: node.getAttribute("data-id"),
           url: node.getAttribute("src"),
+          status: node.getAttribute("data-status"),
           width: node.getAttribute("data-width")
             ? Number(node.getAttribute("data-width"))
             : null,
@@ -39,26 +44,25 @@ export const ImagePlaceholder = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { id, url, width, height } = HTMLAttributes;
-
-    // --- ADJUST THIS if your backend/CDN requires different URL shape ---
-    // prefer absolute CDN if available, otherwise local API route:
+    const { id, url, status, width, height } = HTMLAttributes; // 🔥 FIX
 
     return [
       "img",
-      mergeAttributes({
-        src: url,
-        "data-type": "image-placeholder",
-        "data-id": id,
-        "data-width": width,
-        "data-height": height,
-        style:
-          "max-width:100%; height:auto; max-height:400px; display:block; margin:auto; border-radius:8px;",
-        contenteditable: "false",
-      }),
+      mergeAttributes(
+        {
+          src: url,
+          "data-type": "image-placeholder",
+          "data-id": id,
+          "data-width": width,
+          "data-height": height,
+          contenteditable: "false",
+          style:
+            "max-width:100%; height:auto; max-height:400px; display:block; margin:auto; border-radius:8px;",
+        },
+        status ? { "data-status": status } : {}
+      ),
     ];
   },
-
   addCommands() {
     return {
       // keep single-arg API (id) to match your current upload handler
@@ -68,7 +72,13 @@ export const ImagePlaceholder = Node.create({
           return chain()
             .insertContent({
               type: this.name,
-              attrs: { id, url, width, height },
+              attrs: {
+                id,
+                url,
+                status: url?.startsWith("blob:") ? "local" : null,
+                width,
+                height,
+              },
             })
             .run();
         },

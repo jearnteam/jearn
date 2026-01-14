@@ -6,9 +6,7 @@ import Portal from "@/components/common/Portal";
 import PostForm, { Category } from "@/components/posts/PostForm";
 import { useTranslation } from "react-i18next";
 import type { Post } from "@/types/post";
-import { PostTypes } from "@/types/post";
-
-type PostType = (typeof PostTypes)[keyof typeof PostTypes];
+import { PostTypes, PostType } from "@/types/post";
 
 interface EditPostModalProps {
   post: Post;
@@ -30,7 +28,7 @@ export default function EditPostModal({
   const [allCategories, setAllCategories] = useState<Category[]>([]);
 
   /* -------------------------------------------------
-   * Resolve safe post type (NO `any`)
+   * Resolve safe post type
    * ------------------------------------------------- */
   const mode: PostType =
     post.postType === PostTypes.POST ||
@@ -74,7 +72,6 @@ export default function EditPostModal({
     }
 
     loadCategories();
-
     return () => {
       mounted = false;
     };
@@ -132,6 +129,7 @@ export default function EditPostModal({
                     data.categories,
                     data.tags
                   );
+
                   onClose();
                 }}
               />

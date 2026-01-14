@@ -6,6 +6,7 @@ import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { PostTypes } from "@/types/post";
+import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export const runtime = "nodejs";
 
@@ -159,6 +160,49 @@ export async function GET(req: Request) {
       .limit(limit)
       .toArray();
 
+    // -------------------------------------------------------------
+    // 🟢 FETCH PARENT POSTS FOR ANSWERS (Batch)
+    // -------------------------------------------------------------
+    const answerDocs = docs.filter(
+      (d) => d.postType === PostTypes.ANSWER && d.parentId
+    );
+
+    const parentIds = [
+      ...new Set(
+        answerDocs
+          .map((d) => {
+            if (ObjectId.isValid(d.parentId)) return new ObjectId(d.parentId);
+            return null;
+          })
+          .filter((id): id is ObjectId => id !== null)
+      ),
+    ];
+
+    // ✅ 変更: 単なるタイトル保持ではなく、全プロパティを持つオブジェクトマップへ
+    const parentMap: Record<string, any> = {};
+
+    if (parentIds.length > 0) {
+      const parents = await posts.find({ _id: { $in: parentIds } }).toArray();
+
+      // ✅ 変更: 親投稿も通常投稿と同様に enrich する
+      await Promise.all(
+        parents.map(async (p) => {
+          const categories = await enrichCategories(
+            Array.isArray(p.categories) ? p.categories : [],
+            categoriesColl
+          );
+          const postData = await enrichPost(p as RawPost, users);
+
+          parentMap[postData._id] = {
+            ...postData,
+            categories,
+            tags: p.tags ?? [],
+            commentCount: 0, // 親のコメント数はコンテキスト表示用には不要なため0として扱う（必要なら別途取得）
+          };
+        })
+      );
+    }
+
     // comment count map (page-scoped)
     const commentCounts = (await posts
       .aggregate([
@@ -186,6 +230,10 @@ export async function GET(req: Request) {
           categories,
           tags: p.tags ?? [],
           commentCount: countMap[p._id.toString()] ?? 0,
+          parentPost:
+            p.postType === PostTypes.ANSWER && p.parentId
+              ? parentMap[p.parentId.toString()]
+              : undefined,
         };
       })
     );
@@ -239,11 +287,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
 
     if (
-      [PostTypes.POST, PostTypes.QUESTION].includes(postType) &&
+      [PostTypes.POST, PostTypes.QUESTION, PostTypes.ANSWER].includes(
+        postType
+      ) &&
       !title?.trim()
     ) {
       return NextResponse.json(
-        { error: "Title required for Post or Question" },
+        { error: "Title required for Post or Question or Answer" },
         { status: 400 }
       );
     }
@@ -342,25 +392,45 @@ export async function POST(req: Request) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* R2 CLIENT                                                                  */
+/* -------------------------------------------------------------------------- */
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
+/* -------------------------------------------------------------------------- */
 /*                                EDIT POST                                   */
 /* -------------------------------------------------------------------------- */
 
 export async function PUT(req: Request) {
   try {
+    /* ------------------------------ AUTH ------------------------------ */
     const session = await getServerSession(authConfig);
     if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
 
+    /* ------------------------------ BODY ------------------------------ */
     const {
       id,
       title,
       content,
       categories,
       tags,
+      removedImages = [],
       txId = null,
     } = await req.json();
 
+    if (!id) {
+      return new Response("Missing post id", { status: 400 });
+    }
+
+    /* ------------------------------ DB ------------------------------- */
     const client = await clientPromise;
     const db = client.db("jearn");
 
@@ -369,26 +439,60 @@ export async function PUT(req: Request) {
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
-    if (!existing) return new Response("Post not found", { status: 404 });
+    if (!existing) {
+      return new Response("Post not found", { status: 404 });
+    }
 
-    if (existing.authorId !== session.user.uid)
+    if (existing.authorId !== session.user.uid) {
       return new Response("Forbidden", { status: 403 });
+    }
 
+    /* ------------------------- BUILD UPDATE --------------------------- */
     const updateFields: Record<string, unknown> = {};
+
     if (title !== undefined) updateFields.title = title;
     if (content !== undefined) updateFields.content = content;
-    if (Array.isArray(categories))
+
+    if (Array.isArray(categories)) {
       updateFields.categories = categories.map((c: string) => new ObjectId(c));
-    if (Array.isArray(tags)) updateFields.tags = tags;
+    }
+
+    if (Array.isArray(tags)) {
+      updateFields.tags = tags;
+    }
 
     updateFields.edited = true;
     updateFields.editedAt = new Date();
 
+    /* ---------------------------- UPDATE ------------------------------ */
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
 
+    /* ---------------------- DELETE REMOVED IMAGES ---------------------- */
+    if (Array.isArray(removedImages) && removedImages.length > 0) {
+      for (const url of removedImages) {
+        try {
+          const key = new URL(url).pathname.replace(/^\/+/, "");
+
+          // 🔐 safety guard
+          if (!key.startsWith("uploads/")) continue;
+
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME!,
+              Key: key,
+            })
+          );
+        } catch (err) {
+          console.error("❌ Failed to delete image:", url, err);
+        }
+      }
+    }
+
+    /* ------------------------- FETCH UPDATED -------------------------- */
     const updated = await posts.findOne({ _id: new ObjectId(id) });
-    if (!updated)
+    if (!updated) {
       return new Response("Post not found after update", { status: 404 });
+    }
 
     const enrichedPost = await enrichPost(updated as RawPost, users);
     const enrichedCategories = await enrichCategories(
@@ -403,6 +507,7 @@ export async function PUT(req: Request) {
       commentCount: updated.commentCount ?? 0,
     };
 
+    /* ----------------------------- SSE ------------------------------- */
     broadcastSSE({
       type: existing.parentId ? "update-comment" : "update-post",
       txId,
@@ -410,6 +515,7 @@ export async function PUT(req: Request) {
       post: final,
     });
 
+    /* --------------------------- RESPONSE ----------------------------- */
     return NextResponse.json({ ok: true, post: final });
   } catch (err) {
     console.error("🔥 PUT /api/posts failed:", err);
