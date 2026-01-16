@@ -4,7 +4,7 @@ import { Plus, Home, Users, Bell, Banana } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState, useCallback } from "react";
 
-type HomeView = "home" | "notify" | "users" | "banana";
+type HomeView = "home" | "notify" | "users" | "videos";
 
 interface MobileNavbarProps {
   visible: boolean;
@@ -37,7 +37,7 @@ export default function MobileNavbar({
   const homeRef = useRef<HTMLButtonElement | null>(null);
   const usersRef = useRef<HTMLButtonElement | null>(null);
   const notifyRef = useRef<HTMLButtonElement | null>(null);
-  const bananaRef = useRef<HTMLButtonElement | null>(null);
+  const videosRef = useRef<HTMLButtonElement | null>(null);
 
   /* ------------------------------------------------------------------ */
   /* indicator                                                          */
@@ -54,7 +54,7 @@ export default function MobileNavbar({
       home: homeRef,
       users: usersRef,
       notify: notifyRef,
-      banana: bananaRef,
+      videos: videosRef,
     };
 
     const btn = map[activeView]?.current;
@@ -167,19 +167,17 @@ export default function MobileNavbar({
   return (
     <motion.nav
       ref={navRef}
-      initial={false}
-      animate={{
-        y: visible ? 0 : 96,
-        opacity: visible ? 1 : 0,
+      style={{
+        ["--mobile-navbar-h" as any]: "80px",
       }}
-      transition={{ duration: 0.25, ease: "easeOut" }}
       className="
-        lg:hidden fixed bottom-0 left-0 right-0
-        h-20 bg-white dark:bg-black
-        border-t border-neutral-200 dark:border-neutral-800
-        flex items-center justify-evenly
-        z-40 pt-1 pb-3 px-[5vw]
-      "
+    lg:hidden fixed bottom-0 left-0 right-0
+    h-20
+    bg-white dark:bg-black
+    border-t border-neutral-200 dark:border-neutral-800
+    flex items-center justify-evenly
+    z-40 pt-1 pb-3 px-[5vw]
+  "
     >
       <NavButton tab="home" icon={<Home size={24} />} buttonRef={homeRef} />
 
@@ -204,9 +202,9 @@ export default function MobileNavbar({
       />
 
       <NavButton
-        tab="banana"
+        tab="videos"
         icon={<Banana size={24} />}
-        buttonRef={bananaRef}
+        buttonRef={videosRef}
       />
 
       {/* indicator */}

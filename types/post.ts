@@ -32,6 +32,12 @@ export interface Post {
 
   title?: string;
   content?: string;
+  video?: {
+    url: string;
+    thumbnailUrl?: string | null;
+    duration?: number | null;
+    aspectRatio?: number | null;
+  };
 
   categories?: CategoryObject[];
   tags?: string[];

@@ -20,11 +20,13 @@ import MobileNavbar from "@/components/MobileNavbar";
 import { useTranslation } from "react-i18next";
 import AnswerModal from "@/components/posts/AnswerModal";
 import { motion } from "framer-motion";
+import VideosPage from "@/components/videos/VideosPage";
+import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
 
 /* ---------------------------------------------
  * VIEW TYPE
  * ------------------------------------------- */
-type HomeView = "home" | "notify" | "users" | "banana";
+type HomeView = "home" | "notify" | "users" | "videos";
 
 export default function HomePage() {
   const { t } = useTranslation();
@@ -64,6 +66,7 @@ export default function HomePage() {
     hasMore: followingHasMore,
     loading: followingLoading,
     fetchNext: fetchFollowingNext,
+    refresh: refreshFollowing,
   } = useFollowingPosts();
 
   const { unreadCount, clearUnread, fetchNotifications } = useNotifications();
@@ -79,18 +82,27 @@ export default function HomePage() {
     home: 0,
     notify: 0,
     users: 0,
-    banana: 0,
+    videos: 0,
   });
 
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
     const cur = e.currentTarget.scrollTop;
 
-    // ✅ ALWAYS track scroll position
+    // 🎥 Videos page: mobile navbar always visible
+    if (activeView === "videos") {
+      setNavbarVisible(true);
+      lastScrollTop.current = cur;
+      return;
+    }
+
     if (!restoringScrollRef.current) {
       if (cur <= 0) {
         setNavbarVisible(true);
       } else {
-        setNavbarVisible(cur < lastScrollTop.current);
+        // 🔥 reversed logic
+        // scroll DOWN → show
+        // scroll UP → hide
+        setNavbarVisible(cur > lastScrollTop.current);
       }
     }
 
@@ -144,8 +156,13 @@ export default function HomePage() {
    * ------------------------------------------- */
 
   const { pullY, refreshing } = usePullToRefresh(scrollRef, async () => {
-    if (activeView !== "home") return;
-    await refresh();
+    if (activeView === "home") {
+      await refresh();
+    }
+
+    if (activeView === "users") {
+      await refreshFollowing();
+    }
   });
 
   /* ---------------------------------------------
@@ -167,6 +184,18 @@ export default function HomePage() {
       setDeletePostId(null);
     }
   }
+
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+
+    const update = () => setIsDesktop(mq.matches);
+    update();
+
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   /* ---------------------------------------------
    * EFFECTS
@@ -272,8 +301,14 @@ export default function HomePage() {
       />
 
       {/* ───── LAYOUT ───── */}
-      <div className="fixed inset-0 flex flex-col bg-white dark:bg-black">
-        <header className="h-[4.3rem]" />
+      <div
+        className="fixed inset-0 flex flex-col bg-white dark:bg-black"
+        style={{
+          ["--top-navbar-h" as any]: "4rem",
+          ["--mobile-navbar-h" as any]: "80px",
+        }}
+      >
+        <header className="h-16" />
 
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT SIDEBAR */}
@@ -334,99 +369,114 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
-                  label="Jearn"
-                  active={activeView === "banana"}
-                  onClick={() => changeView("banana")}
+                  label="Videos"
+                  active={activeView === "videos"}
+                  onClick={() => changeView("videos")}
                 />
               </div>
             </nav>
           </aside>
 
           {/* MAIN SCROLL */}
-          <main
-            ref={scrollRef}
-            onScroll={onScroll}
-            className="flex-1 overflow-y-auto no-scrollbar pb-[72px]"
-            style={{
-              transform: `translateY(${pullY}px)`,
-              transition: refreshing ? "transform 0.2s ease" : "none",
-            }}
-          >
-            <PullToRefreshIndicator pullY={pullY} refreshing={refreshing} />
-            {/* HOME */}
-            <div
-              className={
-                activeView === "home"
-                  ? "block"
-                  : "invisible h-0 overflow-hidden"
+          <VideoSettingsProvider>
+            <main
+              ref={scrollRef}
+              onScroll={onScroll}
+              className={`
+              flex-1 overflow-y-auto no-scrollbar
+              ${
+                activeView === "videos"
+                  ? "snap-y snap-mandatory"
+                  : "pb-[72px] lg:pb-0"
               }
+            `}
+              style={{
+                height:
+                  activeView === "videos" && !isDesktop
+                    ? "calc(100svh - var(--top-navbar-h) - var(--mobile-navbar-h))"
+                    : undefined,
+                transform: `translateY(${pullY}px)`,
+                transition: refreshing ? "transform 0.2s ease" : "none",
+              }}
             >
-              <PostList
-                posts={posts}
-                hasMore={hasMore}
-                onLoadMore={fetchNext}
-                onEdit={setEditingPost}
-                onDelete={async (id) => requestDelete(id)}
-                onUpvote={upvotePost}
-                onAnswer={setAnsweringPost}
-                scrollContainerRef={scrollRef}
-              />
-            </div>
+              <PullToRefreshIndicator pullY={pullY} refreshing={refreshing} />
+              {/* HOME */}
+              <div
+                className={
+                  activeView === "home"
+                    ? "block"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                <PostList
+                  posts={posts}
+                  hasMore={hasMore}
+                  onLoadMore={fetchNext}
+                  onEdit={setEditingPost}
+                  onDelete={async (id) => requestDelete(id)}
+                  onUpvote={upvotePost}
+                  onAnswer={setAnsweringPost}
+                  scrollContainerRef={scrollRef}
+                />
+              </div>
 
-            {/* USERS */}
-            {/* USERS（フォロー中） */}
-            <div
-              className={
-                activeView === "users"
-                  ? "block"
-                  : "invisible h-0 overflow-hidden"
-              }
-            >
-              {followingLoading && (
-                <div className="p-4 text-center text-gray-500">読み込み中…</div>
-              )}
+              {/* USERS */}
+              {/* USERS（フォロー中） */}
+              <div
+                className={
+                  activeView === "users"
+                    ? "block"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                {followingLoading && (
+                  <div className="p-4 text-center text-gray-500">
+                    読み込み中…
+                  </div>
+                )}
 
-              {!followingLoading && followingPosts.length === 0 && (
-                <div className="p-4 text-center text-gray-500">
-                  フォロー中のユーザーはいません
-                </div>
-              )}
+                {!followingLoading && followingPosts.length === 0 && (
+                  <div className="p-4 text-center text-gray-500">
+                    フォロー中のユーザーはいません
+                  </div>
+                )}
 
-              <PostList
-                posts={followingPosts}
-                hasMore={followingHasMore}
-                onLoadMore={fetchFollowingNext}
-                /* ▼ PostList が要求する Props をすべて満たす */
-                onEdit={async (_post) => {}}
-                onDelete={async (_id: string) => {}}
-                onUpvote={async (_id: string) => {}}
-                onAnswer={(_post) => {}}
-                scrollContainerRef={scrollRef}
-              />
-            </div>
+                <PostList
+                  posts={followingPosts}
+                  hasMore={followingHasMore}
+                  onLoadMore={fetchFollowingNext}
+                  /* ▼ PostList が要求する Props をすべて満たす */
+                  onEdit={async (_post) => {}}
+                  onDelete={async (_id: string) => {}}
+                  onUpvote={async (_id: string) => {}}
+                  onAnswer={(_post) => {}}
+                  scrollContainerRef={scrollRef}
+                />
+              </div>
 
-            {/* NOTIFICATIONS */}
-            <div
-              className={
-                activeView === "notify"
-                  ? "block"
-                  : "invisible h-0 overflow-hidden"
-              }
-            >
-              <NotificationPage />
-            </div>
+              {/* NOTIFICATIONS */}
+              <div
+                className={
+                  activeView === "notify"
+                    ? "block"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                <NotificationPage />
+              </div>
 
-            {/* BANANA */}
-            <div
-              className={
-                activeView === "banana"
-                  ? "block"
-                  : "invisible h-0 overflow-hidden"
-              }
-            >
-              <div className="p-4 text-center text-gray-500">🍌 Banana</div>
-            </div>
-          </main>
+              {/* VIDEOS */}
+              <div
+                className={
+                  activeView === "videos"
+                    ? "block h-full"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                <VideosPage />
+              </div>
+            </main>
+          </VideoSettingsProvider>
 
           {/* RIGHT SIDEBAR */}
           <aside className="hidden lg:flex w-[280px] p-4" />
@@ -452,7 +502,7 @@ function getSidebarIndicatorTop(view: HomeView) {
       return 44;
     case "notify":
       return 88;
-    case "banana":
+    case "videos":
       return 132;
     default:
       return 0;

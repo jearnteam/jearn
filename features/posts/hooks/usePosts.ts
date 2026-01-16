@@ -166,7 +166,13 @@ export function usePosts() {
       content: string,
       authorId: string | null,
       categories: string[],
-      tags: string[]
+      tags: string[],
+      video?: {
+        url: string;
+        thumbnailUrl?: string;
+        duration?: number;
+        aspectRatio?: number;
+      }
     ) => {
       if (!authorId) return;
 
@@ -180,6 +186,7 @@ export function usePosts() {
           authorId,
           categories,
           tags,
+          video, // ✅ THIS WAS MISSING
         }),
       }).catch((e) => console.error("🔥 addPost error:", e));
     },

@@ -21,6 +21,12 @@ type RawPost = WithId<Document> & {
   createdAt?: Date;
   categories?: unknown[];
   tags?: string[];
+  video?: {
+    url: string;
+    thumbnailUrl?: string;
+    duration?: number;
+    aspectRatio?: number;
+  };
 };
 
 type CategoryDoc = {
@@ -119,6 +125,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
+    const categoryId = searchParams.get("categoryId");
 
     const client = await clientPromise;
     const db = client.db("jearn");
@@ -139,6 +146,12 @@ export async function GET(req: Request) {
         },
       ],
     };
+
+    if (categoryId && ObjectId.isValid(categoryId)) {
+      (query.$and as Record<string, unknown>[]).push({
+        categories: new ObjectId(categoryId),
+      });
+    }
 
     if (cursor) {
       const [createdAt, id] = cursor.split("|");
@@ -273,39 +286,61 @@ export async function POST(req: Request) {
       txId = null,
       categories = [],
       tags = [],
+      video, // ✅ VIDEO
     } = await req.json();
 
-    if (!authorId)
+    if (!authorId) {
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
-    if (authorId !== session.user.uid)
+    }
+    if (authorId !== session.user.uid) {
       return NextResponse.json(
         { error: "Incorrect authorId" },
         { status: 400 }
       );
+    }
 
-    if (!content?.trim())
+    /* ------------------------------------------------------------------ */
+    /* VALIDATION                                                         */
+    /* ------------------------------------------------------------------ */
+    const safeContent = postType === PostTypes.VIDEO ? "" : content;
+    if (postType !== PostTypes.VIDEO && !content?.trim()) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
+    }
 
     if (
-      [PostTypes.POST, PostTypes.QUESTION, PostTypes.ANSWER].includes(
-        postType
-      ) &&
+      [
+        PostTypes.POST,
+        PostTypes.QUESTION,
+        PostTypes.ANSWER,
+        PostTypes.VIDEO,
+      ].includes(postType) &&
       !title?.trim()
     ) {
       return NextResponse.json(
-        { error: "Title required for Post or Question or Answer" },
+        { error: "Title / description required" },
         { status: 400 }
       );
     }
 
     if (
-      [PostTypes.POST, PostTypes.QUESTION].includes(postType) &&
+      [PostTypes.POST, PostTypes.QUESTION, PostTypes.VIDEO].includes(
+        postType
+      ) &&
       (!Array.isArray(categories) || categories.length === 0)
     ) {
       return NextResponse.json(
         { error: "At least one category required" },
         { status: 400 }
       );
+    }
+
+    if (postType === PostTypes.VIDEO) {
+      if (!video?.url) {
+        return NextResponse.json(
+          { error: "Video URL required for video post" },
+          { status: 400 }
+        );
+      }
     }
 
     if (Array.isArray(categories)) {
@@ -318,6 +353,10 @@ export async function POST(req: Request) {
         }
       }
     }
+
+    /* ------------------------------------------------------------------ */
+    /* DB                                                                 */
+    /* ------------------------------------------------------------------ */
 
     const client = await clientPromise;
     const db = client.db("jearn");
@@ -337,19 +376,44 @@ export async function POST(req: Request) {
       }
 
       const target = await posts.findOne({ _id: new ObjectId(replyTo) });
-      if (!target)
+      if (!target) {
         return NextResponse.json(
           { error: "Reply target not found" },
           { status: 404 }
         );
+      }
 
       safeParentId = target.parentId || target._id.toString();
     }
 
-    const doc = {
+    /* ------------------------------------------------------------------ */
+    /* INSERT                                                             */
+    /* ------------------------------------------------------------------ */
+
+    type PostInsertDoc = {
+      postType: string;
+      title: string;
+      content: string;
+      authorId: string;
+      parentId?: string | null;
+      replyTo?: string | null;
+      createdAt: Date;
+      upvoteCount: number;
+      upvoters: string[];
+      categories: ObjectId[];
+      tags: string[];
+      video?: {
+        url: string;
+        thumbnailUrl?: string;
+        duration?: number;
+        aspectRatio?: number;
+      };
+    };
+
+    const doc: PostInsertDoc = {
       postType,
       title,
-      content,
+      content: safeContent,
       authorId,
       parentId: safeParentId,
       replyTo,
@@ -360,7 +424,21 @@ export async function POST(req: Request) {
       tags,
     };
 
+    // ✅ VIDEO metadata
+    if (postType === PostTypes.VIDEO && video) {
+      doc.video = {
+        url: video.url,
+        ...(video.thumbnailUrl ? { thumbnailUrl: video.thumbnailUrl } : {}),
+        ...(video.duration ? { duration: video.duration } : {}),
+        ...(video.aspectRatio ? { aspectRatio: video.aspectRatio } : {}),
+      };
+    }
+
     const result = await posts.insertOne(doc);
+
+    /* ------------------------------------------------------------------ */
+    /* ENRICH                                                             */
+    /* ------------------------------------------------------------------ */
 
     const enrichedNoCats = await enrichPost(
       { ...doc, _id: result.insertedId },
@@ -375,7 +453,12 @@ export async function POST(req: Request) {
       tags,
       commentCount: 0,
       edited: false,
+      video: doc.video ?? undefined, // ✅ expose to client
     };
+
+    /* ------------------------------------------------------------------ */
+    /* SSE                                                                */
+    /* ------------------------------------------------------------------ */
 
     broadcastSSE({
       type: safeParentId ? "new-comment" : "new-post",
@@ -474,7 +557,7 @@ export async function PUT(req: Request) {
           const key = new URL(url).pathname.replace(/^\/+/, "");
 
           // 🔐 safety guard
-          if (!key.startsWith("uploads/")) continue;
+          if (!key.startsWith("posts/")) continue;
 
           await r2.send(
             new DeleteObjectCommand({
@@ -560,6 +643,37 @@ export async function DELETE(req: Request) {
         { parentId: id }, // delete comments
       ],
     });
+
+    if (existing.postType === PostTypes.VIDEO && existing.video?.url) {
+      try {
+        const key = new URL(existing.video.url).pathname.replace(/^\/+/, "");
+        if (key.startsWith("videos/")) {
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME!,
+              Key: key,
+            })
+          );
+        }
+      } catch (err) {
+        console.error("❌ Failed to delete video:", err);
+      }
+    }
+
+    if (existing.video?.thumbnailUrl) {
+      const key = new URL(existing.video.thumbnailUrl).pathname.replace(
+        /^\/+/,
+        ""
+      );
+      if (key.startsWith("videos/")) {
+        await r2.send(
+          new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME!,
+            Key: key,
+          })
+        );
+      }
+    }
 
     /* ---------------- SSE ---------------- */
     broadcastSSE({

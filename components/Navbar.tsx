@@ -77,14 +77,14 @@ export default function Navbar() {
    * ------------------------------------------------ */
   return (
     <header
-      ref={navbarRef}
       className="
-        fixed top-0 left-0 w-full z-50
-        bg-white dark:bg-neutral-900
-        border-b shadow-sm
-      "
+    fixed top-0 left-0 w-full z-50
+    h-16 box-border
+    bg-white dark:bg-neutral-900
+    border-b shadow-sm
+  "
     >
-      <div className="mx-auto flex gap-4 justify-around items-center px-4 h-16">
+      <div className="mx-auto flex gap-4 justify-between items-center px-4 h-16">
         {/* Logo */}
         <div
           className="flex items-center gap-3 cursor-pointer"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper, {
@@ -22,6 +22,12 @@ export interface PostFormData {
   authorId: string | null;
   categories: string[];
   tags: string[];
+  video?: {
+    url: string;
+    thumbnailUrl?: string;
+    duration?: number;
+    aspectRatio?: number;
+  };
 }
 
 export interface Category {
@@ -68,6 +74,9 @@ export default function PostForm({
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
 
+  const videoFileRef = useRef<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+
   const [categories, setCategories] = useState<Category[]>(
     initialAvailableCategories
   );
@@ -104,6 +113,12 @@ export default function PostForm({
     initialSelectedCategories,
     initialAvailableCategories,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    };
+  }, [videoPreviewUrl]);
 
   /* -------------------------------------------------------------------------- */
   /* CHECK CATEGORIES                              */
@@ -175,9 +190,20 @@ export default function PostForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (mode !== PostTypes.ANSWER && !title.trim()) return;
-    if (mode !== PostTypes.ANSWER && selected.length === 0)
-      return alert("Choose a category.");
+    if (mode !== PostTypes.ANSWER && !title.trim()) {
+      alert("Title / description is required.");
+      return;
+    }
+
+    if (mode !== PostTypes.ANSWER && selected.length === 0) {
+      alert("Choose a category.");
+      return;
+    }
+
+    if (mode === PostTypes.VIDEO && !videoFileRef.current) {
+      alert("Please upload a video.");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -234,6 +260,33 @@ export default function PostForm({
 
       const tags = extractTagsFromHTML(html);
 
+      let video;
+
+      if (mode === PostTypes.VIDEO && videoFileRef.current) {
+        const form = new FormData();
+        form.append("file", videoFileRef.current);
+
+        const res = await fetch("/api/media/upload/video", {
+          method: "POST",
+          body: form,
+        });
+
+        if (!res.ok) throw new Error("Video upload failed");
+
+        const uploaded = await res.json();
+
+        if (!uploaded?.url) {
+          throw new Error("Video upload returned no URL");
+        }
+
+        video = {
+          url: uploaded.url,
+          thumbnailUrl: uploaded.thumbnailUrl,
+          duration: uploaded.duration,
+          aspectRatio: uploaded.aspectRatio,
+        };
+      }
+
       await onSubmit({
         postType: mode,
         title,
@@ -241,6 +294,7 @@ export default function PostForm({
         authorId,
         categories: selected,
         tags,
+        video,
       });
 
       // 🧹 reset only on new post
@@ -270,6 +324,16 @@ export default function PostForm({
 
   const visibleCats = ordered.slice(0, visibleCount);
 
+  const avatarUrl = useMemo(() => {
+    if (!user) return null;
+
+    const updatedAt = user.avatarUpdatedAt
+      ? new Date(user.avatarUpdatedAt).getTime()
+      : "";
+
+    return updatedAt ? `${user.picture}?t=${updatedAt}` : user.picture;
+  }, [user?.picture, user?.avatarUpdatedAt]);
+
   return (
     <motion.form
       onSubmit={handleSubmit}
@@ -295,7 +359,9 @@ export default function PostForm({
           <input
             type="text"
             placeholder={
-              mode === PostTypes.QUESTION
+              mode === PostTypes.VIDEO
+                ? "Add a description"
+                : mode === PostTypes.QUESTION
                 ? t("questionEnter") || "Question"
                 : t("title") || "Title"
             }
@@ -421,6 +487,48 @@ export default function PostForm({
               )}
             </motion.div>
           )}
+
+        {mode === PostTypes.VIDEO && (
+          <div className="space-y-3">
+            {videoPreviewUrl ? (
+              <video
+                src={videoPreviewUrl}
+                controls
+                className="w-full max-h-[360px] rounded-lg bg-black"
+              />
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-6 text-center text-gray-500">
+                No video selected
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                const input = document.createElement("input");
+                input.type = "file";
+                input.accept = "video/*";
+
+                input.onchange = () => {
+                  const file = input.files?.[0];
+                  if (!file) return;
+
+                  if (videoPreviewUrl) {
+                    URL.revokeObjectURL(videoPreviewUrl);
+                  }
+
+                  videoFileRef.current = file;
+                  setVideoPreviewUrl(URL.createObjectURL(file));
+                };
+
+                input.click();
+              }}
+              className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
+            >
+              🎥 Select Video
+            </button>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* ------------------------------ Footer ------------------------------ */}
@@ -429,7 +537,7 @@ export default function PostForm({
           <div className="flex items-center gap-2 text-sm">
             {user ? (
               <img
-                src={`${user.picture}?t=${Date.now()}`}
+                src={avatarUrl!}
                 className="w-8 h-8 rounded-full border border-gray-300 dark:border-neutral-700"
               />
             ) : (
@@ -459,44 +567,46 @@ export default function PostForm({
             )}
 
             {/* Image Upload Button */}
-            <button
-              type="button"
-              onClick={async () => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "image/*";
+            {mode !== PostTypes.VIDEO && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
 
-                input.onchange = async () => {
-                  const file = input.files?.[0];
-                  if (!file) return;
+                  input.onchange = async () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
 
-                  // 🔹 create local preview
-                  const localUrl = URL.createObjectURL(file);
-                  const localId = crypto.randomUUID();
+                    // 🔹 create local preview
+                    const localUrl = URL.createObjectURL(file);
+                    const localId = crypto.randomUUID();
 
-                  // 🔹 INSERT PREVIEW ONLY (NO UPLOAD)
-                  editorRef.current?.editor
-                    ?.chain()
-                    .focus()
-                    .insertImagePlaceholder(
-                      localId,
-                      localUrl, // blob: URL
-                      undefined,
-                      undefined
-                    )
-                    .run();
+                    // 🔹 INSERT PREVIEW ONLY (NO UPLOAD)
+                    editorRef.current?.editor
+                      ?.chain()
+                      .focus()
+                      .insertImagePlaceholder(
+                        localId,
+                        localUrl, // blob: URL
+                        undefined,
+                        undefined
+                      )
+                      .run();
 
-                  // 🔹 STORE references for later submit
-                  pendingImagesRef.current.set(localId, file);
-                  localBlobUrlsRef.current.set(localId, localUrl);
-                };
+                    // 🔹 STORE references for later submit
+                    pendingImagesRef.current.set(localId, file);
+                    localBlobUrlsRef.current.set(localId, localUrl);
+                  };
 
-                input.click();
-              }}
-              className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-            >
-              🖼️
-            </button>
+                  input.click();
+                }}
+                className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+              >
+                🖼️
+              </button>
+            )}
 
             {/* Submit / Check Categories Button */}
             {(categories.length === 0 || contentChanged) &&
@@ -521,7 +631,9 @@ export default function PostForm({
                 disabled={
                   submitting ||
                   loading ||
-                  (mode !== PostTypes.ANSWER && selected.length === 0)
+                  (mode !== PostTypes.ANSWER &&
+                    mode !== PostTypes.VIDEO &&
+                    selected.length === 0)
                 }
                 className={`px-6 py-2 rounded-lg text-white disabled:bg-gray-400 transition
                   ${
@@ -543,7 +655,9 @@ export default function PostForm({
                   ? submitting
                     ? "Submitting Answer..."
                     : "Answer"
-                  : "Illegal Statement"}
+                  : mode === PostTypes.VIDEO
+                  ? "Post Video"
+                  : "Placeholder"}
               </motion.button>
             )}
           </div>

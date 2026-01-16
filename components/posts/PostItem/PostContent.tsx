@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse } from "./usePostCollapse";
 import { useMemo } from "react";
+import { PostTypes } from "@/types/post";
 
 /* -------------------------------------------------
  * 🧠 Extract ONLY the first img / video
@@ -32,16 +33,14 @@ function splitFirstMedia(html: string): {
 }
 
 /* -------------------------------------------------
- * 🧠 Detect meaningful rest content (text OR media)
+ * 🧠 Detect meaningful rest content
  * ------------------------------------------------- */
 function hasMeaningfulContent(html: string): boolean {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
 
-  // Remaining media
   if (tmp.querySelector("img, video")) return true;
 
-  // Remaining text
   const text = tmp.textContent?.replace(/\s+/g, "").trim() ?? "";
   return text.length > 0;
 }
@@ -55,6 +54,25 @@ export default function PostContent({
   wrapperRef: React.RefObject<HTMLDivElement | null>;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
+  /* =========================================================
+   * 🎥 VIDEO POST → VIDEO ONLY (NO CONTENT)
+   * ========================================================= */
+  if (post.postType === PostTypes.VIDEO && post.video?.url) {
+    return (
+      <div className="mt-2">
+        <video
+          src={post.video.url}
+          controls
+          preload="metadata"
+          className="w-full max-h-[480px] rounded-xl bg-black"
+        />
+      </div>
+    );
+  }
+
+  /* =========================================================
+   * 📝 NON-VIDEO POSTS (existing logic)
+   * ========================================================= */
   const { firstMediaHTML, restHTML } = useMemo(
     () => splitFirstMedia(post.content ?? ""),
     [post.content]
@@ -75,16 +93,12 @@ export default function PostContent({
     shouldTruncate,
   } = usePostCollapse(restHTML);
 
-  // 🔑 Collapse logic
   const collapsed = firstMediaHTML
-    ? 0 // media-first posts hide everything below image
+    ? 0
     : collapsedHeight ?? fullHeight;
 
   const targetHeight = expanded ? fullHeight : collapsed;
 
-  /* -------------------------------------------------
-   * 🔧 Scroll correction BEFORE collapsing
-   * ------------------------------------------------- */
   function jumpBeforeCollapseIfNeeded() {
     const wrapper = wrapperRef.current;
     const scroller = scrollContainerRef?.current;
@@ -109,14 +123,14 @@ export default function PostContent({
 
   return (
     <>
-      {/* 🖼️ FIRST MEDIA (ALWAYS VISIBLE) */}
+      {/* 🖼️ FIRST MEDIA */}
       {firstMediaHTML && (
         <div className="mt-2">
           <MathRenderer html={firstMediaHTML} />
         </div>
       )}
 
-      {/* 🔒 Hidden measurement layer (REST ONLY) */}
+      {/* 🔒 Measurement layer */}
       {hasRestContent && (
         <div
           className="absolute invisible pointer-events-none"
@@ -128,7 +142,7 @@ export default function PostContent({
         </div>
       )}
 
-      {/* 🎬 COLLAPSIBLE CONTENT (BELOW FIRST MEDIA) */}
+      {/* 🎬 COLLAPSIBLE CONTENT */}
       {initialized && hasRestContent && (
         <>
           {(shouldTruncate || firstMediaHTML) ? (
