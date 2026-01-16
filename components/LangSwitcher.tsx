@@ -25,6 +25,7 @@ export default function LangSwitcher() {
 
   const changeLanguage = async (lang: SupportedLang) => {
     i18n.changeLanguage(lang);
+    localStorage.setItem("lang", lang); //critical
     setOpen(false);
 
     if (status === "authenticated") {
