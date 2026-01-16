@@ -23,6 +23,8 @@ import { motion } from "framer-motion";
 import VideosPage from "@/components/videos/VideosPage";
 import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
 
+import { useScrollBus } from "@/components/3d_spinner/ScrollContext";
+
 /* ---------------------------------------------
  * VIEW TYPE
  * ------------------------------------------- */
@@ -30,6 +32,7 @@ type HomeView = "home" | "notify" | "users" | "videos";
 
 export default function HomePage() {
   const { t } = useTranslation();
+  const { emitScroll } = useScrollBus();
 
   /* ---------------------------------------------
    * STATE
@@ -87,6 +90,9 @@ export default function HomePage() {
 
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
     const cur = e.currentTarget.scrollTop;
+
+    const delta = cur - lastScrollTop.current;
+    emitScroll(delta);
 
     // 🎥 Videos page: mobile navbar always visible
     if (activeView === "videos") {

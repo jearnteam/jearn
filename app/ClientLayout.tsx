@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import { SessionProvider } from "next-auth/react";
 import { useState, useEffect } from "react";
 import ThemeTransitionOverlay from "@/components/ThemeTransitionOverlay";
+import { ScrollProvider } from "@/components/3d_spinner/ScrollContext";
 
 export default function ClientLayout({
   children,
@@ -48,7 +49,7 @@ export default function ClientLayout({
         onDone={() => setThemeAnimating(false)}
       />
 
-      <SessionProvider>{children}</SessionProvider>
+      <SessionProvider><ScrollProvider>{children}</ScrollProvider></SessionProvider>
     </>
   );
 }

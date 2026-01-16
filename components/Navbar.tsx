@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
-const ThreeBall = dynamic(() => import("./3d_spinner"), {
+const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
   loading: () => null,
 });

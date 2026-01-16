@@ -1,9 +1,3 @@
-/* ✅ Import Google Font (placed before Tailwind rules) */
-@import url("https://fonts.googleapis.com/css2?family=Shadows+Into+Light&display=swap");
-
-/* ✅ KaTeX (inline math rendering) */
-@import "katex/dist/katex.min.css";
-
 /* ✅ Tailwind Base Layers (required for utilities/classes to work) */
 @tailwind base;
 @tailwind components;

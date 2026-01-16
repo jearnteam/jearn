@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { signIn } from "next-auth/react";
 
-const ThreeBall = dynamic(() => import("./3d_spinner"), {
+const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
   loading: () => null,
 });
