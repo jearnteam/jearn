@@ -6,6 +6,7 @@ import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { PostTypes } from "@/types/post";
+import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 
 export const runtime = "nodejs";
@@ -242,6 +243,7 @@ export async function GET(req: Request) {
           ...post,
           categories,
           tags: p.tags ?? [],
+          mediaRefs: p.mediaRefs ?? [],
           commentCount: countMap[p._id.toString()] ?? 0,
           parentPost:
             p.postType === PostTypes.ANSWER && p.parentId
@@ -303,6 +305,8 @@ export async function POST(req: Request) {
     /* VALIDATION                                                         */
     /* ------------------------------------------------------------------ */
     const safeContent = postType === PostTypes.VIDEO ? "" : content;
+    const mediaRefs =
+      postType === PostTypes.VIDEO ? [] : extractPostImageKeys(safeContent);
     if (postType !== PostTypes.VIDEO && !content?.trim()) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
     }
@@ -402,6 +406,7 @@ export async function POST(req: Request) {
       upvoters: string[];
       categories: ObjectId[];
       tags: string[];
+      mediaRefs?: string[];
       video?: {
         url: string;
         thumbnailUrl?: string;
@@ -422,6 +427,7 @@ export async function POST(req: Request) {
       upvoters: [],
       categories: categories.map((id: string) => new ObjectId(id)),
       tags,
+      mediaRefs,
     };
 
     // ✅ VIDEO metadata
@@ -505,7 +511,6 @@ export async function PUT(req: Request) {
       content,
       categories,
       tags,
-      removedImages = [],
       txId = null,
     } = await req.json();
 
@@ -525,6 +530,9 @@ export async function PUT(req: Request) {
     if (!existing) {
       return new Response("Post not found", { status: 404 });
     }
+    const oldRefs: string[] = Array.isArray(existing.mediaRefs)
+      ? existing.mediaRefs
+      : [];
 
     if (existing.authorId !== session.user.uid) {
       return new Response("Forbidden", { status: 403 });
@@ -534,7 +542,29 @@ export async function PUT(req: Request) {
     const updateFields: Record<string, unknown> = {};
 
     if (title !== undefined) updateFields.title = title;
-    if (content !== undefined) updateFields.content = content;
+    if (content !== undefined) {
+      updateFields.content = content;
+
+      const newRefs = extractPostImageKeys(content);
+      updateFields.mediaRefs = newRefs;
+
+      const removedRefs = oldRefs.filter((k) => !newRefs.includes(k));
+
+      for (const key of removedRefs) {
+        try {
+          if (!key.startsWith("posts/")) continue;
+
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME!,
+              Key: key,
+            })
+          );
+        } catch (err) {
+          console.error("❌ Failed to delete image:", key, err);
+        }
+      }
+    }
 
     if (Array.isArray(categories)) {
       updateFields.categories = categories.map((c: string) => new ObjectId(c));
@@ -549,27 +579,6 @@ export async function PUT(req: Request) {
 
     /* ---------------------------- UPDATE ------------------------------ */
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
-
-    /* ---------------------- DELETE REMOVED IMAGES ---------------------- */
-    if (Array.isArray(removedImages) && removedImages.length > 0) {
-      for (const url of removedImages) {
-        try {
-          const key = new URL(url).pathname.replace(/^\/+/, "");
-
-          // 🔐 safety guard
-          if (!key.startsWith("posts/")) continue;
-
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME!,
-              Key: key,
-            })
-          );
-        } catch (err) {
-          console.error("❌ Failed to delete image:", url, err);
-        }
-      }
-    }
 
     /* ------------------------- FETCH UPDATED -------------------------- */
     const updated = await posts.findOne({ _id: new ObjectId(id) });
@@ -637,11 +646,29 @@ export async function DELETE(req: Request) {
     }
 
     /* ---------------- DELETE POST + COMMENTS ---------------- */
+    const toDelete = await posts
+      .find({ $or: [{ _id: new ObjectId(id) }, { parentId: id }] })
+      .toArray();
+
+    for (const p of toDelete) {
+      for (const key of p.mediaRefs ?? []) {
+        try {
+          if (!key.startsWith("posts/")) continue;
+
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME!,
+              Key: key,
+            })
+          );
+        } catch (err) {
+          console.error("❌ Failed to delete image:", key, err);
+        }
+      }
+    }
+
     await posts.deleteMany({
-      $or: [
-        { _id: new ObjectId(id) },
-        { parentId: id }, // delete comments
-      ],
+      $or: [{ _id: new ObjectId(id) }, { parentId: id }],
     });
 
     if (existing.postType === PostTypes.VIDEO && existing.video?.url) {
@@ -659,20 +686,23 @@ export async function DELETE(req: Request) {
         console.error("❌ Failed to delete video:", err);
       }
     }
-
-    if (existing.video?.thumbnailUrl) {
-      const key = new URL(existing.video.thumbnailUrl).pathname.replace(
-        /^\/+/,
-        ""
-      );
-      if (key.startsWith("videos/")) {
-        await r2.send(
-          new DeleteObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME!,
-            Key: key,
-          })
+    try {
+      if (existing.video?.thumbnailUrl) {
+        const key = new URL(existing.video.thumbnailUrl).pathname.replace(
+          /^\/+/,
+          ""
         );
+        if (key.startsWith("videos/")) {
+          await r2.send(
+            new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_NAME!,
+              Key: key,
+            })
+          );
+        }
       }
+    } catch (err) {
+      console.error("❌ Failed to delete thumbnail:", err);
     }
 
     /* ---------------- SSE ---------------- */

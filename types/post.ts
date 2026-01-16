@@ -32,6 +32,7 @@ export interface Post {
 
   title?: string;
   content?: string;
+  mediaRefs?: string[];
   video?: {
     url: string;
     thumbnailUrl?: string | null;
