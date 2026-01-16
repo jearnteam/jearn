@@ -60,12 +60,25 @@ export default function PostContent({
   if (post.postType === PostTypes.VIDEO && post.video?.url) {
     return (
       <div className="mt-2">
-        <video
-          src={post.video.url}
-          controls
-          preload="metadata"
-          className="w-full max-h-[480px] rounded-xl bg-black"
-        />
+        {/* 🎥 FIXED VIDEO BOX (NO LAYOUT SHIFT) */}
+        <div
+          className="
+          relative w-full overflow-hidden rounded-xl bg-black
+          aspect-video
+          max-h-[480px]
+        "
+        >
+          <video
+            src={post.video.url}
+            controls
+            preload="metadata"
+            className="
+            absolute inset-0
+            w-full h-full
+            object-contain
+          "
+          />
+        </div>
       </div>
     );
   }
@@ -93,9 +106,7 @@ export default function PostContent({
     shouldTruncate,
   } = usePostCollapse(restHTML);
 
-  const collapsed = firstMediaHTML
-    ? 0
-    : collapsedHeight ?? fullHeight;
+  const collapsed = firstMediaHTML ? 0 : collapsedHeight ?? fullHeight;
 
   const targetHeight = expanded ? fullHeight : collapsed;
 
@@ -145,7 +156,7 @@ export default function PostContent({
       {/* 🎬 COLLAPSIBLE CONTENT */}
       {initialized && hasRestContent && (
         <>
-          {(shouldTruncate || firstMediaHTML) ? (
+          {shouldTruncate || firstMediaHTML ? (
             <>
               <motion.div
                 initial={{ height: collapsed }}

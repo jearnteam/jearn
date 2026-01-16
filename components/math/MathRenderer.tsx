@@ -6,82 +6,170 @@ import "katex/dist/katex.min.css";
 
 /**
  * @deprecated
- * @param container 
+ * @param container
  */
-function setupMedia(container: HTMLElement) {
-  const mediaNodes = container.querySelectorAll("[data-type='media']");
 
-  mediaNodes.forEach((node) => {
-    const el = node as HTMLElement;
-    const raw = el.dataset.media;
-    if (!raw) return;
+/* --------------------------------------------------
+ * 🖼 IMAGE / GIF FULLSCREEN OVERLAY (FRAMED)
+ * -------------------------------------------------- */
+function openImageOverlay(src: string) {
+  if (document.getElementById("image-overlay")) return;
 
-    const decoded = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
-    let media: { url: string; kind?: string };
+  const isMobile = window.innerWidth < 768;
 
-    try {
-      media = JSON.parse(decoded);
-    } catch {
-      console.error("Invalid media JSON:", decoded);
-      return;
-    }
+  const overlay = document.createElement("div");
+  overlay.id = "image-overlay";
+  overlay.style.position = "fixed";
+  overlay.style.inset = "0";
+  overlay.style.zIndex = "999999";
+  overlay.style.display = "flex";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.cursor = "zoom-out";
 
-    const wrapper = document.createElement("div");
-    wrapper.style.width = "100%";
-    wrapper.style.maxWidth = "100%";
-    wrapper.style.margin = "16px auto";
-    wrapper.style.display = "block";
-    wrapper.style.background = "#111";
-    wrapper.style.border = "2px solid red"; // 🔥 DEBUG BORDER
-    wrapper.style.height = "225px"; // 🔥 FORCE HEIGHT (16:9)
-    wrapper.style.borderRadius = "8px";
-    wrapper.style.overflow = "hidden";
+  // 🔥 mobile = true black fullscreen
+  overlay.style.background = isMobile ? "#000" : "rgba(0,0,0,0.65)";
+  overlay.style.padding = isMobile ? "0" : "32px";
 
-    el.replaceWith(wrapper);
+  // ❌ CLOSE BUTTON (TOP RIGHT)
+  const closeBtn = document.createElement("button");
+  closeBtn.innerHTML = "✕";
+  closeBtn.setAttribute("aria-label", "Close image");
 
-    const isVideo =
-      media.kind === "video" ||
-      media.url.endsWith(".mp4") ||
-      media.url.endsWith(".webm");
+  closeBtn.style.position = "absolute";
+  closeBtn.style.top = "16px";
+  closeBtn.style.left = "16px";
+  closeBtn.style.width = "40px";
+  closeBtn.style.height = "40px";
+  closeBtn.style.color = "white";
+  closeBtn.style.fontSize = "24px";
+  closeBtn.style.lineHeight = "1";
+  closeBtn.style.cursor = "pointer";
+  closeBtn.style.display = "flex";
+  closeBtn.style.alignItems = "center";
+  closeBtn.style.justifyContent = "center";
+  closeBtn.style.zIndex = "1000000";
 
-    if (isVideo) {
-      const video = document.createElement("video");
-      video.src = media.url;
+  // mobile-friendly tap size
+  closeBtn.style.touchAction = "manipulation";
 
-      video.controls = true;
-      video.muted = true;
-      video.playsInline = true;
-      video.preload = "metadata";
-
-      video.style.width = "100%";
-      video.style.height = "100%";
-      video.style.display = "block";
-      video.style.background = "black";
-
-      // 🔥 HARD DEBUG
-      video.addEventListener("error", () => {
-        console.error("VIDEO ERROR", video.error, media.url);
-      });
-
-      video.addEventListener("loadedmetadata", () => {
-        console.log("VIDEO OK", media.url, video.videoWidth, video.videoHeight);
-      });
-
-      wrapper.appendChild(video);
-      return;
-    }
-
-    // Image fallback
-    const img = document.createElement("img");
-    img.src = media.url;
-    img.style.maxWidth = "100%";
-    img.style.maxHeight = "400px";
-    img.style.display = "block";
-    img.style.margin = "0 auto";
-    img.style.borderRadius = "8px";
-
-    wrapper.appendChild(img);
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    close();
   });
+
+  overlay.appendChild(closeBtn);
+
+  const frame = document.createElement("div");
+  frame.style.width = "100%";
+  frame.style.height = "100%";
+  frame.style.display = "flex";
+  frame.style.alignItems = "center";
+  frame.style.justifyContent = "center";
+  frame.style.pointerEvents = "none";
+
+  if (isMobile) {
+    frame.style.maxWidth = "100vw";
+    frame.style.maxHeight = "100vh";
+  } else {
+    frame.style.maxWidth = "min(92vw, 1200px)";
+    frame.style.maxHeight = "min(92vh, 800px)";
+  }
+
+  const img = document.createElement("img");
+  img.src = src;
+  img.draggable = false;
+
+  const isGif = src.endsWith(".gif") || src.includes(".gif?");
+
+  img.style.maxWidth = "100%";
+  img.style.maxHeight = "100%";
+  img.style.objectFit = "contain";
+  img.style.pointerEvents = "auto";
+  img.style.cursor = "zoom-out";
+  img.style.touchAction = "none"; // 🔥 REQUIRED for drag
+
+  if (isGif || isMobile) {
+    img.style.width = "100%";
+    img.style.height = "100%";
+  }
+
+  // -----------------------------
+  // 🖐 DRAG TO CLOSE (MOBILE)
+  // -----------------------------
+  let startY = 0;
+  let currentY = 0;
+  let dragging = false;
+
+  const CLOSE_THRESHOLD = 120; // px
+
+  function onTouchStart(e: TouchEvent) {
+    dragging = true;
+    startY = e.touches[0].clientY;
+    img.style.transition = "none";
+  }
+
+  function onTouchMove(e: TouchEvent) {
+    if (!dragging) return;
+
+    currentY = e.touches[0].clientY - startY;
+
+    img.style.transform = `translateY(${currentY}px)`;
+
+    // fade background as you drag
+    const opacity = Math.max(0, 1 - Math.abs(currentY) / 300);
+    overlay.style.opacity = String(opacity);
+  }
+
+  function onTouchEnd() {
+    dragging = false;
+
+    if (Math.abs(currentY) > CLOSE_THRESHOLD) {
+      close();
+      return;
+    }
+
+    // snap back
+    img.style.transition = "transform 200ms ease";
+    img.style.transform = "translateY(0)";
+    overlay.style.opacity = "1";
+  }
+
+  if (isMobile) {
+    img.addEventListener("touchstart", onTouchStart);
+    img.addEventListener("touchmove", onTouchMove);
+    img.addEventListener("touchend", onTouchEnd);
+  }
+
+  // -----------------------------
+  // 🔚 CLOSE HANDLERS
+  // -----------------------------
+  function close() {
+    document.body.style.overflow = "";
+    window.removeEventListener("keydown", onKey);
+    overlay.remove();
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === "Escape") close();
+  }
+
+  overlay.addEventListener("click", () => {
+    if (!isMobile) close();
+  });
+
+  img.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!isMobile) close();
+  });
+
+  window.addEventListener("keydown", onKey);
+
+  frame.appendChild(img);
+  overlay.appendChild(frame);
+  document.body.appendChild(overlay);
+
+  document.body.style.overflow = "hidden";
 }
 
 function setupLegacyImages(container: HTMLElement) {
@@ -170,6 +258,12 @@ function setupLegacyImages(container: HTMLElement) {
     imgEl.style.display = "block";
     imgEl.style.margin = "0 auto";
     imgEl.style.borderRadius = "8px";
+    imgEl.style.cursor = "zoom-in";
+
+    imgEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openImageOverlay(imgEl.src);
+    });
   });
 }
 
@@ -385,7 +479,6 @@ function MathRendererBase({ html }: { html: string }) {
     styleMentions(el);
     setupMentions(el);
     setupTags(el);
-    setupMedia(el);
     setupLegacyImages(el);
 
     return () => {
