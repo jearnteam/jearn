@@ -19,7 +19,6 @@ export function useFollowingPosts() {
     const res = await fetch(`/api/posts/following?${params}`, {
       cache: "no-store",
     });
-
     const data = await res.json();
 
     setPosts((prev) => [...prev, ...data.items]);
@@ -28,9 +27,27 @@ export function useFollowingPosts() {
     setLoading(false);
   }, [cursor, hasMore]);
 
+  // ✅ 追加：PullToRefresh 用
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setPosts([]);
+    setCursor(null);
+    setHasMore(true);
+
+    const res = await fetch(`/api/posts/following?limit=10`, {
+      cache: "no-store",
+    });
+    const data = await res.json();
+
+    setPosts(data.items);
+    setCursor(data.nextCursor);
+    setHasMore(Boolean(data.nextCursor));
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     fetchNext();
   }, []);
 
-  return { posts, hasMore, loading, fetchNext };
+  return { posts, hasMore, loading, fetchNext, refresh };
 }

@@ -4,11 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import lottie from "lottie-web";
 import { useTheme } from "next-themes";
 
-export default function LoadingOwl({
-  theme,
-}: {
-  theme?: "light" | "dark";
-}) {
+export default function LoadingOwl({ theme }: { theme?: "light" | "dark" }) {
   const container = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -18,8 +14,7 @@ export default function LoadingOwl({
     setMounted(true);
   }, []);
 
-  const effectiveTheme =
-    theme ?? (resolvedTheme === "dark" ? "dark" : "light");
+  const effectiveTheme = theme ?? (resolvedTheme === "dark" ? "dark" : "light");
 
   useEffect(() => {
     if (!mounted || !container.current) return;
@@ -37,7 +32,7 @@ export default function LoadingOwl({
     anim.setSpeed(0.8);
 
     return () => anim.destroy();
-  }, [mounted]);
+  }, [mounted, effectiveTheme]);
 
   if (!mounted) {
     return <div style={{ width: 200, height: 200 }} />;

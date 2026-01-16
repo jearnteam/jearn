@@ -9,29 +9,31 @@ export default function FullScreenLoader({ text }: { text?: string }) {
 
   return (
     <motion.div
-      /* ❌ no fade-in */
       initial={false}
       animate={{ opacity: 1 }}
-      /* ✅ fade-out allowed */
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       className="
         fixed
-        inset-x-0
-        top-[4.3rem]
-        bottom-0
+        inset-0
         z-50
-        flex flex-col items-center justify-center
-        bg-white dark:bg-neutral-900
+        flex
+        items-center
+        justify-center
+        bg-white
+        dark:bg-neutral-900
       "
     >
-      <div className="w-40 h-40">
-        <LoadingOwl />
-      </div>
+      {/* ✅ 表示領域を明示 */}
+      <div className="flex flex-col items-center justify-center">
+        <div className="w-[200px] h-[200px] flex items-center justify-center">
+          <LoadingOwl />
+        </div>
 
-      <p className="text-lg font-medium mt-4 text-gray-700 dark:text-gray-300">
-        {text || t('loading') || 'Loading'}...
-      </p>
+        <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">
+          {text || t("loading") || "Loading"}...
+        </p>
+      </div>
     </motion.div>
   );
 }

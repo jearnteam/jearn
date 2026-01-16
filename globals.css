@@ -204,7 +204,6 @@ code {
   color: rgb(147 197 253); /* blue-300 */
 }
 
-
 /* ---------------------------------------------------------- */
 /*                        TIPTAP WRAPPER                      */
 /* ---------------------------------------------------------- */
@@ -439,6 +438,7 @@ code {
       transition: none !important;
     }
   }
+  
 }
 
 @layer base {
@@ -446,7 +446,8 @@ code {
   body {
     font-family: var(--font-geist-sans), "Apple Color Emoji", "Segoe UI Emoji",
       "Noto Color Emoji", sans-serif !important;
-    overscroll-behavior-y: auto;
+    overflow: hidden;
+    overscroll-behavior-y: none;
     touch-action: pan-y;
   }
   * {
