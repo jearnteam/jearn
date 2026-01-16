@@ -45,10 +45,12 @@ export default function CategoryPageClientWrapper({
 
     (async () => {
       try {
+        /* ----------------- resolve category ----------------- */
         const catRes = await fetch(
           `/api/category/by-name/${encodeURIComponent(slug)}`,
           { cache: "no-store" }
         );
+
         if (!catRes.ok) return;
 
         const cat: Category = await catRes.json();
@@ -56,8 +58,9 @@ export default function CategoryPageClientWrapper({
 
         setCategory(cat);
 
+        /* ----------------- fetch posts (FIXED) ----------------- */
         const postsRes = await fetch(
-          `/api/posts?category=${encodeURIComponent(cat.id)}&limit=10`,
+          `/api/posts?categoryId=${encodeURIComponent(cat.id)}&limit=10`,
           { cache: "no-store" }
         );
 
@@ -68,6 +71,7 @@ export default function CategoryPageClientWrapper({
         setCursor(data.nextCursor ?? null);
         setHasMore(Boolean(data.nextCursor));
 
+        /* ----------------- fetch usage count ----------------- */
         const countRes = await fetch(`/api/category/usage/bulk`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,7 +79,9 @@ export default function CategoryPageClientWrapper({
         });
 
         const usage = await countRes.json();
-        setCount(usage.usage?.[cat.id] ?? 0);
+        if (!cancelled) {
+          setCount(usage.usage?.[cat.id] ?? 0);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -96,7 +102,7 @@ export default function CategoryPageClientWrapper({
 
     try {
       const res = await fetch(
-        `/api/posts?category=${encodeURIComponent(
+        `/api/posts?categoryId=${encodeURIComponent(
           category.id
         )}&limit=10&cursor=${encodeURIComponent(cursor)}`,
         { cache: "no-store" }
@@ -105,7 +111,6 @@ export default function CategoryPageClientWrapper({
       const data = await res.json();
 
       setPosts((prev) => [...prev, ...normalizePosts(data.items ?? [])]);
-
       setCursor(data.nextCursor ?? null);
       setHasMore(Boolean(data.nextCursor));
     } finally {
@@ -113,6 +118,9 @@ export default function CategoryPageClientWrapper({
     }
   }, [category, cursor, hasMore, loadingMore]);
 
+  /* --------------------------------------------------
+   * Render
+   * ------------------------------------------------ */
   if (loading) return <FullScreenLoader text="Loading category…" />;
   if (!category) return <div className="p-10">Category not found</div>;
 

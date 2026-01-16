@@ -19,15 +19,30 @@ export const Mention = Node.create({
 
   addAttributes() {
     return {
-      uid: { default: null },
-      userId: { default: null },
+      uid: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-uid"),
+        renderHTML: (attrs) => (attrs.uid ? { "data-uid": attrs.uid } : {}),
+      },
+      userId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-userid"),
+        renderHTML: (attrs) =>
+          attrs.userId ? { "data-userid": attrs.userId } : {},
+      },
     };
   },
-
   parseHTML() {
-    return [{ tag: "span[data-mention]" }];
+    return [
+      {
+        tag: "span[data-mention]",
+        getAttrs: (node) => ({
+          uid: (node as HTMLElement).getAttribute("data-uid"),
+          userId: (node as HTMLElement).getAttribute("data-userid"),
+        }),
+      },
+    ];
   },
-
   renderHTML({ HTMLAttributes }) {
     // ⚠️ used for serialization only
     return [
