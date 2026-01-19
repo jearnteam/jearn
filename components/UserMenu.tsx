@@ -140,6 +140,17 @@ export default function UserMenu({ user }: { user: User }) {
             <LangSwitcher />
           </div>
 
+          {/* Category Request */}
+          <button
+            onClick={() => {
+              setOpen(false);
+              // TODO:
+            }}
+            className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
+          >
+            {t("categoryRequest") || "Request Category"}
+          </button>
+
           {/* ADMIN */}
           {user.isAdmin && (
             <button
