@@ -119,6 +119,16 @@ export default function HomePage() {
     const el = scrollRef.current;
     if (!el) return;
 
+    // BEFORE anything else
+    if (activeView === "videos") {
+      window.dispatchEvent(new Event("videos:save-state"));
+      window.dispatchEvent(new Event("videos:disable"));
+    }
+
+    if (next === "videos") {
+      window.dispatchEvent(new Event("videos:enable"));
+    }
+
     // 🔔 clear unread when opening notifications
     if (next === "notify") {
       fetchNotifications(); // FETCH LIST HERE

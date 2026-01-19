@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useRef } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 
 type PlaybackContextType = {
   setActive: (id: string, video: HTMLVideoElement) => void;
@@ -19,10 +19,26 @@ export function VideoPlaybackProvider({
     video: HTMLVideoElement;
   } | null>(null);
 
+  const enabledRef = useRef(true);
+
+  useEffect(() => {
+    const enable = () => (enabledRef.current = true);
+    const disable = () => (enabledRef.current = false);
+
+    window.addEventListener("videos:enable", enable);
+    window.addEventListener("videos:disable", disable);
+
+    return () => {
+      window.removeEventListener("videos:enable", enable);
+      window.removeEventListener("videos:disable", disable);
+    };
+  }, []);
+
   function setActive(id: string, video: HTMLVideoElement) {
+    if (!enabledRef.current) return;
+
     if (activeVideoRef.current?.id === id) return;
 
-    // pause previous
     if (activeVideoRef.current) {
       activeVideoRef.current.video.pause();
     }
@@ -33,6 +49,7 @@ export function VideoPlaybackProvider({
 
   function clearActive(id: string) {
     if (activeVideoRef.current?.id === id) {
+      activeVideoRef.current.video.pause();
       activeVideoRef.current = null;
     }
   }
@@ -46,10 +63,6 @@ export function VideoPlaybackProvider({
 
 export function useVideoPlayback() {
   const ctx = useContext(PlaybackContext);
-  if (!ctx) {
-    throw new Error(
-      "useVideoPlayback must be used inside VideoPlaybackProvider"
-    );
-  }
+  if (!ctx) throw new Error("useVideoPlayback must be used inside provider");
   return ctx;
 }
