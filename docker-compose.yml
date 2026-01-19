@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  jearn:
+    build: .
+    container_name: jearn-app
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.production

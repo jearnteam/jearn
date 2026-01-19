@@ -33,7 +33,8 @@ export interface PostFormData {
 export interface Category {
   id: string;
   label: string;
-  jname: string;
+  jname?: string;
+  myname?: string;
   score: number;
 }
 
@@ -78,7 +79,7 @@ export default function PostForm({
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<Category[]>(
-    initialAvailableCategories
+    initialAvailableCategories,
   );
   const [selected, setSelected] = useState<string[]>(initialSelectedCategories);
 
@@ -88,7 +89,7 @@ export default function PostForm({
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [categoryReady, setCategoryReady] = useState(
-    initialAvailableCategories.length > 0
+    initialAvailableCategories.length > 0,
   );
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
@@ -154,9 +155,13 @@ export default function PostForm({
 
       if (!res.ok) throw new Error("Categorization failed");
 
-      const data: Category[] = await res.json();
+      const data = await res.json();
 
-      setCategories([...data]);
+      if (!data?.predictions || !Array.isArray(data.predictions)) {
+        throw new Error("Invalid AI format");
+      }
+
+      setCategories([...data.predictions]);
       setCategoryReady(true);
     } catch (err) {
       console.error("❌ Category check failed:", err);
@@ -217,8 +222,8 @@ export default function PostForm({
       // ✅ ONLY local placeholder images
       const images = Array.from(
         doc.querySelectorAll(
-          "img[data-type='image-placeholder'][data-status='local']"
-        )
+          "img[data-type='image-placeholder'][data-status='local']",
+        ),
       );
 
       for (const img of images) {
@@ -362,8 +367,8 @@ export default function PostForm({
               mode === PostTypes.VIDEO
                 ? "Add a description"
                 : mode === PostTypes.QUESTION
-                ? t("questionEnter") || "Question"
-                : t("title") || "Title"
+                  ? t("questionEnter") || "Question"
+                  : t("title") || "Title"
             }
             value={title}
             maxLength={200}
@@ -393,10 +398,10 @@ export default function PostForm({
             mode === PostTypes.POST
               ? t("placeholder") || "Placeholder"
               : mode === PostTypes.QUESTION
-              ? "質問内容を詳しく書いてください"
-              : mode === PostTypes.ANSWER
-              ? "Answer"
-              : "Placeholder(Illegal Statement)"
+                ? "質問内容を詳しく書いてください"
+                : mode === PostTypes.ANSWER
+                  ? "Answer"
+                  : "Placeholder(Illegal Statement)"
           }
         />
       </div>
@@ -591,7 +596,7 @@ export default function PostForm({
                         localId,
                         localUrl, // blob: URL
                         undefined,
-                        undefined
+                        undefined,
                       )
                       .run();
 
@@ -648,16 +653,16 @@ export default function PostForm({
                     ? "Submitting..."
                     : t("submit") || "Submit"
                   : mode === PostTypes.QUESTION
-                  ? submitting
-                    ? "Submitting Question..."
-                    : "Ask Question"
-                  : mode === PostTypes.ANSWER
-                  ? submitting
-                    ? "Submitting Answer..."
-                    : "Answer"
-                  : mode === PostTypes.VIDEO
-                  ? "Post Video"
-                  : "Placeholder"}
+                    ? submitting
+                      ? "Submitting Question..."
+                      : "Ask Question"
+                    : mode === PostTypes.ANSWER
+                      ? submitting
+                        ? "Submitting Answer..."
+                        : "Answer"
+                      : mode === PostTypes.VIDEO
+                        ? "Post Video"
+                        : "Placeholder"}
               </motion.button>
             )}
           </div>
