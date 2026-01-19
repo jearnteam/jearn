@@ -13,6 +13,14 @@ function cleanInput(text: string): string {
     .trim();
 }
 
+/* 🧠 Strip HTML tags for ML */
+function stripHTML(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /* Timeout wrapper */
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -37,7 +45,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing content" }, { status: 400 });
     }
 
-    const content = cleanInput(body.content);
+    const cleaned = cleanInput(body.content);
+    const textOnly = stripHTML(cleaned);   // ✅ critical fix
 
     /* load DB categories for fallback only */
     const client = await clientPromise;
@@ -48,7 +57,7 @@ export async function POST(req: Request) {
       .toArray()) as DbCategory[];
 
     try {
-      const ai = await withTimeout(categorize(content), 6000);
+      const ai = await withTimeout(categorize(textOnly), 6000);
       return NextResponse.json(ai);
     } catch (err) {
       console.error("⚠️ AI failed:", err);

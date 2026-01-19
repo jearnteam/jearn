@@ -157,11 +157,13 @@ export default function PostForm({
 
       const data = await res.json();
 
-      if (!data?.predictions || !Array.isArray(data.predictions)) {
+      const preds = Array.isArray(data) ? data : data.predictions;
+
+      if (!Array.isArray(preds)) {
         throw new Error("Invalid AI format");
       }
 
-      setCategories([...data.predictions]);
+      setCategories(preds);
       setCategoryReady(true);
     } catch (err) {
       console.error("❌ Category check failed:", err);

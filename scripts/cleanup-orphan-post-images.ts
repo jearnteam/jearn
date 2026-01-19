@@ -1,117 +1,102 @@
 /* scripts/cleanup-orphan-post-images.ts */
 
-//run this ( npx tsx --env-file .env.local scripts/cleanup-orphan-post-images.ts )
-//at ( kioh@kioh-Modern-14-B11MOU:~/JEARN/kioh$ ) to check
-//are there still unnecessary imgs storing in cdn but not using in any post content
-
-// -----------------------------------------------------------------------------
-// ENV SETUP (must be first)
-// -----------------------------------------------------------------------------
 import dotenv from "dotenv";
-
-// Try .env.local first, fallback to .env
-dotenv.config({ path: ".env.local" });
-dotenv.config();
-
-function requireEnv(name: string) {
-  const v = process.env[name];
-  if (!v) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return v;
-}
-
-// -----------------------------------------------------------------------------
-// IMPORTS
-// -----------------------------------------------------------------------------
-import clientPromise from "@/lib/mongodb";
+import { MongoClient } from "mongodb";
 import {
   S3Client,
   ListObjectsV2Command,
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
-import { extractPostImageKeys } from "@/lib/media/media";
+
+// -----------------------------------------------------------------------------
+// ENV (ONLY R2)
+/// -----------------------------------------------------------------------------
+dotenv.config({ path: ".env.local" });
+dotenv.config();
+
+function requireEnv(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+
+// -----------------------------------------------------------------------------
+// HARD-CODED Mongo (local replica)
+// -----------------------------------------------------------------------------
+const MONGODB_URI =
+  "mongodb://127.0.0.1:27018/test?replicaSet=rs0&directConnection=true";
 
 // -----------------------------------------------------------------------------
 // CONFIG
 // -----------------------------------------------------------------------------
-const DRY_RUN = true; // 🔥 SET TO false TO ACTUALLY DELETE
-
-const R2_ACCOUNT_ID = requireEnv("R2_ACCOUNT_ID");
-const R2_ACCESS_KEY_ID = requireEnv("R2_ACCESS_KEY_ID");
-const R2_SECRET_ACCESS_KEY = requireEnv("R2_SECRET_ACCESS_KEY");
-const R2_BUCKET_NAME = requireEnv("R2_BUCKET_NAME");
+const DRY_RUN = false;
 
 // -----------------------------------------------------------------------------
-// R2 CLIENT
+// R2 Client
 // -----------------------------------------------------------------------------
-const r2 = new S3Client({
+const R2 = new S3Client({
   region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  endpoint: `https://${requireEnv("R2_ACCOUNT_ID")}.r2.cloudflarestorage.com`,
   credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID,
-    secretAccessKey: R2_SECRET_ACCESS_KEY,
+    accessKeyId: requireEnv("R2_ACCESS_KEY_ID"),
+    secretAccessKey: requireEnv("R2_SECRET_ACCESS_KEY"),
   },
 });
 
-// -----------------------------------------------------------------------------
-// COLLECT USED IMAGE KEYS
-// -----------------------------------------------------------------------------
-async function getAllUsedImageKeys(): Promise<Set<string>> {
-  const client = await clientPromise;
-  const db = client.db("jearn");
-  const posts = db.collection("posts");
+const BUCKET = requireEnv("R2_BUCKET_NAME");
 
+// -----------------------------------------------------------------------------
+// Extract keys from HTML manually
+// -----------------------------------------------------------------------------
+function extractKeys(html: string): string[] {
+  const regex = /posts\/[a-zA-Z0-9_\-./]+/g;
+  return html.match(regex) ?? [];
+}
+
+// -----------------------------------------------------------------------------
+// Used image keys from Mongo
+// -----------------------------------------------------------------------------
+async function getUsedKeys() {
+  const client = new MongoClient(MONGODB_URI);
+  await client.connect();
+
+  const posts = client.db("jearn").collection("posts");
   const used = new Set<string>();
 
-  const cursor = posts.find(
-    {},
-    { projection: { content: 1, mediaRefs: 1 } }
-  );
-
-  for await (const post of cursor) {
-    // Prefer authoritative mediaRefs
-    if (Array.isArray(post.mediaRefs)) {
-      for (const key of post.mediaRefs) {
-        if (typeof key === "string" && key.startsWith("posts/")) {
-          used.add(key);
-        }
-      }
+  for await (const p of posts.find({}, { projection: { content: 1, mediaRefs: 1 } })) {
+    if (Array.isArray(p.mediaRefs)) {
+      p.mediaRefs.forEach((k: string) => k.startsWith("posts/") && used.add(k));
       continue;
     }
 
-    // Legacy fallback: parse content
-    if (typeof post.content === "string") {
-      const keys = extractPostImageKeys(post.content);
-      for (const k of keys) used.add(k);
+    if (typeof p.content === "string") {
+      extractKeys(p.content).forEach((k) => used.add(k));
     }
   }
 
+  await client.close();
   return used;
 }
 
 // -----------------------------------------------------------------------------
-// LIST ALL R2 POST IMAGES
+// List all R2 post images
 // -----------------------------------------------------------------------------
-async function getAllR2PostImages(): Promise<string[]> {
+async function getAllR2() {
   const keys: string[] = [];
-  let continuationToken: string | undefined;
+  let token: string | undefined;
 
   do {
-    const res = await r2.send(
+    const res = await R2.send(
       new ListObjectsV2Command({
-        Bucket: R2_BUCKET_NAME,
+        Bucket: BUCKET,
         Prefix: "posts/",
-        ContinuationToken: continuationToken,
-      })
+        ContinuationToken: token,
+      }),
     );
 
-    for (const obj of res.Contents ?? []) {
-      if (obj.Key) keys.push(obj.Key);
-    }
-
-    continuationToken = res.NextContinuationToken;
-  } while (continuationToken);
+    res.Contents?.forEach((o) => o.Key && keys.push(o.Key));
+    token = res.NextContinuationToken;
+  } while (token);
 
   return keys;
 }
@@ -119,51 +104,26 @@ async function getAllR2PostImages(): Promise<string[]> {
 // -----------------------------------------------------------------------------
 // MAIN
 // -----------------------------------------------------------------------------
-async function main() {
-  console.log("🔍 Collecting used image references...");
-  const usedKeys = await getAllUsedImageKeys();
-  console.log(`✅ Used images: ${usedKeys.size}`);
+(async () => {
+  console.log("🔍 Loading used keys...");
+  const used = await getUsedKeys();
+  console.log("✅ Used:", used.size);
 
-  console.log("📦 Listing R2 post images...");
-  const allKeys = await getAllR2PostImages();
-  console.log(`📦 Total images in R2/posts/: ${allKeys.length}`);
+  console.log("📦 Listing R2...");
+  const all = await getAllR2();
+  console.log("📦 Total:", all.length);
 
-  const orphaned = allKeys.filter((k) => !usedKeys.has(k));
-  console.log(`🧹 Orphaned images: ${orphaned.length}`);
+  const orphan = all.filter((k) => !used.has(k));
+  console.log("🧹 Orphan:", orphan.length);
 
-  if (orphaned.length === 0) {
-    console.log("🎉 Nothing to delete");
-    return;
-  }
-
-  for (const key of orphaned) {
-    if (!key.startsWith("posts/")) continue;
-
+  for (const key of orphan) {
     if (DRY_RUN) {
-      console.log(`[DRY RUN] Would delete: ${key}`);
+      console.log("[DRY]", key);
     } else {
-      try {
-        await r2.send(
-          new DeleteObjectCommand({
-            Bucket: R2_BUCKET_NAME,
-            Key: key,
-          })
-        );
-        console.log(`🗑️ Deleted: ${key}`);
-      } catch (err) {
-        console.error(`❌ Failed to delete ${key}`, err);
-      }
+      await R2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+      console.log("🗑 Deleted:", key);
     }
   }
 
-  console.log(
-    DRY_RUN
-      ? "🧪 Dry run complete. Set DRY_RUN=false to delete."
-      : "🔥 Cleanup complete."
-  );
-}
-
-main().catch((err) => {
-  console.error("🔥 Cleanup failed:", err);
-  process.exit(1);
-});
+  console.log("🎉 Done");
+})();
