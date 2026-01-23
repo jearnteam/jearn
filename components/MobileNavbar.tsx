@@ -3,6 +3,7 @@
 import { Plus, Home, Users, Bell, Banana } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState, useCallback } from "react";
+import { useUpload } from "@/components/upload/UploadContext";
 
 type HomeView = "home" | "notify" | "users" | "videos";
 
@@ -38,6 +39,7 @@ export default function MobileNavbar({
   const usersRef = useRef<HTMLButtonElement | null>(null);
   const notifyRef = useRef<HTMLButtonElement | null>(null);
   const videosRef = useRef<HTMLButtonElement | null>(null);
+  const { uploading, progress } = useUpload();
 
   /* ------------------------------------------------------------------ */
   /* indicator                                                          */
@@ -185,13 +187,40 @@ export default function MobileNavbar({
 
       {/* CREATE */}
       <button
-        onClick={onCreatePost}
+        onClick={uploading ? undefined : onCreatePost}
         className="
-          w-12 h-12 bg-blue-600 rounded-full text-white
-          flex items-center justify-center shadow-lg
-        "
+    relative w-12 h-12 rounded-full text-white
+    flex items-center justify-center shadow-lg overflow-hidden
+    bg-blue-600 disabled:opacity-70
+  "
       >
-        <Plus size={28} />
+        {/* progress pie */}
+        {uploading && (
+          <svg className="absolute inset-0 w-full h-full -rotate-90">
+            <circle
+              cx="24"
+              cy="24"
+              r="22"
+              stroke="rgba(255,255,255,0.25)"
+              strokeWidth="4"
+              fill="none"
+            />
+            <circle
+              cx="24"
+              cy="24"
+              r="22"
+              stroke="white"
+              strokeWidth="4"
+              fill="none"
+              strokeDasharray={138.2}
+              strokeDashoffset={138.2 - (progress / 100) * 138.2}
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
+
+        {/* icon */}
+        <Plus size={28} className={uploading ? "opacity-40" : ""} />
       </button>
 
       <NavButton
