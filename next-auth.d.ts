@@ -11,7 +11,7 @@ declare module "next-auth" {
       provider_id?: string | null;
       picture?: string | null;
       bio?: string;
-      role?: string;
+      role?: "user" | 'admin';
     };
   }
 }

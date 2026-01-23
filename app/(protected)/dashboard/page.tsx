@@ -16,7 +16,9 @@ import {
   Settings,
   Bell,
   FileBarChart,
+  FolderPlus,
 } from "lucide-react";
+import CategoryRequestsPanel from "./CategoryRequestPanel";
 
 export default function Dashboard() {
   const { data: session } = useSession();
@@ -34,6 +36,7 @@ export default function Dashboard() {
     | "notification"
     | "reports"
     | "settings"
+    | "categoryRequest"
     | null
   >(null);
 
@@ -141,6 +144,14 @@ export default function Dashboard() {
           />
 
           <SidebarItem
+            icon={<FolderPlus size={18} />}
+            label={t("categoryRequest") || "categoryRequest"}
+            active={activeTab === "categoryRequest"}
+            sidebarFullyOpen={sidebarFullyOpen}
+            onClick={() => setActiveTab("categoryRequest")}
+          />
+
+          <SidebarItem
             icon={<Settings size={18} />}
             label={t("settings") || "Settings"}
             active={activeTab === "settings"}
@@ -166,6 +177,7 @@ export default function Dashboard() {
         {activeTab === "analytics" && <AnalyticsPanel />}
         {activeTab === "database" && <DatabasePanel />}
         {activeTab === "reports" && <ReportsPanel />}
+        {activeTab === "categoryRequest" && <CategoryRequestsPanel />}
         {activeTab === "settings" && <p>Settings will be added here.</p>}
       </main>
     </div>
