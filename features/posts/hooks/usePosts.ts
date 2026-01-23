@@ -227,7 +227,9 @@ export function usePosts() {
   /*                               EDIT POST                                    */
   /* -------------------------------------------------------------------------- */
   /* helper */
-  function extractCdnImages(html: string): Set<string> {
+  function extractCdnImages(html?: string): Set<string> {
+    if (!html) return new Set();
+
     const doc = new DOMParser().parseFromString(html, "text/html");
 
     return new Set(
@@ -244,30 +246,20 @@ export function usePosts() {
   const editPost = useCallback(
     async (
       id: string,
+      originalContent: string,
       title: string,
       content: string,
       categories?: string[],
       tags?: string[]
     ) => {
-      let originalContent: string | null = null;
-
-      // 🔎 capture original content safely
-      setPosts((prev) => {
-        const target = prev.find((p) => p._id === id);
-        originalContent = target?.content ?? null;
-        return prev;
-      });
-
-      if (!originalContent) {
-        console.error("❌ editPost: original post not found");
-        return;
-      }
-
       // 🧮 compute removed images
       const oldImages = extractCdnImages(originalContent);
       const newImages = extractCdnImages(content);
-
-      const removedImages = [...oldImages].filter((url) => !newImages.has(url));
+      
+      const removedImages = [...oldImages].filter(
+        (url) => !newImages.has(url)
+      );
+      
 
       // ⚡ optimistic update
       setPosts((prev) =>

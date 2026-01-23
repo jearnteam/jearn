@@ -294,7 +294,12 @@ export default function HomePage() {
           post={editingPost}
           onClose={() => setEditingPost(null)}
           onSave={async (title, content) => {
-            await editPost(editingPost._id, title, content);
+            await editPost(
+              editingPost._id,
+              editingPost.content ?? "",
+              title,
+              content
+            );
             setEditingPost(null);
           }}
         />
