@@ -17,6 +17,7 @@ function openImageOverlay(src: string) {
 
   const isMobile = window.innerWidth < 768;
 
+  /* ---------------- Overlay ---------------- */
   const overlay = document.createElement("div");
   overlay.id = "image-overlay";
   overlay.style.position = "fixed";
@@ -25,125 +26,214 @@ function openImageOverlay(src: string) {
   overlay.style.display = "flex";
   overlay.style.alignItems = "center";
   overlay.style.justifyContent = "center";
+  overlay.style.background = isMobile ? "#000" : "rgba(0,0,0,0.65)";
   overlay.style.cursor = "zoom-out";
 
-  // 🔥 mobile = true black fullscreen
-  overlay.style.background = isMobile ? "#000" : "rgba(0,0,0,0.65)";
-  overlay.style.padding = isMobile ? "0" : "32px";
-
-  // ❌ CLOSE BUTTON (TOP RIGHT)
+  /* ---------------- Close button ---------------- */
   const closeBtn = document.createElement("button");
   closeBtn.innerHTML = "✕";
-  closeBtn.setAttribute("aria-label", "Close image");
-
   closeBtn.style.position = "absolute";
   closeBtn.style.top = "16px";
   closeBtn.style.left = "16px";
-  closeBtn.style.width = "40px";
-  closeBtn.style.height = "40px";
   closeBtn.style.color = "white";
   closeBtn.style.fontSize = "24px";
-  closeBtn.style.lineHeight = "1";
-  closeBtn.style.cursor = "pointer";
-  closeBtn.style.display = "flex";
-  closeBtn.style.alignItems = "center";
-  closeBtn.style.justifyContent = "center";
   closeBtn.style.zIndex = "1000000";
 
-  // mobile-friendly tap size
-  closeBtn.style.touchAction = "manipulation";
-
   closeBtn.addEventListener("click", (e) => {
+    e.preventDefault();
     e.stopPropagation();
     close();
   });
 
   overlay.appendChild(closeBtn);
 
+  /* ---------------- Frame + Image ---------------- */
   const frame = document.createElement("div");
   frame.style.width = "100%";
   frame.style.height = "100%";
+  frame.style.overflow = "hidden";
   frame.style.display = "flex";
   frame.style.alignItems = "center";
   frame.style.justifyContent = "center";
-  frame.style.pointerEvents = "none";
-
-  if (isMobile) {
-    frame.style.maxWidth = "100vw";
-    frame.style.maxHeight = "100vh";
-  } else {
-    frame.style.maxWidth = "min(92vw, 1200px)";
-    frame.style.maxHeight = "min(92vh, 800px)";
-  }
 
   const img = document.createElement("img");
   img.src = src;
   img.draggable = false;
-
-  const isGif = src.endsWith(".gif") || src.includes(".gif?");
-
   img.style.maxWidth = "100%";
   img.style.maxHeight = "100%";
   img.style.objectFit = "contain";
-  img.style.pointerEvents = "auto";
-  img.style.cursor = "zoom-out";
-  img.style.touchAction = "none"; // 🔥 REQUIRED for drag
+  img.style.userSelect = "none";
+  img.style.touchAction = "none";
+  img.style.transformOrigin = "0 0";
 
-  if (isGif || isMobile) {
-    img.style.width = "100%";
-    img.style.height = "100%";
+  frame.appendChild(img);
+  overlay.appendChild(frame);
+  document.body.appendChild(overlay);
+  document.body.style.overflow = "hidden";
+
+  /* ---------------- Transform state ---------------- */
+  let scale = 1;
+  let x = 0;
+  let y = 0;
+
+  const MIN_SCALE = 1;
+  const MAX_SCALE = 4;
+
+  function applyTransform() {
+    img.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
   }
 
-  // -----------------------------
-  // 🖐 DRAG TO CLOSE (MOBILE)
-  // -----------------------------
-  let startY = 0;
-  let currentY = 0;
+  /* ==================================================
+   * 🖥 DESKTOP — CURSOR ZOOM + PAN
+   * ================================================== */
+  overlay.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+
+      const delta = -e.deltaY * 0.0015;
+      const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale + delta));
+      if (next === scale) return;
+
+      const rect = overlay.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+
+      const ratio = next / scale;
+      x = cx - (cx - x) * ratio;
+      y = cy - (cy - y) * ratio;
+
+      scale = next;
+      applyTransform();
+    },
+    { passive: false }
+  );
+
   let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
 
-  const CLOSE_THRESHOLD = 120; // px
+  img.addEventListener("contextmenu", (e) => e.preventDefault());
 
-  function onTouchStart(e: TouchEvent) {
+  img.addEventListener("mousedown", (e) => {
+    if (e.button !== 2) return;
     dragging = true;
-    startY = e.touches[0].clientY;
-    img.style.transition = "none";
-  }
+    dragStartX = e.clientX - x;
+    dragStartY = e.clientY - y;
+  });
 
-  function onTouchMove(e: TouchEvent) {
+  window.addEventListener("mousemove", (e) => {
     if (!dragging) return;
+    x = e.clientX - dragStartX;
+    y = e.clientY - dragStartY;
+    applyTransform();
+  });
 
-    currentY = e.touches[0].clientY - startY;
+  window.addEventListener("mouseup", () => {
+    dragging = false;
+  });
 
-    img.style.transform = `translateY(${currentY}px)`;
-
-    // fade background as you drag
-    const opacity = Math.max(0, 1 - Math.abs(currentY) / 300);
-    overlay.style.opacity = String(opacity);
+  if (!isMobile) {
+    overlay.addEventListener("click", () => close());
   }
 
-  function onTouchEnd() {
-    dragging = false;
+  /* ==================================================
+   * 📱 MOBILE — PINCH + PAN + TAP CLOSE
+   * ================================================== */
+  let mode: "none" | "pinch" | "pan" = "none";
 
-    if (Math.abs(currentY) > CLOSE_THRESHOLD) {
+  let lastDist = 0;
+  let lastCenterX = 0;
+  let lastCenterY = 0;
+
+  let panStartX = 0;
+  let panStartY = 0;
+
+  let tapStartX = 0;
+  let tapStartY = 0;
+  let isTap = false;
+
+  img.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2) {
+      mode = "pinch";
+      isTap = false;
+
+      const [a, b] = e.touches;
+      lastDist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+      lastCenterX = (a.clientX + b.clientX) / 2;
+      lastCenterY = (a.clientY + b.clientY) / 2;
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      mode = "pan";
+      tapStartX = e.touches[0].clientX;
+      tapStartY = e.touches[0].clientY;
+      panStartX = tapStartX - x;
+      panStartY = tapStartY - y;
+      isTap = true;
+    }
+  });
+
+  img.addEventListener(
+    "touchmove",
+    (e) => {
+      if (mode === "pinch" && e.touches.length === 2) {
+        e.preventDefault();
+
+        const [a, b] = e.touches;
+        const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        const centerX = (a.clientX + b.clientX) / 2;
+        const centerY = (a.clientY + b.clientY) / 2;
+
+        const next = Math.min(
+          MAX_SCALE,
+          Math.max(MIN_SCALE, scale * (dist / lastDist))
+        );
+
+        const ratio = next / scale;
+        x = centerX - (centerX - x) * ratio;
+        y = centerY - (centerY - y) * ratio;
+
+        scale = next;
+        lastDist = dist;
+        lastCenterX = centerX;
+        lastCenterY = centerY;
+
+        applyTransform();
+        return;
+      }
+
+      if (mode === "pan" && e.touches.length === 1) {
+        const dx = e.touches[0].clientX - tapStartX;
+        const dy = e.touches[0].clientY - tapStartY;
+
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          isTap = false;
+        }
+
+        x = e.touches[0].clientX - panStartX;
+        y = e.touches[0].clientY - panStartY;
+        applyTransform();
+      }
+    },
+    { passive: false }
+  );
+
+  img.addEventListener("touchend", (e) => {
+    if (isTap && e.touches.length === 0) {
+      e.preventDefault();
       close();
       return;
     }
 
-    // snap back
-    img.style.transition = "transform 200ms ease";
-    img.style.transform = "translateY(0)";
-    overlay.style.opacity = "1";
-  }
+    if (e.touches.length === 0) {
+      mode = "none";
+      isTap = false;
+    }
+  });
 
-  if (isMobile) {
-    img.addEventListener("touchstart", onTouchStart);
-    img.addEventListener("touchmove", onTouchMove);
-    img.addEventListener("touchend", onTouchEnd);
-  }
-
-  // -----------------------------
-  // 🔚 CLOSE HANDLERS
-  // -----------------------------
+  /* ---------------- Close ---------------- */
   function close() {
     document.body.style.overflow = "";
     window.removeEventListener("keydown", onKey);
@@ -154,22 +244,7 @@ function openImageOverlay(src: string) {
     if (e.key === "Escape") close();
   }
 
-  overlay.addEventListener("click", () => {
-    if (!isMobile) close();
-  });
-
-  img.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (!isMobile) close();
-  });
-
   window.addEventListener("keydown", onKey);
-
-  frame.appendChild(img);
-  overlay.appendChild(frame);
-  document.body.appendChild(overlay);
-
-  document.body.style.overflow = "hidden";
 }
 
 function setupLegacyImages(container: HTMLElement) {
