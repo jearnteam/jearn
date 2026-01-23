@@ -15,6 +15,8 @@ import { useNotifications } from "@/features/notifications/useNotifications";
 import PostFormBox from "@/components/posts/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import { useUpload } from "@/components/upload/UploadContext";
+
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import MobileNavbar from "@/components/MobileNavbar";
 import { useTranslation } from "react-i18next";
@@ -46,6 +48,7 @@ export default function HomePage() {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const { uploading, progress } = useUpload();
 
   const [navbarVisible, setNavbarVisible] = useState(true);
 
@@ -330,10 +333,13 @@ export default function HomePage() {
           {/* LEFT SIDEBAR */}
           <aside className="hidden lg:flex w-[280px] px-4 py-4 flex-col gap-4">
             <button
-              onClick={() => setShowPostBox(true)}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg"
+              onClick={() => !uploading && setShowPostBox(true)}
+              disabled={uploading}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg disabled:opacity-60"
             >
-              + {t("createPost") || "Create Post"}
+              {uploading
+                ? `Uploading ${progress}%`
+                : `+ ${t("createPost") || "Create Post"}`}
             </button>
 
             <nav className="mt-6 relative flex flex-col gap-1">

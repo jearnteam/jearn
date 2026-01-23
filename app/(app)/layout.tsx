@@ -3,6 +3,7 @@
 import HomePage from "./HomePage";
 import Navbar from "@/components/Navbar";
 import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
+import { UploadProvider } from "@/components/upload/UploadContext";
 
 export default function AppLayout({
   children,
@@ -15,9 +16,9 @@ export default function AppLayout({
     <>
       <Navbar />
       <AppNavigationBridge />
-
-      <HomePage />
-
+      <UploadProvider>
+        <HomePage />
+      </UploadProvider>
       {children}
       {overlay}
     </>

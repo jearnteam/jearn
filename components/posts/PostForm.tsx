@@ -14,6 +14,8 @@ import {
   extractTextWithMath,
   removeZWSP,
 } from "@/lib/processText";
+import { useUpload } from "@/components/upload/UploadContext";
+import { xhrUpload } from "@/lib/xhrUpload";
 
 export interface PostFormData {
   postType: PostType;
@@ -79,7 +81,7 @@ export default function PostForm({
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<Category[]>(
-    initialAvailableCategories,
+    initialAvailableCategories
   );
   const [selected, setSelected] = useState<string[]>(initialSelectedCategories);
 
@@ -89,8 +91,19 @@ export default function PostForm({
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [categoryReady, setCategoryReady] = useState(
-    initialAvailableCategories.length > 0,
+    initialAvailableCategories.length > 0
   );
+  const upload = useUpload();
+  const { progress, stage } = useUpload();
+  const label =
+  stage === "uploading"
+    ? "Uploading files…"
+    : stage === "processing"
+    ? "Processing post…"
+    : stage === "done"
+    ? "Done"
+    : "";
+
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
 
@@ -212,6 +225,8 @@ export default function PostForm({
       return;
     }
 
+    upload.start();
+    onCancel?.();
     setSubmitting(true);
 
     try {
@@ -221,13 +236,13 @@ export default function PostForm({
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      // ✅ ONLY local placeholder images
       const images = Array.from(
         doc.querySelectorAll(
-          "img[data-type='image-placeholder'][data-status='local']",
-        ),
+          "img[data-type='image-placeholder'][data-status='local']"
+        )
       );
 
+      // 🖼 Image uploads (XHR)
       for (const img of images) {
         const localId = img.getAttribute("data-id");
         if (!localId) continue;
@@ -238,61 +253,37 @@ export default function PostForm({
         const form = new FormData();
         form.append("file", file);
 
-        const res = await fetch("/api/media/upload", {
-          method: "POST",
-          body: form,
-        });
+        const uploaded = await xhrUpload("/api/media/upload", form, (p) =>
+          upload.setUploading(p)
+        );
 
-        if (!res.ok) throw new Error("Image upload failed");
+        if (!uploaded?.url) throw new Error("Image upload failed");
 
-        const { url, width, height } = await res.json();
-
-        // replace blob with CDN
-        img.setAttribute("src", url);
+        img.setAttribute("src", uploaded.url);
         img.removeAttribute("data-status");
 
-        if (width) img.setAttribute("data-width", String(width));
-        if (height) img.setAttribute("data-height", String(height));
-
-        // 🧹 memory cleanup
         const blobUrl = localBlobUrlsRef.current.get(localId);
-        if (blobUrl) {
-          URL.revokeObjectURL(blobUrl);
-          localBlobUrlsRef.current.delete(localId);
-        }
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
       }
 
-      // ✅ FINAL HTML
       html = doc.body.innerHTML;
-
       const tags = extractTagsFromHTML(html);
 
       let video;
 
+      // 🎥 Video upload (XHR)
       if (mode === PostTypes.VIDEO && videoFileRef.current) {
         const form = new FormData();
         form.append("file", videoFileRef.current);
 
-        const res = await fetch("/api/media/upload/video", {
-          method: "POST",
-          body: form,
-        });
+        video = await xhrUpload("/api/media/upload/video", form, (p) =>
+          upload.setUploading(p)
+        );
 
-        if (!res.ok) throw new Error("Video upload failed");
-
-        const uploaded = await res.json();
-
-        if (!uploaded?.url) {
-          throw new Error("Video upload returned no URL");
-        }
-
-        video = {
-          url: uploaded.url,
-          thumbnailUrl: uploaded.thumbnailUrl,
-          duration: uploaded.duration,
-          aspectRatio: uploaded.aspectRatio,
-        };
+        if (!video?.url) throw new Error("Video upload failed");
       }
+
+      upload.setProcessing();
 
       await onSubmit({
         postType: mode,
@@ -304,18 +295,10 @@ export default function PostForm({
         video,
       });
 
-      // 🧹 reset only on new post
-      if (!initialContent) {
-        editorRef.current?.clearEditor();
-        pendingImagesRef.current.clear();
-        setTitle("");
-        setSelected([]);
-        setCategories([]);
-        setResetKey((k) => k + 1);
-        setContentChanged(true);
-      }
+      upload.finish();
     } catch (err) {
       console.error("❌ Error posting:", err);
+      upload.finish();
     } finally {
       setSubmitting(false);
     }
@@ -369,8 +352,8 @@ export default function PostForm({
               mode === PostTypes.VIDEO
                 ? "Add a description"
                 : mode === PostTypes.QUESTION
-                  ? t("questionEnter") || "Question"
-                  : t("title") || "Title"
+                ? t("questionEnter") || "Question"
+                : t("title") || "Title"
             }
             value={title}
             maxLength={200}
@@ -400,10 +383,10 @@ export default function PostForm({
             mode === PostTypes.POST
               ? t("placeholder") || "Placeholder"
               : mode === PostTypes.QUESTION
-                ? "質問内容を詳しく書いてください"
-                : mode === PostTypes.ANSWER
-                  ? "Answer"
-                  : "Placeholder(Illegal Statement)"
+              ? "質問内容を詳しく書いてください"
+              : mode === PostTypes.ANSWER
+              ? "Answer"
+              : "Placeholder(Illegal Statement)"
           }
         />
       </div>
@@ -598,7 +581,7 @@ export default function PostForm({
                         localId,
                         localUrl, // blob: URL
                         undefined,
-                        undefined,
+                        undefined
                       )
                       .run();
 
@@ -655,16 +638,16 @@ export default function PostForm({
                     ? "Submitting..."
                     : t("submit") || "Submit"
                   : mode === PostTypes.QUESTION
-                    ? submitting
-                      ? "Submitting Question..."
-                      : "Ask Question"
-                    : mode === PostTypes.ANSWER
-                      ? submitting
-                        ? "Submitting Answer..."
-                        : "Answer"
-                      : mode === PostTypes.VIDEO
-                        ? "Post Video"
-                        : "Placeholder"}
+                  ? submitting
+                    ? "Submitting Question..."
+                    : "Ask Question"
+                  : mode === PostTypes.ANSWER
+                  ? submitting
+                    ? "Submitting Answer..."
+                    : "Answer"
+                  : mode === PostTypes.VIDEO
+                  ? "Post Video"
+                  : "Placeholder"}
               </motion.button>
             )}
           </div>

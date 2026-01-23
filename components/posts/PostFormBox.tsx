@@ -24,7 +24,7 @@ interface PostFormBoxProps {
       thumbnailUrl?: string;
       duration?: number;
       aspectRatio?: number;
-    }
+    },
   ) => Promise<void>;
 
   type?: (typeof PostTypes)[Extract<
@@ -77,12 +77,12 @@ export default function PostFormBox({
                     {mode === PostTypes.POST
                       ? t("createPost") || "Create Post"
                       : mode === PostTypes.QUESTION
-                      ? "Ask Question"
-                      : mode === PostTypes.VIDEO
-                      ? "Upload Video"
-                      : mode === PostTypes.ANSWER
-                      ? "Answer Question"
-                      : "Create Post"}
+                        ? "Ask Question"
+                        : mode === PostTypes.VIDEO
+                          ? "Upload Video"
+                          : mode === PostTypes.ANSWER
+                            ? "Answer Question"
+                            : "Create Post"}
                   </h2>
 
                   <button
@@ -136,6 +136,7 @@ export default function PostFormBox({
               <section className="flex-1 overflow-y-auto p-4">
                 <PostForm
                   mode={mode}
+                  onCancel={onClose}
                   onSubmit={async (data) => {
                     await onSubmit(
                       data.postType,
@@ -144,9 +145,8 @@ export default function PostFormBox({
                       data.authorId,
                       data.categories,
                       data.tags,
-                      data.video
+                      data.video,
                     );
-                    onClose();
                   }}
                 />
               </section>
