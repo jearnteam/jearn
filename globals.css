@@ -121,6 +121,54 @@ html.dark {
   line-height: 1.35; /* FIXED multi-line spacing */
 }
 
+.math-content p {
+  margin: 0.5em 0;
+}
+
+/* ---------- Lists ---------- */
+.math-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.75em 0;
+}
+
+.math-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.75em 0;
+}
+
+.math-content li {
+  margin: 0.25rem 0;
+}
+
+/* ---------- Blockquote ---------- */
+.math-content blockquote {
+  border-left: 4px solid #d1d5db; /* gray-300 */
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: #6b7280; /* gray-500 */
+  font-style: italic;
+}
+
+.dark .math-content blockquote {
+  border-left-color: #4b5563; /* gray-600 */
+  color: #9ca3af; /* gray-400 */
+}
+
+/* ---------- Inline code ---------- */
+.math-content code {
+  color: #29a425;
+  padding: 3px;
+  border-radius: 4px;
+  display: inline-block;
+  white-space: pre-wrap;
+}
+
+.dark .math-content code {
+  color: #39c945;
+}
+
 /* -------------------------------------------------------------------------- */
 
 /* Other blocks */
@@ -144,6 +192,41 @@ html.dark {
 .ProseMirror:focus {
   outline: none !important;
   box-shadow: none !important;
+}
+
+.ProseMirror ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+.ProseMirror li {
+  margin: 0.25rem 0;
+}
+
+.ProseMirror blockquote {
+  border-left: 4px solid #d1d5db;
+  padding-left: 1rem;
+  color: #6b7280;
+  margin: 0.75rem 0;
+}
+
+.dark .ProseMirror blockquote {
+  border-color: #4b5563;
+  color: #9ca3af;
+}
+
+.ProseMirror a {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
+.dark .ProseMirror a {
+  color: #60a5fa;
 }
 
 /* ---------------------------------------------------------- */
@@ -432,7 +515,6 @@ code {
       transition: none !important;
     }
   }
-  
 }
 
 @layer base {

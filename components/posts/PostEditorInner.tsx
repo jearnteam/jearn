@@ -22,6 +22,11 @@ import Text from "@tiptap/extension-text";
 import Heading from "@tiptap/extension-heading";
 import HardBreak from "@tiptap/extension-hard-break";
 import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import Link from "@tiptap/extension-link";
+import BulletList from "@tiptap/extension-bullet-list";
+import ListItem from "@tiptap/extension-list-item";
+import Blockquote from "@tiptap/extension-blockquote";
+import ListKeymap from "@tiptap/extension-list-keymap";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
@@ -31,13 +36,16 @@ import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
 import { ImagePlaceholder } from "@/features/ImagePlaceholder";
 import { CursorExitFix } from "@/features/CursorExitFix";
 import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
+import { FixHeadingEnter } from "@/features/ExitHeadingOnEnter";
 
 import { Extension, ChainedCommands } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
 import type { Level } from "@tiptap/extension-heading";
 import { AtomBoundaryFix } from "@/features/AtomBoundaryFix";
-import { buildImagePlaceholderHTML } from "@/lib/insertImageHtml";
-
+import { BackspaceExitListLikeEnter } from "@/features/BackspaceExitListLikeEnter";
+import { SmartBackspaceBlockquote } from "@/features/SmartBackspaceBlockquote";
+import { FloatingMenuIndexedShortcuts } from "@/features/FloatingMenuIndexedShortcuts";
+import { ClearFormatting } from "@/features/ClearFormatting";
 /* ----------------------- ZERO WIDTH (PASTE ONLY) ----------------------- */
 
 const zeroWidthCleanupKey = new PluginKey("zero-width-cleanup");
@@ -50,14 +58,25 @@ const ZeroWidthCleanup = Extension.create({
         key: zeroWidthCleanupKey,
         props: {
           handlePaste(view, event) {
-            const text = event.clipboardData?.getData("text/plain");
+            const clipboard = event.clipboardData;
+            if (!clipboard) return false;
+
+            const html = clipboard.getData("text/html");
+
+            // ✅ If HTML exists → let ProseMirror handle it
+            if (html) return false;
+
+            // 🧼 Plain-text only
+            const text = clipboard.getData("text/plain");
             if (!text) return false;
 
             const clean = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
             view.dispatch(view.state.tr.insertText(clean));
             return true;
           },
+
           transformPastedHTML(html) {
+            // 🧼 Clean HTML but KEEP formatting
             return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
           },
         },
@@ -179,6 +198,18 @@ export default function PostEditorInner({
       AtomBoundaryFix,
       MathExtension,
       ZeroWidthCleanup,
+      Link,
+      BulletList,
+      ListItem,
+      Blockquote,
+
+      // behavior overrides
+      FixHeadingEnter,
+      ListKeymap,
+      BackspaceExitListLikeEnter,
+      SmartBackspaceBlockquote,
+      FloatingMenuIndexedShortcuts,
+      ClearFormatting,
 
       CursorExitFix,
 
@@ -273,20 +304,70 @@ export default function PostEditorInner({
       getReferenceClientRect: null,
       content: menuRef.current,
       trigger: "manual",
-      placement: "top",
       interactive: true,
       appendTo: document.body,
       hideOnClick: false,
       zIndex: 20000,
-      maxWidth: "none",
+      maxWidth: "calc(100vw - 16px)",
+      placement: "top",
+      popperOptions: {
+        modifiers: [
+          {
+            name: "flip",
+            options: {
+              fallbackPlacements: ["bottom"],
+            },
+          },
+          {
+            name: "preventOverflow",
+            options: {
+              padding: 8,
+            },
+          },
+        ],
+      },
     });
 
     const update = () => {
       const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0) return instance.hide();
+      if (!sel || sel.rangeCount === 0) {
+        instance.hide();
+        return;
+      }
 
       const range = sel.getRangeAt(0);
-      if (range.collapsed) return instance.hide();
+      if (range.collapsed) {
+        instance.hide();
+        return;
+      }
+
+      const anchorNode = sel.anchorNode;
+      if (!anchorNode) {
+        instance.hide();
+        return;
+      }
+
+      // 🔑 CRITICAL CHECK: selection must be inside THIS editor
+      const editorDom = editor.view.dom;
+      const isInsideEditor =
+        anchorNode === editorDom || editorDom.contains(anchorNode);
+
+      if (!isInsideEditor) {
+        instance.hide();
+        return;
+      }
+
+      // Optional but recommended: editor must be focused
+      if (!editor.isFocused) {
+        instance.hide();
+        return;
+      }
+
+      // Mobile guard (your existing logic)
+      if (window.matchMedia("(max-width: 640px)").matches) {
+        instance.hide();
+        return;
+      }
 
       instance.setProps({
         getReferenceClientRect: () => range.getBoundingClientRect(),
@@ -295,22 +376,22 @@ export default function PostEditorInner({
       instance.show();
     };
 
-    const deb = () => {
+    const debouncedUpdate = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(update);
     };
 
-    editor.on("selectionUpdate", deb);
-    editor.on("transaction", deb);
-    document.addEventListener("selectionchange", deb);
+    editor.on("selectionUpdate", debouncedUpdate);
+    editor.on("transaction", debouncedUpdate);
+    document.addEventListener("selectionchange", debouncedUpdate);
 
     tippyRef.current = instance;
 
     return () => {
       cancelAnimationFrame(raf);
-      editor.off("selectionUpdate", deb);
-      editor.off("transaction", deb);
-      document.removeEventListener("selectionchange", deb);
+      editor.off("selectionUpdate", debouncedUpdate);
+      editor.off("transaction", debouncedUpdate);
+      document.removeEventListener("selectionchange", debouncedUpdate);
       instance.destroy();
       document.body.removeChild(el);
     };
@@ -334,6 +415,115 @@ export default function PostEditorInner({
   };
 
   const levels: Level[] = [1, 2, 3];
+  const toolBtn =
+    "h-9 min-w-[36px] px-2 flex items-center justify-center rounded-md text-sm font-medium transition select-none touch-manipulation";
+
+  type FloatingMenuAction = {
+    id: string;
+    label: string;
+    shortcut?: string;
+    isActive?: (editor: Editor) => boolean;
+    run: (editor: Editor, withRestore: any) => void;
+  };
+
+  const FLOATING_MENU_ACTIONS: FloatingMenuAction[] = [
+    {
+      id: "h1",
+      label: "H1",
+      shortcut: "Header 1\nCtrl/Cmd + Alt + 1",
+      isActive: (e) => e.isActive("heading", { level: 1 }),
+      run: (_, withRestore) =>
+        withRestore((c: any) => c.toggleHeading({ level: 1 })),
+    },
+    {
+      id: "h2",
+      label: "H2",
+      shortcut: "Header 2\nCtrl/Cmd + Alt + 2",
+      isActive: (e) => e.isActive("heading", { level: 2 }),
+      run: (_, withRestore) =>
+        withRestore((c: any) => c.toggleHeading({ level: 2 })),
+    },
+    {
+      id: "h3",
+      label: "H3",
+      shortcut: "Header 3\nCtrl/Cmd + Alt + 3",
+      isActive: (e) => e.isActive("heading", { level: 3 }),
+      run: (_, withRestore) =>
+        withRestore((c: any) => c.toggleHeading({ level: 3 })),
+    },
+    {
+      id: "bold",
+      label: "B",
+      shortcut: "Bold\nCtrl/Cmd + Alt + 4",
+      isActive: (e) => e.isActive("bold"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleBold()),
+    },
+    {
+      id: "italic",
+      label: "I",
+      shortcut: "Italic\nCtrl/Cmd + Alt + 5",
+      isActive: (e) => e.isActive("italic"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleItalic()),
+    },
+    {
+      id: "underline",
+      label: "U",
+      shortcut: "Underline\nCtrl/Cmd + Alt + 6",
+      isActive: (e) => e.isActive("underline"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleUnderline()),
+    },
+    {
+      id: "strike",
+      label: "S",
+      shortcut: "Strike\nCtrl/Cmd + Alt + 7",
+      isActive: (e) => e.isActive("strike"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleStrike()),
+    },
+    {
+      id: "bullet",
+      label: "•",
+      shortcut: "Bullet-List\nCtrl/Cmd + Alt + 8",
+      isActive: (e) => e.isActive("bulletList"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleBulletList()),
+    },
+    {
+      id: "quote",
+      label: "❝",
+      shortcut: "Quote\nCtrl/Cmd + Alt + 9",
+      isActive: (e) => e.isActive("blockquote"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleBlockquote()),
+    },
+    {
+      id: "code",
+      label: "</>",
+      shortcut: "Code\nCtrl/Cmd + Alt + 0",
+      isActive: (e) => e.isActive("code"),
+      run: (_, withRestore) => withRestore((c: any) => c.toggleCode()),
+    },
+    {
+      id: "math",
+      label: "∑",
+      shortcut: "Latex\nNo shortcut",
+      run: (editor) => {
+        const sel = window.getSelection()?.toString();
+        if (!sel?.trim()) return;
+        editor.chain().focus().insertMath(sel.trim()).run();
+      },
+    },
+    {
+      id: "clear",
+      label: "Tx",
+      shortcut: "Clear all formats\nCtrl / Cmd + Alt + \\",
+      run: (editor) =>
+        editor
+          .chain()
+          .focus()
+          .unsetAllMarks()
+          .clearNodes()
+          .setParagraph()
+          .run(),
+    },
+  ];
 
   return (
     <div className="w-full mx-auto">
@@ -341,106 +531,70 @@ export default function PostEditorInner({
       <div
         ref={menuRef}
         className="
-          inline-flex flex-nowrap items-center gap-2
-          whitespace-nowrap
-          bg-white dark:bg-neutral-900 
-          border border-gray-300 dark:border-gray-700 
-          rounded-xl shadow-lg px-3 py-2 backdrop-blur-md
-          min-w-[360px]
-        "
+    flex items-center gap-1
+    bg-white dark:bg-neutral-900
+    border border-gray-300 dark:border-gray-700
+    rounded-xl shadow-lg
+    px-2 py-1
+    backdrop-blur-md
+    max-w-full
+    overflow-x-auto
+    scrollbar-none
+    touch-pan-x
+  "
       >
-        {levels.map((lv) => (
-          <button
-            key={lv}
-            onClick={() => withRestore((c) => c.toggleHeading({ level: lv }))}
-            className={`shrink-0 px-3 py-1.5 rounded-md font-semibold text-sm transition
-              ${
-                editor.isActive("heading", { level: lv })
+        {FLOATING_MENU_ACTIONS.map((action, index) => {
+          const active = action.isActive?.(editor) ?? false;
+          return (
+            <button
+              key={action.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => action.run(editor, withRestore)}
+              title={`${action.shortcut ?? "No shortcut"}`}
+              className={`${toolBtn} ${
+                active
                   ? "bg-black text-white dark:bg-white dark:text-black shadow"
                   : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }
-            `}
-          >
-            H{lv}
-          </button>
-        ))}
+              }`}
+            >
+              {action.label}
 
-        <button
-          onClick={() => withRestore((c) => c.toggleBold())}
-          className={`shrink-0 px-3 py-1.5 rounded-md font-semibold text-sm transition
-            ${
-              editor.isActive("bold")
-                ? "bg-black text-white dark:bg-white dark:text-black shadow"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }
-          `}
-        >
-          B
-        </button>
-
-        <button
-          onClick={() => withRestore((c) => c.toggleItalic())}
-          className={`shrink-0 px-3 py-1.5 rounded-md italic font-semibold text-sm transition
-            ${
-              editor.isActive("italic")
-                ? "bg-black text-white dark:bg-white dark:text-black shadow"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }
-          `}
-        >
-          I
-        </button>
-
-        <button
-          onClick={() => withRestore((c) => c.toggleUnderline())}
-          className={`shrink-0 px-3 py-1.5 rounded-md underline font-semibold text-sm transition
-            ${
-              editor.isActive("underline")
-                ? "bg-black text-white dark:bg-white dark:text-black shadow"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }
-          `}
-        >
-          U
-        </button>
-
-        <button
-          onClick={() => withRestore((c) => c.toggleStrike())}
-          className={`shrink-0 px-3 py-1.5 rounded-md line-through font-semibold text-sm transition
-            ${
-              editor.isActive("strike")
-                ? "bg-black text-white dark:bg-white dark:text-black shadow"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }
-          `}
-        >
-          S
-        </button>
-
-        <button
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => withRestore((c) => c.toggleCode())}
-          className={`shrink-0 px-3 py-1.5 rounded-md font-mono text-sm transition
-            ${
-              editor.isActive("code")
-                ? "bg-black text-white dark:bg-white dark:text-black shadow"
-                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-            }
-          `}
-        >
-          {"</>"}
-        </button>
-
-        <button
-          onClick={() => {
-            const sel = window.getSelection()?.toString();
-            if (!sel?.trim()) return;
-            withRestore((c) => c.insertMath(sel.trim()));
-          }}
-          className="shrink-0 px-3 py-1.5 rounded-md transition text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-        >
-          ∑
-        </button>
+              {/* shortcut index badge */}
+              {action.id === "clear" ? (
+                <span
+                  className="
+                    ml-1
+                    px-1
+                    rounded
+                    text-[10px]
+                    opacity-60
+                    bg-black/10
+                    dark:bg-white/10
+                    font-mono
+                  "
+                >
+                  \
+                </span>
+              ) : (
+                index < 10 && (
+                  <span
+                    className="
+                      ml-1
+                      px-1
+                      rounded
+                      text-[10px]
+                      opacity-60
+                      bg-black/10
+                      dark:bg-white/10
+                    "
+                  >
+                    {index === 9 ? "0" : index + 1}
+                  </span>
+                )
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* EDITOR */}
