@@ -58,7 +58,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, avatarUpdatedAt: 1 } },
+      { projection: { name: 1, avatarUpdatedAt: 1 } }
     );
   }
 
@@ -89,7 +89,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
 
 async function enrichCategories(
   catIds: unknown[],
-  categoriesColl: Collection<CategoryDoc>,
+  categoriesColl: Collection<CategoryDoc>
 ) {
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
@@ -179,7 +179,7 @@ export async function GET(req: Request) {
     // 🟢 FETCH PARENT POSTS FOR ANSWERS (Batch)
     // -------------------------------------------------------------
     const answerDocs = docs.filter(
-      (d) => d.postType === PostTypes.ANSWER && d.parentId,
+      (d) => d.postType === PostTypes.ANSWER && d.parentId
     );
 
     const parentIds = [
@@ -189,7 +189,7 @@ export async function GET(req: Request) {
             if (ObjectId.isValid(d.parentId)) return new ObjectId(d.parentId);
             return null;
           })
-          .filter((id): id is ObjectId => id !== null),
+          .filter((id): id is ObjectId => id !== null)
       ),
     ];
 
@@ -204,7 +204,7 @@ export async function GET(req: Request) {
         parents.map(async (p) => {
           const categories = await enrichCategories(
             Array.isArray(p.categories) ? p.categories : [],
-            categoriesColl,
+            categoriesColl
           );
           const postData = await enrichPost(p as RawPost, users);
 
@@ -214,7 +214,7 @@ export async function GET(req: Request) {
             tags: p.tags ?? [],
             commentCount: 0, // 親のコメント数はコンテキスト表示用には不要なため0として扱う（必要なら別途取得）
           };
-        }),
+        })
       );
     }
 
@@ -235,7 +235,7 @@ export async function GET(req: Request) {
       docs.map(async (p: RawPost) => {
         const categories = await enrichCategories(
           Array.isArray(p.categories) ? p.categories : [],
-          categoriesColl,
+          categoriesColl
         );
 
         const post = await enrichPost(p, users);
@@ -251,7 +251,7 @@ export async function GET(req: Request) {
               ? parentMap[p.parentId.toString()]
               : undefined,
         };
-      }),
+      })
     );
 
     const nextCursor =
@@ -298,7 +298,7 @@ export async function POST(req: Request) {
     if (authorId !== session.user.uid) {
       return NextResponse.json(
         { error: "Incorrect authorId" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -323,19 +323,19 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json(
         { error: "Title / description required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
     if (
       [PostTypes.POST, PostTypes.QUESTION, PostTypes.VIDEO].includes(
-        postType,
+        postType
       ) &&
       (!Array.isArray(categories) || categories.length === 0)
     ) {
       return NextResponse.json(
         { error: "At least one category required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -343,7 +343,7 @@ export async function POST(req: Request) {
       if (!video?.url) {
         return NextResponse.json(
           { error: "Video URL required for video post" },
-          { status: 400 },
+          { status: 400 }
         );
       }
     }
@@ -353,7 +353,7 @@ export async function POST(req: Request) {
         if (!ObjectId.isValid(c)) {
           return NextResponse.json(
             { error: "Invalid category id" },
-            { status: 400 },
+            { status: 400 }
           );
         }
       }
@@ -376,7 +376,7 @@ export async function POST(req: Request) {
       if (!ObjectId.isValid(replyTo)) {
         return NextResponse.json(
           { error: "Invalid replyTo id" },
-          { status: 400 },
+          { status: 400 }
         );
       }
 
@@ -384,7 +384,7 @@ export async function POST(req: Request) {
       if (!target) {
         return NextResponse.json(
           { error: "Reply target not found" },
-          { status: 404 },
+          { status: 404 }
         );
       }
 
@@ -448,7 +448,7 @@ export async function POST(req: Request) {
       const ai = await categorize(doc.content);
 
       const meaningful = ai.predictions.filter(
-        (c: { rawScore: number }) => c.rawScore > 0,
+        (c: { rawScore: number }) => c.rawScore > 0
       );
 
       await db.collection("ai_feedback").insertOne({
@@ -469,7 +469,7 @@ export async function POST(req: Request) {
 
     const enrichedNoCats = await enrichPost(
       { ...doc, _id: result.insertedId },
-      users,
+      users
     );
 
     const categoryData = await enrichCategories(doc.categories, categoriesColl);
@@ -579,7 +579,7 @@ export async function PUT(req: Request) {
             new DeleteObjectCommand({
               Bucket: process.env.R2_BUCKET_NAME!,
               Key: key,
-            }),
+            })
           );
         } catch (err) {
           console.error("❌ Failed to delete image:", key, err);
@@ -610,7 +610,7 @@ export async function PUT(req: Request) {
     const enrichedPost = await enrichPost(updated as RawPost, users);
     const enrichedCategories = await enrichCategories(
       updated.categories ?? [],
-      categoriesColl,
+      categoriesColl
     );
 
     const final = {
@@ -633,6 +633,26 @@ export async function PUT(req: Request) {
   } catch (err) {
     console.error("🔥 PUT /api/posts failed:", err);
     return new Response("Internal Server Error", { status: 500 });
+  }
+}
+
+async function deleteR2ByUrl(url?: string) {
+  if (!url) return;
+
+  try {
+    const key = new URL(url).pathname.replace(/^\/+/, "");
+    if (!key) return;
+
+    await r2.send(
+      new DeleteObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME!,
+        Key: key,
+      })
+    );
+
+    console.log("🗑️ Deleted R2 object:", key);
+  } catch (err) {
+    console.error("❌ Failed to delete R2 object:", url, err);
   }
 }
 
@@ -666,7 +686,7 @@ export async function DELETE(req: Request) {
       return new Response("Forbidden", { status: 403 });
     }
 
-    /* ---------------- DELETE POST + COMMENTS ---------------- */
+    /* ---------------- DELETE POST + COMMENTS MEDIA ---------------- */
     const toDelete = await posts
       .find({ $or: [{ _id: new ObjectId(id) }, { parentId: id }] })
       .toArray();
@@ -680,7 +700,7 @@ export async function DELETE(req: Request) {
             new DeleteObjectCommand({
               Bucket: process.env.R2_BUCKET_NAME!,
               Key: key,
-            }),
+            })
           );
         } catch (err) {
           console.error("❌ Failed to delete image:", key, err);
@@ -688,6 +708,15 @@ export async function DELETE(req: Request) {
       }
     }
 
+    /* ---------------- DELETE VIDEO + THUMBNAIL ---------------- */
+    if (existing.postType === PostTypes.VIDEO && existing.video) {
+      await Promise.all([
+        deleteR2ByUrl(existing.video.url),
+        deleteR2ByUrl(existing.video.thumbnailUrl),
+      ]);
+    }
+
+    /* ---------------- DELETE POSTS ---------------- */
     await posts.deleteMany({
       $or: [{ _id: new ObjectId(id) }, { parentId: id }],
     });
@@ -700,40 +729,6 @@ export async function DELETE(req: Request) {
       console.log("🧠 Deleted AI feedback for post:", id);
     } catch (err) {
       console.error("❌ Failed to delete AI feedback:", err);
-    }
-
-    if (existing.postType === PostTypes.VIDEO && existing.video?.url) {
-      try {
-        const key = new URL(existing.video.url).pathname.replace(/^\/+/, "");
-        if (key.startsWith("videos/")) {
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME!,
-              Key: key,
-            }),
-          );
-        }
-      } catch (err) {
-        console.error("❌ Failed to delete video:", err);
-      }
-    }
-    try {
-      if (existing.video?.thumbnailUrl) {
-        const key = new URL(existing.video.thumbnailUrl).pathname.replace(
-          /^\/+/,
-          "",
-        );
-        if (key.startsWith("videos/")) {
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME!,
-              Key: key,
-            }),
-          );
-        }
-      }
-    } catch (err) {
-      console.error("❌ Failed to delete thumbnail:", err);
     }
 
     /* ---------------- SSE ---------------- */

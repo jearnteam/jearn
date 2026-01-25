@@ -4,7 +4,7 @@ import type { Post } from "@/types/post";
 import { motion } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse } from "./usePostCollapse";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PostTypes } from "@/types/post";
 
 /* -------------------------------------------------
@@ -33,6 +33,38 @@ function splitFirstMedia(html: string): {
 }
 
 /* -------------------------------------------------
+ * 🎥 Extract first frame from video
+ * ------------------------------------------------- */
+async function extractVideoPoster(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.src = url;
+    video.crossOrigin = "anonymous";
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+
+    video.addEventListener("loadeddata", () => {
+      video.currentTime = 0.1;
+    });
+
+    video.addEventListener("seeked", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject();
+
+      ctx.drawImage(video, 0, 0);
+      resolve(canvas.toDataURL("image/jpeg", 0.8));
+    });
+
+    video.onerror = reject;
+  });
+}
+
+/* -------------------------------------------------
  * 🧠 Detect meaningful rest content
  * ------------------------------------------------- */
 function hasMeaningfulContent(html: string): boolean {
@@ -55,28 +87,50 @@ export default function PostContent({
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
   /* =========================================================
-   * 🎥 VIDEO POST → VIDEO ONLY (NO CONTENT)
+   * 🎥 VIDEO THUMBNAIL (FIRST FRAME)
+   * ========================================================= */
+  const [poster, setPoster] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (post.postType !== PostTypes.VIDEO) return;
+    if (!post.video?.url) return;
+
+    let cancelled = false;
+
+    extractVideoPoster(post.video.url)
+      .then((img) => {
+        if (!cancelled) setPoster(img);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post.postType, post.video?.url]);
+
+  /* =========================================================
+   * 🎥 VIDEO POST → VIDEO ONLY
    * ========================================================= */
   if (post.postType === PostTypes.VIDEO && post.video?.url) {
     return (
       <div className="mt-2">
-        {/* 🎥 FIXED VIDEO BOX (NO LAYOUT SHIFT) */}
         <div
           className="
-          relative w-full overflow-hidden rounded-xl bg-black
-          aspect-video
-          max-h-[480px]
-        "
+            relative w-full overflow-hidden rounded-xl bg-black
+            aspect-video max-h-[480px]
+          "
         >
           <video
             src={post.video.url}
+            poster={poster}
             controls
             preload="metadata"
+            playsInline
             className="
-            absolute inset-0
-            w-full h-full
-            object-contain
-          "
+              absolute inset-0
+              w-full h-full
+              object-contain
+            "
           />
         </div>
       </div>
@@ -84,7 +138,7 @@ export default function PostContent({
   }
 
   /* =========================================================
-   * 📝 NON-VIDEO POSTS (existing logic)
+   * 📝 NON-VIDEO POSTS
    * ========================================================= */
   const { firstMediaHTML, restHTML } = useMemo(
     () => splitFirstMedia(post.content ?? ""),
@@ -108,7 +162,8 @@ export default function PostContent({
 
   const collapsed = firstMediaHTML ? 0 : collapsedHeight ?? fullHeight;
 
-  const targetHeight = expanded ? fullHeight : collapsed;
+  /** 🔒 Mobile safety buffer (prevents last-line clipping) */
+  const SAFE_PADDING = 32;
 
   function jumpBeforeCollapseIfNeeded() {
     const wrapper = wrapperRef.current;
@@ -159,31 +214,41 @@ export default function PostContent({
           {shouldTruncate || firstMediaHTML ? (
             <>
               <motion.div
-                initial={{ height: collapsed }}
-                animate={{ height: targetHeight }}
+                initial={false}
+                animate={{
+                  maxHeight: expanded
+                    ? fullHeight + SAFE_PADDING
+                    : collapsed,
+                }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="overflow-hidden mt-2"
+                className="relative overflow-hidden mt-2"
               >
-                <div className="pb-3">
+                <div className="pb-8">
                   <MathRenderer html={restHTML} />
                 </div>
               </motion.div>
 
-              <button
-                onClick={() => {
-                  if (expanded) {
-                    setExpanded(false);
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(jumpBeforeCollapseIfNeeded);
-                    });
-                  } else {
-                    setExpanded(true);
-                  }
-                }}
-                className="mt-2 text-blue-600 text-sm"
-              >
-                {expanded ? "Show Less ▲" : "Show More ▼"}
-              </button>
+              {shouldTruncate && (
+                <div className="mt-2 text-left">
+                  <button
+                    onClick={() => {
+                      if (expanded) {
+                        setExpanded(false);
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(
+                            jumpBeforeCollapseIfNeeded
+                          );
+                        });
+                      } else {
+                        setExpanded(true);
+                      }
+                    }}
+                    className="px-2 py-1 text-blue-600 text-sm hover:underline"
+                  >
+                    {expanded ? "Show Less ▲" : "Show More ▼"}
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <div className="mt-2">

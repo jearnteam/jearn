@@ -493,15 +493,11 @@ export default function HomePage() {
               </div>
 
               {/* VIDEOS */}
-              <div
-                className={
-                  activeView === "videos"
-                    ? "block h-full"
-                    : "invisible h-0 overflow-hidden"
-                }
-              >
-                <VideosPage />
-              </div>
+              {activeView === "videos" && (
+                <div className="block h-full">
+                  <VideosPage />
+                </div>
+              )}
             </main>
           </VideoSettingsProvider>
 

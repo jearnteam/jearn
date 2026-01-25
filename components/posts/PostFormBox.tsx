@@ -24,7 +24,7 @@ interface PostFormBoxProps {
       thumbnailUrl?: string;
       duration?: number;
       aspectRatio?: number;
-    },
+    }
   ) => Promise<void>;
 
   type?: (typeof PostTypes)[Extract<
@@ -67,7 +67,13 @@ export default function PostFormBox({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ duration: 0.25 }}
-              className="w-full max-w-4xl max-h-[80vh] bg-white dark:bg-neutral-900 shadow-lg rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col"
+              className="
+  w-full max-w-4xl max-h-[80vh]
+  bg-white dark:bg-neutral-900
+  shadow-lg rounded-2xl
+  border border-gray-200 dark:border-gray-700
+  flex flex-col
+"
               onClick={(e) => e.stopPropagation()}
             >
               {/* ---------------- Header ---------------- */}
@@ -77,12 +83,12 @@ export default function PostFormBox({
                     {mode === PostTypes.POST
                       ? t("createPost") || "Create Post"
                       : mode === PostTypes.QUESTION
-                        ? "Ask Question"
-                        : mode === PostTypes.VIDEO
-                          ? "Upload Video"
-                          : mode === PostTypes.ANSWER
-                            ? "Answer Question"
-                            : "Create Post"}
+                      ? "Ask Question"
+                      : mode === PostTypes.VIDEO
+                      ? "Upload Video"
+                      : mode === PostTypes.ANSWER
+                      ? "Answer Question"
+                      : "Create Post"}
                   </h2>
 
                   <button
@@ -133,7 +139,7 @@ export default function PostFormBox({
               </header>
 
               {/* ---------------- Content ---------------- */}
-              <section className="flex-1 overflow-y-auto p-4">
+              <section className="flex-1 flex flex-col min-h-0">
                 <PostForm
                   mode={mode}
                   onCancel={onClose}
@@ -145,7 +151,7 @@ export default function PostFormBox({
                       data.authorId,
                       data.categories,
                       data.tags,
-                      data.video,
+                      data.video
                     );
                   }}
                 />

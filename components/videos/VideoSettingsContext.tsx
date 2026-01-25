@@ -7,7 +7,11 @@ import {
   useState,
   ReactNode,
 } from "react";
+import type { Post } from "@/types/post";
 
+/* ---------------------------------------------
+ * TYPES
+ * ------------------------------------------- */
 type SavedVideoState = {
   videoId: string | null;
   time: number;
@@ -16,22 +20,37 @@ type SavedVideoState = {
 };
 
 type VideoSettingsContextType = {
+  /* 🔊 Audio */
   muted: boolean;
   toggleMute: () => void;
   setMuted: (v: boolean) => void;
 
+  /* 🎬 Playback state */
   savedState: SavedVideoState;
   saveVideoState: (v: Partial<SavedVideoState>) => void;
+
+  /* 📦 Video list (in-memory, survives tab switch) */
+  videos: Post[];
+  setVideos: (v: Post[]) => void;
 };
 
-const VideoSettingsContext = createContext<VideoSettingsContextType | null>(null);
+const VideoSettingsContext =
+  createContext<VideoSettingsContextType | null>(null);
 
+/* ---------------------------------------------
+ * STORAGE KEYS
+ * ------------------------------------------- */
 const STORAGE_KEY = "video-muted";
 const VIDEO_STATE_KEY = "video-playback-state";
 
+/* ---------------------------------------------
+ * PROVIDER
+ * ------------------------------------------- */
 export function VideoSettingsProvider({ children }: { children: ReactNode }) {
+  /* 🔊 Muted */
   const [muted, setMutedState] = useState(true);
 
+  /* 🎬 Playback */
   const [savedState, setSavedState] = useState<SavedVideoState>({
     videoId: null,
     time: 0,
@@ -39,6 +58,12 @@ export function VideoSettingsProvider({ children }: { children: ReactNode }) {
     scrollTop: 0,
   });
 
+  /* 📦 Video list (NOT persisted) */
+  const [videos, setVideos] = useState<Post[]>([]);
+
+  /* ---------------------------------------------
+   * INIT FROM STORAGE
+   * ------------------------------------------- */
   useEffect(() => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored !== null) setMutedState(stored === "true");
@@ -52,6 +77,9 @@ export function VideoSettingsProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
+  /* ---------------------------------------------
+   * AUDIO CONTROLS
+   * ------------------------------------------- */
   const setMuted = (value: boolean) => {
     setMutedState(value);
     sessionStorage.setItem(STORAGE_KEY, String(value));
@@ -59,6 +87,9 @@ export function VideoSettingsProvider({ children }: { children: ReactNode }) {
 
   const toggleMute = () => setMuted(!muted);
 
+  /* ---------------------------------------------
+   * SAVE PLAYBACK STATE
+   * ------------------------------------------- */
   const saveVideoState = (patch: Partial<SavedVideoState>) => {
     setSavedState((prev) => {
       const next = { ...prev, ...patch };
@@ -67,17 +98,33 @@ export function VideoSettingsProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  /* ---------------------------------------------
+   * CONTEXT VALUE
+   * ------------------------------------------- */
   return (
     <VideoSettingsContext.Provider
-      value={{ muted, setMuted, toggleMute, savedState, saveVideoState }}
+      value={{
+        muted,
+        setMuted,
+        toggleMute,
+        savedState,
+        saveVideoState,
+        videos,
+        setVideos,
+      }}
     >
       {children}
     </VideoSettingsContext.Provider>
   );
 }
 
+/* ---------------------------------------------
+ * HOOK
+ * ------------------------------------------- */
 export function useVideoSettings() {
   const ctx = useContext(VideoSettingsContext);
-  if (!ctx) throw new Error("useVideoSettings must be used inside provider");
+  if (!ctx) {
+    throw new Error("useVideoSettings must be used inside provider");
+  }
   return ctx;
 }
