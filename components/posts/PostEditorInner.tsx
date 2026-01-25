@@ -46,6 +46,7 @@ import { BackspaceExitListLikeEnter } from "@/features/BackspaceExitListLikeEnte
 import { SmartBackspaceBlockquote } from "@/features/SmartBackspaceBlockquote";
 import { FloatingMenuIndexedShortcuts } from "@/features/FloatingMenuIndexedShortcuts";
 import { ClearFormatting } from "@/features/ClearFormatting";
+import clsx from "clsx";
 /* ----------------------- ZERO WIDTH (PASTE ONLY) ----------------------- */
 
 const zeroWidthCleanupKey = new PluginKey("zero-width-cleanup");
@@ -170,6 +171,7 @@ export default function PostEditorInner({
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const [charCount, setCharCount] = useState(0);
   const [, forceRerender] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
 
   /* ------------------------- EXTENSIONS -------------------------- */
   const extensions = useMemo(
@@ -242,6 +244,15 @@ export default function PostEditorInner({
     },
     []
   );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const update = () => setIsMobile(mq.matches);
+
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   /* Editor ready */
   useEffect(() => {
@@ -608,6 +619,50 @@ export default function PostEditorInner({
         <div className="flex-1 relative max-h-[300px] overflow-y-auto">
           <EditorContent editor={editor} />
         </div>
+
+        {/* MOBILE TOOLBAR */}
+        {isMobile && editor && (
+          <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700">
+            <div
+              className="
+        flex items-center gap-2
+        overflow-x-auto overflow-y-hidden
+        whitespace-nowrap
+        px-2 pt-3 pb-4
+        scrollbar-thin
+      "
+            >
+              {FLOATING_MENU_ACTIONS.map((action) => {
+                const active = action.isActive?.(editor) ?? false;
+
+                return (
+                  <button
+                    key={action.id}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // keep editor focus
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      action.run(editor, withRestore);
+                    }}
+                    title={action.shortcut ?? "No shortcut"}
+                    aria-label={action.shortcut ?? action.label}
+                    className={clsx(
+                      "h-9 min-w-[40px] shrink-0 px-2 rounded-md text-sm font-medium",
+                      active
+                        ? "bg-black text-white dark:bg-white dark:text-black"
+                        : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    )}
+                  >
+                    {action.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div
           className={`text-right text-xs px-4 py-1 border-t ${

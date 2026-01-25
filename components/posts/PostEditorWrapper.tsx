@@ -116,7 +116,7 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
       <div
         ref={wrapperRef}
         className={clsx(
-          "flex flex-col h-full overflow-hidden rounded-lg transition"
+          "flex flex-col h-full rounded-lg transition"
         )}
       >
         <PostEditorInner

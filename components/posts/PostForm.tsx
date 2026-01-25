@@ -72,6 +72,8 @@ export default function PostForm({
   const [resetKey, setResetKey] = useState(0);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const [footerHeight, setFooterHeight] = useState(0);
   const pendingImagesRef = useRef<Map<string, File>>(new Map());
   const localBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const [submitting, setSubmitting] = useState(false);
@@ -79,6 +81,10 @@ export default function PostForm({
 
   const videoFileRef = useRef<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const thumbnailFileRef = useRef<File | null>(null);
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(
+    null
+  );
 
   const [categories, setCategories] = useState<Category[]>(
     initialAvailableCategories
@@ -96,14 +102,13 @@ export default function PostForm({
   const upload = useUpload();
   const { progress, stage } = useUpload();
   const label =
-  stage === "uploading"
-    ? "Uploading files…"
-    : stage === "processing"
-    ? "Processing post…"
-    : stage === "done"
-    ? "Done"
-    : "";
-
+    stage === "uploading"
+      ? "Uploading files…"
+      : stage === "processing"
+      ? "Processing post…"
+      : stage === "done"
+      ? "Done"
+      : "";
 
   const [animatingLayout, setAnimatingLayout] = useState(false);
 
@@ -131,8 +136,21 @@ export default function PostForm({
   useEffect(() => {
     return () => {
       if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+      if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
     };
-  }, [videoPreviewUrl]);
+  }, [videoPreviewUrl, thumbnailPreviewUrl]);
+
+  useEffect(() => {
+    if (!footerRef.current) return;
+
+    const update = () => {
+      setFooterHeight(footerRef.current!.offsetHeight);
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   /* -------------------------------------------------------------------------- */
   /* CHECK CATEGORIES                              */
@@ -271,10 +289,13 @@ export default function PostForm({
 
       let video;
 
-      // 🎥 Video upload (XHR)
       if (mode === PostTypes.VIDEO && videoFileRef.current) {
         const form = new FormData();
         form.append("file", videoFileRef.current);
+
+        if (thumbnailFileRef.current) {
+          form.append("thumbnail", thumbnailFileRef.current);
+        }
 
         video = await xhrUpload("/api/media/upload/video", form, (p) =>
           upload.setUploading(p)
@@ -330,199 +351,247 @@ export default function PostForm({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
-      className="flex flex-col h-full space-y-4 bg-white dark:bg-neutral-900 p-4 rounded-lg"
+      className="flex flex-col min-h-0 bg-white dark:bg-neutral-900 rounded-lg"
     >
-      {/* ------------------------------ Title ------------------------------ */}
-      <>
-        <motion.div
-          animate={{
-            boxShadow: isTitleFocused
-              ? "0px 0px 12px rgba(0,0,0,0.15)"
-              : "0px 0px 0px rgba(0,0,0,0)",
-          }}
-          className={`rounded-lg border transition ${
-            isTitleFocused
-              ? "border-black dark:border-white"
-              : "border-gray-300 dark:border-gray-500"
-          }`}
-        >
-          <input
-            type="text"
-            placeholder={
-              mode === PostTypes.VIDEO
-                ? "Add a description"
-                : mode === PostTypes.QUESTION
-                ? t("questionEnter") || "Question"
-                : t("title") || "Title"
-            }
-            value={title}
-            maxLength={200}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              setContentChanged(true);
+      {/* ================= SCROLL AREA ================= */}
+      <div
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
+        <>
+          <motion.div
+            animate={{
+              boxShadow: isTitleFocused
+                ? "0px 0px 12px rgba(0,0,0,0.15)"
+                : "0px 0px 0px rgba(0,0,0,0)",
             }}
-            onFocus={() => setIsTitleFocused(true)}
-            onBlur={() => setIsTitleFocused(false)}
-            className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
-            autoComplete="off"
+            className={`rounded-lg border transition ${
+              isTitleFocused
+                ? "border-black dark:border-white"
+                : "border-gray-300 dark:border-gray-500"
+            }`}
+          >
+            <input
+              type="text"
+              placeholder={
+                mode === PostTypes.VIDEO
+                  ? "Add a description"
+                  : mode === PostTypes.QUESTION
+                  ? t("questionEnter") || "Question"
+                  : t("title") || "Title"
+              }
+              value={title}
+              maxLength={200}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                setContentChanged(true);
+              }}
+              onFocus={() => setIsTitleFocused(true)}
+              onBlur={() => setIsTitleFocused(false)}
+              className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
+              autoComplete="off"
+            />
+          </motion.div>
+          <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
+            {title.length}/200
+          </p>
+        </>
+
+        {/* ------------------------------ Editor ------------------------------ */}
+        <div className="overflow-visible rounded-md">
+          <PostEditorWrapper
+            key={`${resetKey}-${mode}`}
+            ref={editorRef}
+            value={cleanInitialContent}
+            onUpdate={handleEditorUpdate}
+            placeholder={
+              mode === PostTypes.POST
+                ? t("placeholder") || "Placeholder"
+                : mode === PostTypes.QUESTION
+                ? "質問内容を詳しく書いてください"
+                : mode === PostTypes.ANSWER
+                ? "Answer"
+                : "Placeholder(Illegal Statement)"
+            }
           />
-        </motion.div>
-        <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
-          {title.length}/200
-        </p>
-      </>
+        </div>
 
-      {/* ------------------------------ Editor ------------------------------ */}
-      <div className="flex-1 overflow-y-auto rounded-md">
-        <PostEditorWrapper
-          key={`${resetKey}-${mode}`}
-          ref={editorRef}
-          value={cleanInitialContent}
-          onUpdate={handleEditorUpdate}
-          placeholder={
-            mode === PostTypes.POST
-              ? t("placeholder") || "Placeholder"
-              : mode === PostTypes.QUESTION
-              ? "質問内容を詳しく書いてください"
-              : mode === PostTypes.ANSWER
-              ? "Answer"
-              : "Placeholder(Illegal Statement)"
-          }
-        />
-      </div>
-
-      {/* ------------------------------ Categories ------------------------------ */}
-      <AnimatePresence>
-        {(!contentChanged || initialAvailableCategories.length > 0) &&
-          categoryReady &&
-          categories.length > 0 &&
-          mode !== PostTypes.ANSWER && (
-            <motion.div
-              key="cat-list"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              transition={{ duration: 0.25 }}
-              className="space-y-3"
-              onLayoutAnimationStart={() => setAnimatingLayout(true)}
-              onLayoutAnimationComplete={() => setAnimatingLayout(false)}
-            >
-              <motion.div layout className="overflow-hidden">
-                <motion.div
-                  layout
-                  className="flex flex-wrap gap-3"
-                  transition={{ layout: { duration: 0.35, ease: "easeInOut" } }}
-                >
-                  {visibleCats.map((cat) => {
-                    const isSelected = selected.includes(cat.id);
-                    return (
-                      <motion.div
-                        key={cat.label}
-                        layout
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="flex flex-col"
-                      >
-                        <motion.button
-                          type="button"
+        {/* ------------------------------ Categories ------------------------------ */}
+        <AnimatePresence>
+          {(!contentChanged || initialAvailableCategories.length > 0) &&
+            categoryReady &&
+            categories.length > 0 &&
+            mode !== PostTypes.ANSWER && (
+              <motion.div
+                key="cat-list"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 6 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-3"
+                onLayoutAnimationStart={() => setAnimatingLayout(true)}
+                onLayoutAnimationComplete={() => setAnimatingLayout(false)}
+              >
+                <motion.div layout className="overflow-hidden">
+                  <motion.div
+                    layout
+                    className="flex flex-wrap gap-3"
+                    transition={{
+                      layout: { duration: 0.35, ease: "easeInOut" },
+                    }}
+                  >
+                    {visibleCats.map((cat) => {
+                      const isSelected = selected.includes(cat.id);
+                      return (
+                        <motion.div
+                          key={cat.label}
                           layout
-                          whileTap={{ scale: 0.92 }}
-                          whileHover={{ scale: 1.05 }}
-                          onClick={() => handleSelectCategory(cat.id)}
-                          className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-                            isSelected
-                              ? "bg-blue-600 text-white shadow"
-                              : "bg-gray-200 dark:bg-gray-700"
-                          }`}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="flex flex-col"
                         >
-                          {i18n.language === "ja" ? cat.jname : cat.label}
-                        </motion.button>
-                        <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${cat.score * 100}%` }}
-                            transition={{ duration: 0.6 }}
-                            className="h-full bg-blue-500 dark:bg-blue-400"
-                          />
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                          <motion.button
+                            type="button"
+                            layout
+                            whileTap={{ scale: 0.92 }}
+                            whileHover={{ scale: 1.05 }}
+                            onClick={() => handleSelectCategory(cat.id)}
+                            className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                              isSelected
+                                ? "bg-blue-600 text-white shadow"
+                                : "bg-gray-200 dark:bg-gray-700"
+                            }`}
+                          >
+                            {i18n.language === "ja" ? cat.jname : cat.label}
+                          </motion.button>
+                          <div className="w-full h-1.5 bg-gray-300 dark:bg-neutral-800 mt-1 rounded-full overflow-hidden">
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${cat.score * 100}%` }}
+                              transition={{ duration: 0.6 }}
+                              className="h-full bg-blue-500 dark:bg-blue-400"
+                            />
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </motion.div>
                 </motion.div>
+
+                {!animatingLayout && (
+                  <motion.div layout className="flex gap-4 text-sm">
+                    {visibleCount < ordered.length && (
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount((v) => v + 5)}
+                        className="text-blue-500 hover:underline"
+                      >
+                        {t("showMore") || "Show more"}
+                      </button>
+                    )}
+                    {visibleCount > 5 && (
+                      <button
+                        type="button"
+                        onClick={() => setVisibleCount(5)}
+                        className="text-blue-500 hover:underline"
+                      >
+                        {t("showLess") || "Show less"}
+                      </button>
+                    )}
+                  </motion.div>
+                )}
               </motion.div>
-
-              {!animatingLayout && (
-                <motion.div layout className="flex gap-4 text-sm">
-                  {visibleCount < ordered.length && (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount((v) => v + 5)}
-                      className="text-blue-500 hover:underline"
-                    >
-                      {t("showMore") || "Show more"}
-                    </button>
-                  )}
-                  {visibleCount > 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount(5)}
-                      className="text-blue-500 hover:underline"
-                    >
-                      {t("showLess") || "Show less"}
-                    </button>
-                  )}
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-
-        {mode === PostTypes.VIDEO && (
-          <div className="space-y-3">
-            {videoPreviewUrl ? (
-              <video
-                src={videoPreviewUrl}
-                controls
-                className="w-full max-h-[360px] rounded-lg bg-black"
-              />
-            ) : (
-              <div className="border-2 border-dashed rounded-lg p-6 text-center text-gray-500">
-                No video selected
-              </div>
             )}
 
-            <button
-              type="button"
-              onClick={() => {
-                const input = document.createElement("input");
-                input.type = "file";
-                input.accept = "video/*";
+          {mode === PostTypes.VIDEO && (
+            <div className="space-y-4">
+              {/* 🎥 Video Preview */}
+              {videoPreviewUrl ? (
+                <video
+                  src={videoPreviewUrl}
+                  controls
+                  className="w-full max-h-[360px] rounded-lg bg-black"
+                />
+              ) : (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center text-gray-500">
+                  No video selected
+                </div>
+              )}
 
-                input.onchange = () => {
-                  const file = input.files?.[0];
-                  if (!file) return;
+              {/* 🎥 Select Video */}
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "video/*";
 
-                  if (videoPreviewUrl) {
-                    URL.revokeObjectURL(videoPreviewUrl);
-                  }
+                  input.onchange = () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
 
-                  videoFileRef.current = file;
-                  setVideoPreviewUrl(URL.createObjectURL(file));
-                };
+                    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
 
-                input.click();
-              }}
-              className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
-            >
-              🎥 Select Video
-            </button>
-          </div>
-        )}
-      </AnimatePresence>
+                    videoFileRef.current = file;
+                    setVideoPreviewUrl(URL.createObjectURL(file));
+                  };
+
+                  input.click();
+                }}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
+              >
+                Select Video
+              </button>
+
+              {/* 🖼 Thumbnail Preview */}
+              {thumbnailPreviewUrl ? (
+                <img
+                  src={thumbnailPreviewUrl}
+                  alt="Thumbnail preview"
+                  className="w-full max-h-[200px] object-cover rounded-lg border"
+                />
+              ) : (
+                <div className="text-sm text-gray-500">
+                  If the thumbnail is not selected, first frame will be used
+                </div>
+              )}
+
+              {/* 🖼 Select Thumbnail */}
+              <button
+                type="button"
+                onClick={() => {
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = "image/*";
+
+                  input.onchange = () => {
+                    const file = input.files?.[0];
+                    if (!file) return;
+
+                    if (thumbnailPreviewUrl)
+                      URL.revokeObjectURL(thumbnailPreviewUrl);
+
+                    thumbnailFileRef.current = file;
+                    setThumbnailPreviewUrl(URL.createObjectURL(file));
+                  };
+
+                  input.click();
+                }}
+                className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
+              >
+                Select Thumbnail
+              </button>
+            </div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* ------------------------------ Footer ------------------------------ */}
-      <div className="sticky bottom-0 bg-white dark:bg-neutral-900 border-t dark:border-gray-700 pt-3 pb-4">
+      <div
+        ref={footerRef}
+        className="sticky b-0 p-3"
+      >
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-sm">
             {user ? (
