@@ -43,19 +43,21 @@ export const Mention = Node.create({
       },
     ];
   },
-  renderHTML({ HTMLAttributes }) {
-    // ⚠️ used for serialization only
+  renderHTML({ node, HTMLAttributes }) {
+    const { uid, userId } = node.attrs;
+
     return [
       "span",
       {
+        ...HTMLAttributes,
         "data-mention": "true",
-        "data-uid": HTMLAttributes.uid,
-        "data-userid": HTMLAttributes.userId,
+        "data-uid": uid,
+        "data-userid": userId,
+        class: "mention",
       },
-      `@${HTMLAttributes.userId}`,
+      `@${userId}`,
     ];
   },
-
   addNodeView() {
     return ({ node }) => {
       const dom = document.createElement("span");
