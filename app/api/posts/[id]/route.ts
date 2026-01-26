@@ -1,7 +1,7 @@
 // app/api/posts/[id]/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId, Collection } from "mongodb";
+import { ObjectId, Collection, WithId, Document } from "mongodb"; // WithId, Document 追加
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
@@ -15,6 +15,24 @@ type EnrichedCategory = {
   name: string;
   jname: string;
   myname: string;
+};
+
+// RawPost 型定義を追加
+type RawPost = WithId<Document> & {
+  authorId?: string;
+  authorName?: string;
+  authorAvatar?: string;
+  createdAt?: Date;
+  categories?: unknown[];
+  tags?: string[];
+  mediaRefs?: string[];
+};
+
+type CategoryDoc = {
+  _id: ObjectId;
+  name?: string;
+  jname?: string;
+  myname?: string;
 };
 
 /* ---------------------- AUTHOR RESOLVER ---------------------- */
@@ -57,6 +75,61 @@ async function resolveAuthor(
   };
 }
 
+/* ---------------------- CATEGORY RESOLVER ---------------------- */
+// ✅ 追加: カテゴリー解決用ヘルパー
+async function resolveCategories(
+  categoriesColl: Collection<CategoryDoc>,
+  categoryIds?: unknown[]
+): Promise<EnrichedCategory[]> {
+  if (!Array.isArray(categoryIds) || categoryIds.length === 0) return [];
+
+  const validIds = categoryIds
+    .map((c) => {
+      if (c instanceof ObjectId) return c;
+      if (typeof c === "string" && ObjectId.isValid(c)) {
+        return new ObjectId(c);
+      }
+      return null;
+    })
+    .filter((c): c is ObjectId => c !== null);
+
+  if (validIds.length === 0) return [];
+
+  const docs = await categoriesColl
+    .find({ _id: { $in: validIds } })
+    .project({ name: 1, jname: 1, myname: 1 })
+    .toArray();
+
+  return docs.map((c) => ({
+    id: c._id.toString(),
+    name: c.name ?? "",
+    jname: c.jname ?? "",
+    myname: c.myname ?? "",
+  }));
+}
+
+/* ---------------------- POST ENRICHER ---------------------- */
+// ✅ 追加: 親投稿なども含めて共通で使えるエンリッチ関数
+async function enrichSinglePost(
+  post: RawPost,
+  users: Collection,
+  categoriesColl: Collection<CategoryDoc>
+) {
+  const author = await resolveAuthor(users, post.authorId);
+  const categories = await resolveCategories(categoriesColl, post.categories);
+
+  return {
+    ...post,
+    _id: post._id.toString(),
+    authorName: author.name,
+    authorUserId: author.userId,
+    authorAvatarUpdatedAt: author.avatarUpdatedAt,
+    categories,
+    tags: post.tags ?? [],
+    mediaRefs: post.mediaRefs ?? [],
+  };
+}
+
 /* ===============================================================
    GET — return enriched post
    =============================================================== */
@@ -76,35 +149,17 @@ export async function GET(
 
     const posts = db.collection("posts");
     const users = db.collection("users");
-    const categories = db.collection("categories");
+    const categoriesColl = db.collection<CategoryDoc>("categories");
 
     const post = await posts.findOne({ _id: new ObjectId(id) });
     if (!post) return NextResponse.json(null, { status: 404 });
 
-    const author = await resolveAuthor(users, post.authorId);
-
-    let populatedCategories: EnrichedCategory[] = [];
-
-    if (Array.isArray(post.categories)) {
-      const catIds = post.categories
-        .filter(
-          (cid): cid is string =>
-            typeof cid === "string" && ObjectId.isValid(cid)
-        )
-        .map((cid) => new ObjectId(cid));
-
-      const cats = await categories
-        .find({ _id: { $in: catIds } })
-        .project({ name: 1, jname: 1, myname: 1 })
-        .toArray();
-
-      populatedCategories = cats.map((c) => ({
-        id: String(c._id),
-        name: c.name ?? "",
-        jname: c.jname ?? "",
-        myname: c.myname ?? "",
-      }));
-    }
+    // ✅ メイン投稿のエンリッチ
+    const enrichedPost = await enrichSinglePost(
+      post as RawPost,
+      users,
+      categoriesColl
+    );
 
     const commentCount = await posts.countDocuments({ parentId: id });
 
@@ -115,17 +170,20 @@ export async function GET(
       post.parentId &&
       ObjectId.isValid(post.parentId)
     ) {
-      parentPost = await posts.findOne({ _id: new ObjectId(post.parentId) });
+      const parent = await posts.findOne({ _id: new ObjectId(post.parentId) });
+      if (parent) {
+        // ✅ 親投稿も同様にエンリッチ (カテゴリー含む)
+        parentPost = await enrichSinglePost(
+          parent as RawPost,
+          users,
+          categoriesColl
+        );
+      }
     }
 
     return NextResponse.json({
-      ...post,
-      _id: id,
-      authorName: author.name,
-      authorUserId: author.userId,
-      authorAvatarUpdatedAt: author.avatarUpdatedAt,
+      ...enrichedPost,
       commentCount,
-      categories: populatedCategories,
       parentPost,
     });
   } catch (err) {
@@ -137,6 +195,7 @@ export async function GET(
 /* ===============================================================
    PUT — update post (title, content, categories, tags, SSE)
    =============================================================== */
+// PUT メソッドは変更なし（前回提供したコードが動作している前提）
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -167,7 +226,7 @@ export async function PUT(
 
     const posts = db.collection("posts");
     const users = db.collection("users");
-    const categoriesColl = db.collection("categories");
+    const categoriesColl = db.collection<CategoryDoc>("categories");
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing) {
@@ -201,7 +260,7 @@ export async function PUT(
     updateFields.editedAt = new Date();
 
     await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
-    console.error("🔥 SERVER removedImages:", removedImages);
+
     /* ---------------- DELETE REMOVED MEDIA ---------------- */
     if (Array.isArray(removedImages) && removedImages.length > 0) {
       try {
@@ -214,39 +273,19 @@ export async function PUT(
     /* ---------------- ENRICH ---------------- */
     const updated = await posts.findOne({ _id: new ObjectId(id) });
 
-    const author = await resolveAuthor(users, updated?.authorId);
+    // ✅ PUT側も共通化した関数を利用してエンリッチ
+    const enrichedPost = await enrichSinglePost(
+      updated as RawPost,
+      users,
+      categoriesColl
+    );
 
-    let enrichedCategories: EnrichedCategory[] = [];
-    if (Array.isArray(updated?.categories)) {
-      const catDocs = await categoriesColl
-        .find({
-          _id: {
-            $in: updated.categories
-              .filter(
-                (cid): cid is string =>
-                  typeof cid === "string" && ObjectId.isValid(cid)
-              )
-              .map((cid) => new ObjectId(cid)),
-          },
-        })
-        .toArray();
-
-      enrichedCategories = catDocs.map((c) => ({
-        id: String(c._id),
-        name: c.name ?? "",
-        jname: c.jname ?? "",
-        myname: c.myname ?? "",
-      }));
-    }
+    // コメント数取得 (既存コード踏襲)
+    const commentCount = await posts.countDocuments({ parentId: id });
 
     const final = {
-      ...updated,
-      _id: String(updated?._id),
-      authorName: author.name,
-      authorUserId: author.userId,
-      authorAvatarUpdatedAt: author.avatarUpdatedAt,
-      categories: enrichedCategories,
-      tags: updated?.tags ?? [],
+      ...enrichedPost,
+      commentCount,
     };
 
     /* ---------------- SSE ---------------- */
