@@ -101,7 +101,7 @@ export default function PostItem({
                 e.stopPropagation();
                 router.push(`/posts/${post._id}`, { scroll: false });
               }}
-              className="font-semibold text-lg text-gray-800 dark:text-gray-100 break-words w-fit"
+              className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
             >
               {post.postType === PostTypes.QUESTION && (
                 <span className="text-red-500">Q. </span>
