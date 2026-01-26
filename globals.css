@@ -165,6 +165,15 @@ html.dark {
   white-space: pre-wrap;
 }
 
+.math-content a {
+  color: #5095fa;
+  cursor: pointer;
+}
+
+.math-content a:hover {
+  text-decoration: underline;
+}
+
 .dark .math-content code {
   color: #39c945;
 }
