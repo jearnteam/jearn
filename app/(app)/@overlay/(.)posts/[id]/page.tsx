@@ -4,7 +4,6 @@ import { useParams, notFound } from "next/navigation";
 import { useEffect, useState } from "react";
 import PostOverlayShell from "@/app/(app)/posts/[id]/PostOverlayShell";
 import FullPostClient from "@/components/posts/FullPostClient";
-import CommentClientSection from "@/components/comments/CommentClientSection";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import { PostTypes, type Post } from "@/types/post";
 
@@ -22,6 +21,7 @@ export default function OverlayPostPage() {
 
     (async () => {
       try {
+        // 1. Fetch Post
         const postRes = await fetch(`/api/posts/${id}`, {
           cache: "no-store",
         });
@@ -31,14 +31,25 @@ export default function OverlayPostPage() {
           return;
         }
 
-        const postData = await postRes.json();
-        if (!cancelled) setPost(postData);
+        const postData: Post = await postRes.json();
+        if (cancelled) return;
+        
+        setPost(postData);
 
-        const commentsRes = await fetch(`/api/posts/${id}/comments`, {
-          cache: "no-store",
-        });
-        if (commentsRes.ok && !cancelled) {
-          setComments(await commentsRes.json());
+        // 2. Fetch Comments ONLY if NOT a Question
+        if (postData.postType !== PostTypes.QUESTION) {
+          const commentsRes = await fetch(`/api/posts/${id}/comments`, {
+            cache: "no-store",
+          });
+          if (commentsRes.ok && !cancelled) {
+            const data = await commentsRes.json();
+            // 配列チェック
+            if (Array.isArray(data)) {
+              setComments(data);
+            } else {
+              setComments([]);
+            }
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -52,32 +63,30 @@ export default function OverlayPostPage() {
 
   /* -------------------------------
      1️⃣ LOADING
-  -------------------------------- */
+   -------------------------------- */
   if (loading) {
     return <FullScreenLoader text="Loading post…" />;
   }
 
   /* -------------------------------
      2️⃣ NOT FOUND (AFTER loading)
-  -------------------------------- */
+   -------------------------------- */
   if (!post) {
     return notFound();
   }
 
   /* -------------------------------
      3️⃣ CONTENT
-  -------------------------------- */
+   -------------------------------- */
   return (
     <PostOverlayShell onClose={() => history.back()}>
-      {() => (
-        <>
-          <FullPostClient initialPost={post} />
-          {post.postType !== PostTypes.QUESTION ? (
-            <CommentClientSection comments={comments} postId={post._id} />
-          ) : (
-            <></>
-          )}
-        </>
+      {(scrollRef) => (
+        // ✅ FullPostClient に表示制御を集約
+        <FullPostClient
+          initialPost={post}
+          initialComments={comments}
+          scrollContainerRef={scrollRef}
+        />
       )}
     </PostOverlayShell>
   );

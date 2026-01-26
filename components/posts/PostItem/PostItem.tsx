@@ -112,30 +112,34 @@ export default function PostItem({
 
           {post.postType === PostTypes.ANSWER && (
             <>
-              <h2
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  router.push(`/posts/${post.parentPost?._id}`, {
-                    scroll: false,
-                  });
-                }}
-                className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
-              >
-                <span className="text-red-500">Q. </span>
-                {post.parentPost?.title}
-              </h2>
-              <h2
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  router.push(`/posts/${post._id}`, { scroll: false });
-                }}
-                className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
-              >
-                <span className="text-blue-500">A. </span>
-                {post?.title}
-              </h2>
+              {post.parentPost?.title && (
+                <h2
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/posts/${post.parentPost?._id}`, {
+                      scroll: false,
+                    });
+                  }}
+                  className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
+                >
+                  <span className="text-red-500">Q. </span>
+                  {post.parentPost.title}
+                </h2>
+              )}
+              {post.title && (
+                <h2
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(`/posts/${post._id}`, { scroll: false });
+                  }}
+                  className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
+                >
+                  <span className="text-blue-500">A. </span>
+                  {post.title}
+                </h2>
+              )}
             </>
           )}
 

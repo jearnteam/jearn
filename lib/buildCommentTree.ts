@@ -1,20 +1,29 @@
-// lib/buildCommentTree.ts
-import type { Post } from "@/types/post";
+import { Post } from "@/types/post";
 
-export function buildCommentTree(comments: Post[]): Post[] {
-  const map = new Map<string, Post & { children: Post[] }>();
-  const roots: (Post & { children: Post[] })[] = [];
+export interface CommentNode extends Post {
+  children: CommentNode[];
+}
 
-  // init map
-  comments.forEach((c) => map.set(c._id, { ...c, children: [] }));
+export function buildCommentTree(comments: Post[]): CommentNode[] {
+  // ✅ 修正: comments が undefined / null / 配列以外 の場合は空配列を返してクラッシュを防ぐ
+  if (!Array.isArray(comments)) {
+    return [];
+  }
 
-  // link children
+  const map: Record<string, CommentNode> = {};
+  const roots: CommentNode[] = [];
+
+  // 1. Create nodes
   comments.forEach((c) => {
-    const node = map.get(c._id)!;
-    if (c.replyTo && map.has(c.replyTo)) {
-      map.get(c.replyTo)!.children.push(node);
-    } else if (!c.replyTo) {
-      roots.push(node);
+    map[c._id] = { ...c, children: [] };
+  });
+
+  // 2. Link
+  comments.forEach((c) => {
+    if (c.replyTo && map[c.replyTo]) {
+      map[c.replyTo].children.push(map[c._id]);
+    } else {
+      roots.push(map[c._id]);
     }
   });
 

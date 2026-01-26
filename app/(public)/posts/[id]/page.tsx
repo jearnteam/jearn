@@ -6,9 +6,8 @@ import { useSession } from "next-auth/react";
 
 import PostOverlayShell from "@/app/(public)/posts/[id]/PostOverlayShell";
 import FullPostClient from "@/components/posts/FullPostClient";
-import CommentClientSection from "@/components/comments/CommentClientSection";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
-import type { Post } from "@/types/post";
+import { PostTypes, type Post } from "@/types/post";
 
 export default function PublicPostPage() {
   const { id } = useParams() as { id: string };
@@ -20,11 +19,10 @@ export default function PublicPostPage() {
   const [loading, setLoading] = useState(true);
 
   /* -------------------------------------------------
-   * 🔁 AUTH UPGRADE (KEY FIX)
+   * 🔁 AUTH UPGRADE
    * ------------------------------------------------- */
   useEffect(() => {
     if (status === "authenticated" && id) {
-      // Logged-in user → upgrade to app overlay route
       router.replace(`/posts/${id}`);
     }
   }, [status, id, router]);
@@ -37,6 +35,7 @@ export default function PublicPostPage() {
 
     (async () => {
       try {
+        // 1. Fetch Post
         const postRes = await fetch(`/api/posts/${id}`, {
           cache: "no-store",
         });
@@ -46,15 +45,24 @@ export default function PublicPostPage() {
           return;
         }
 
-        const postData = await postRes.json();
+        const postData: Post = await postRes.json();
         setPost(postData);
 
-        const commentsRes = await fetch(`/api/posts/${id}/comments`, {
-          cache: "no-store",
-        });
+        // 2. Fetch Comments ONLY if NOT a Question
+        if (postData.postType !== PostTypes.QUESTION) {
+          const commentsRes = await fetch(`/api/posts/${id}/comments`, {
+            cache: "no-store",
+          });
 
-        if (commentsRes.ok) {
-          setComments(await commentsRes.json());
+          if (commentsRes.ok) {
+            const data = await commentsRes.json();
+            // ✅ 配列チェックを追加 (万が一 {error: ...} が返ってきた場合などを考慮)
+            if (Array.isArray(data)) {
+              setComments(data);
+            } else {
+              setComments([]);
+            }
+          }
         }
       } finally {
         setLoading(false);
@@ -65,8 +73,8 @@ export default function PublicPostPage() {
   /* -------------------------------------------------
    * RENDER GUARDS
    * ------------------------------------------------- */
-  if (status === "loading") return null; // prevent flicker
-  if (status === "authenticated") return null; // redirect in progress
+  if (status === "loading") return null;
+  if (status === "authenticated") return null;
 
   if (loading) return <FullScreenLoader />;
   if (!post) return notFound();
@@ -77,15 +85,11 @@ export default function PublicPostPage() {
   return (
     <PostOverlayShell onClose={() => router.push("/")}>
       {(scrollRef) => (
-        <>
-          <FullPostClient initialPost={post} />
-
-          <CommentClientSection
-            comments={comments}
-            postId={post._id}
-            scrollContainerRef={scrollRef}
-          />
-        </>
+        <FullPostClient
+          initialPost={post}
+          initialComments={comments}
+          scrollContainerRef={scrollRef}
+        />
       )}
     </PostOverlayShell>
   );
