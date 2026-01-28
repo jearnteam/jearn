@@ -2,6 +2,7 @@ import clientPromise from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
+import { isAdminEmail } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +10,8 @@ export async function GET() {
   try {
     const session = await getServerSession(authConfig);
     // 簡易的な管理者チェック (実際にはロールチェック等を推奨)
-    if (!session?.user?.email || !["admin", "owner"].includes(session.user.role as string)) {
-        // ※ 本来は lib/authz.ts などを利用すべきですが、今回は簡易実装
-       // return new Response("Forbidden", { status: 403 });
+    if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+       return new Response("Forbidden", { status: 403 });
     }
 
     const client = await clientPromise;

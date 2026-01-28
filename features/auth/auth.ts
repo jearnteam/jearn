@@ -3,6 +3,12 @@ import clientPromise from "@/lib/mongodb";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import type { AuthOptions } from "next-auth";
 
+// 管理者メールアドレスのリストを事前にパース
+const adminEmails = (process.env.ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim())
+  .filter(Boolean);
+
 export const authConfig: AuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
 
@@ -43,14 +49,13 @@ export const authConfig: AuthOptions = {
       });
 
       if (!existingUser) {
+        // ※ ここで初期roleをDBに入れたい場合は role: "user" などを追加可能
         await db.collection("users").insertOne({
           name: user.name ?? "",
           email: user.email,
           image: user.image ?? null,
-
           provider: account.provider,
           provider_id: account.providerAccountId,
-
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -72,11 +77,16 @@ export const authConfig: AuthOptions = {
         email: token.email,
       });
 
+      // Userが見つかった場合に情報を付与
       if (user) {
         token.uid = user._id.toString();
         token.provider = user.provider ?? null;
         token.provider_id = user.provider_id ?? null;
       }
+
+      // ✅ Role判定: ADMIN_EMAILSに含まれていれば 'admin'、それ以外は 'user'
+      const isAdmin = adminEmails.includes(token.email);
+      token.role = isAdmin ? "admin" : "user";
 
       return token;
     },
@@ -85,10 +95,14 @@ export const authConfig: AuthOptions = {
      * SESSION ENRICHMENT (CLIENT ACCESS)
      * ---------------------------------------------------- */
     async session({ session, token }) {
-      if (session.user && token.uid) {
-        session.user.uid = token.uid as string;
-        session.user.provider = token.provider as string | null;
-        session.user.provider_id = token.provider_id as string | null;
+      // next-auth.d.ts で型拡張しているので、プロパティが存在することが保証される
+      if (session.user) {
+        session.user.uid = token.uid;
+        session.user.provider = token.provider ?? null;
+        session.user.provider_id = token.provider_id ?? null;
+
+        // ✅ JWTからSessionへRoleをコピー
+        session.user.role = token.role;
       }
 
       return session;
