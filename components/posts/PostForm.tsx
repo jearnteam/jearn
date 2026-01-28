@@ -16,9 +16,11 @@ import {
 } from "@/lib/processText";
 import { useUpload } from "@/components/upload/UploadContext";
 import { xhrUpload } from "@/lib/xhrUpload";
+import { loadDraft, saveDraft, clearDraft } from "@/lib/postDraft";
 
 export interface PostFormData {
   postType: PostType;
+  questionId?: string;
   title: string;
   content: string;
   authorId: string | null;
@@ -42,6 +44,7 @@ export interface Category {
 
 export interface PostFormProps {
   mode: PostType;
+  questionId?: string;
   onSubmit: (data: PostFormData) => Promise<void>;
 
   initialTitle?: string;
@@ -49,7 +52,6 @@ export interface PostFormProps {
   initialSelectedCategories?: string[];
   initialAvailableCategories?: Category[];
   submitLabel?: string;
-  onCancel?: () => void;
 }
 // ✅ 修正点1: 空配列の参照を固定するための定数
 const EMPTY_CATEGORIES: Category[] = [];
@@ -57,6 +59,7 @@ const EMPTY_STRING_ARRAY: string[] = [];
 
 export default function PostForm({
   mode,
+  questionId,
   onSubmit,
   initialTitle = "",
   initialContent = "",
@@ -64,15 +67,77 @@ export default function PostForm({
   initialSelectedCategories = EMPTY_STRING_ARRAY,
   initialAvailableCategories = EMPTY_CATEGORIES,
   submitLabel,
-  onCancel,
 }: PostFormProps) {
-  const cleanInitialContent = removeZWSP(initialContent);
-
   const [title, setTitle] = useState(initialTitle);
-  const [resetKey, setResetKey] = useState(0);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const footerRef = useRef<HTMLDivElement>(null);
+  const editorReadyRef = useRef(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const clearUndoRef = useRef<ClearSnapshot | null>(null);
+  const clearRedoRef = useRef<ClearSnapshot | null>(null);
+  const editorHostRef = useRef<HTMLDivElement>(null);
+  const lastFocusedAreaRef = useRef<FocusArea>("none");
+
+  type ClearSnapshot = {
+    title: string;
+    content: string;
+  };
+
+  type FocusArea = "title" | "editor" | "none";
+
+  const getFocusArea = (): FocusArea => {
+    const active = document.activeElement;
+
+    if (active && titleInputRef.current && active === titleInputRef.current) {
+      lastFocusedAreaRef.current = "title";
+      return "title";
+    }
+
+    if (
+      active &&
+      editorHostRef.current &&
+      editorHostRef.current.contains(active)
+    ) {
+      lastFocusedAreaRef.current = "editor";
+      return "editor";
+    }
+
+    // 🔑 fallback for keyboard undo
+    return lastFocusedAreaRef.current;
+  };
+  const suppressTitleBlurRef = useRef(false);
+  const refocus = (area: FocusArea) => {
+    requestAnimationFrame(() => {
+      if (area === "title") {
+        const input = titleInputRef.current;
+        if (!input) return;
+
+        suppressTitleBlurRef.current = true;
+
+        input.focus();
+
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
+
+        requestAnimationFrame(() => {
+          suppressTitleBlurRef.current = false;
+        });
+      }
+
+      if (area === "editor") {
+        editorRef.current?.focus();
+      }
+    });
+  };
+
+  const titleHistoryRef = useRef<string[]>([]);
+  const titleRedoRef = useRef<string[]>([]);
+
+  const [editorInitialHTML, setEditorInitialHTML] = useState<string>(
+    removeZWSP(initialContent || "<p></p>")
+  );
+
   const [footerHeight, setFooterHeight] = useState(0);
   const pendingImagesRef = useRef<Map<string, File>>(new Map());
   const localBlobUrlsRef = useRef<Map<string, string>>(new Map());
@@ -116,17 +181,78 @@ export default function PostForm({
   const { t } = useTranslation();
 
   const authorId = user?._id || null;
+  const lastTitleChangeAtRef = useRef<number>(0);
+  const TITLE_UNDO_THRESHOLD = 300;
+  const editorKey = useMemo(() => {
+    if (!user?._id) return "anon";
+
+    if (mode === PostTypes.ANSWER) {
+      return `editor:${user._id}:ANSWER:${questionId ?? "none"}`;
+    }
+
+    return `editor:${user._id}:${mode}`;
+  }, [user?._id, mode, questionId]);
+  const draftReadyRef = useRef(false);
+
+  const getDraftScope = () => ({
+    userId: user!._id,
+    postType: mode,
+    questionId: mode === PostTypes.ANSWER ? questionId : undefined,
+  });
+  const saveDraftNow = (nextTitle?: string) => {
+    if (!user?._id) return;
+    if (!editorRef.current) return;
+
+    const content = removeZWSP(editorRef.current.getHTML());
+    const { userId, postType, questionId } = getDraftScope();
+
+    saveDraft(
+      userId,
+      postType,
+      {
+        postType,
+        title: (nextTitle ?? title).trim(),
+        content,
+      },
+      questionId
+    );
+  };
 
   // ✅ 修正点3: 依存配列の問題が解消され、無限ループしなくなります
+  const draftKey = useMemo(() => {
+    if (!user?._id) return null;
+    return `${user._id}:${mode}:${
+      mode === PostTypes.ANSWER ? questionId ?? "" : ""
+    }`;
+  }, [user?._id, mode, questionId]);
+
+  const didInitRef = useRef(false);
   useEffect(() => {
-    setTitle(initialTitle);
+    if (!user?._id) return;
+    if (didInitRef.current) return;
+
+    const { userId, postType, questionId } = getDraftScope();
+    const draft = loadDraft(userId, postType, questionId);
+
+    if (draft) {
+      setTitle(draft.title ?? "");
+      setEditorInitialHTML(removeZWSP(draft.content ?? "<p></p>"));
+      setContentChanged(false);
+    } else {
+      setTitle(initialTitle);
+      setEditorInitialHTML(removeZWSP(initialContent || "<p></p>"));
+      setContentChanged(!initialContent);
+    }
+
     setSelected(initialSelectedCategories);
     setCategories(initialAvailableCategories);
     setCategoryReady(initialAvailableCategories.length > 0);
-    setContentChanged(!initialContent);
-    // エディタのリセット
-    setResetKey((k) => k + 1);
+
+    didInitRef.current = true;
   }, [
+    user?._id,
+    mode,
+    questionId,
     initialTitle,
     initialContent,
     initialSelectedCategories,
@@ -152,6 +278,30 @@ export default function PostForm({
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+
+      if (e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+
+      if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  useEffect(() => {
+    editorReadyRef.current = false;
+    draftReadyRef.current = false;
+  }, [mode, questionId]);
+
   /* -------------------------------------------------------------------------- */
   /* CHECK CATEGORIES                              */
   /* -------------------------------------------------------------------------- */
@@ -161,12 +311,14 @@ export default function PostForm({
     let html = editorRef.current?.getHTML() ?? "";
     html = removeZWSP(html);
 
-    const text = extractTextWithMath(html);
+    const text = extractTextWithMath(html).trim();
+    const hasMedia =
+      html.includes("<img") ||
+      html.includes("<video") ||
+      html.includes("math-inline") ||
+      html.includes("math-block");
 
-    if (!text.trim() && !title.trim()) {
-      console.log("❌ No content to categorize");
-      return;
-    }
+    if (!text && !hasMedia && !title.trim()) return;
 
     const checkText = `title: ${title}\n${text}`;
 
@@ -207,8 +359,185 @@ export default function PostForm({
   /* -------------------------------------------------------------------------- */
   /* CONTENT CHANGE                                */
   /* -------------------------------------------------------------------------- */
+
+  const isApplyingUndoRedoRef = useRef(false);
   const handleEditorUpdate = () => {
+    if (!editorRef.current) return;
+    if (isApplyingUndoRedoRef.current) return;
+
+    const html = removeZWSP(editorRef.current.getHTML());
+
+    const hasMeaningfulContent =
+      extractTextWithMath(html).trim().length > 0 ||
+      html.includes("<img") ||
+      html.includes("<video") ||
+      html.includes("math-inline") ||
+      html.includes("math-block");
+
+    saveDraftNow(title);
+
+    if (mode !== PostTypes.QUESTION && !hasMeaningfulContent) return;
+
     setContentChanged(true);
+  };
+  const clearModeRef = useRef(false);
+  const handleClearContent = () => {
+    const editor = editorRef.current?.editor;
+    if (!editor) return;
+
+    const content = editor.getHTML();
+
+    clearUndoRef.current = { title, content };
+    clearRedoRef.current = null;
+
+    clearModeRef.current = true; // 🔒 lock undo mode
+
+    editorRef.current?.clearWithHistory();
+    setTitle("");
+    setContentChanged(true);
+
+    (document.activeElement as HTMLElement | null)?.blur();
+
+    if (authorId) {
+      clearDraft(
+        authorId,
+        mode,
+        mode === PostTypes.ANSWER ? questionId : undefined
+      );
+    }
+  };
+
+  const handleUndo = () => {
+    const area = getFocusArea();
+
+    // 🔒 CLEAR MODE: only atomic clear undo allowed
+    if (clearModeRef.current) {
+      if (!clearUndoRef.current) return;
+
+      const snap = clearUndoRef.current;
+      clearUndoRef.current = null;
+
+      clearRedoRef.current = {
+        title,
+        content: editorRef.current?.getHTML() ?? "<p></p>",
+      };
+
+      isApplyingUndoRedoRef.current = true;
+      editorRef.current?.editor?.commands.setContent(snap.content, {
+        emitUpdate: false,
+      });
+      isApplyingUndoRedoRef.current = false;
+
+      setTitle(snap.title);
+      saveDraftNow(snap.title);
+
+      requestAnimationFrame(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+        lastFocusedAreaRef.current = "none";
+      });
+
+      return;
+    }
+
+    // 1️⃣ Title undo
+    if (area === "title") {
+      const history = titleHistoryRef.current;
+
+      // ✅ drop duplicates of current
+      while (history.length && history[history.length - 1] === title) {
+        history.pop();
+      }
+
+      const prev = history.pop();
+      if (prev === undefined) return;
+
+      titleRedoRef.current.push(title);
+
+      isApplyingUndoRedoRef.current = true;
+      setTitle(prev);
+      isApplyingUndoRedoRef.current = false;
+
+      refocus("title");
+      return;
+    }
+
+    // 2️⃣ Editor undo
+    if (area === "editor") {
+      if (!editorRef.current?.editor?.can().undo()) return;
+
+      isApplyingUndoRedoRef.current = true;
+      editorRef.current?.editor?.commands.undo();
+      isApplyingUndoRedoRef.current = false;
+      refocus("editor");
+      return;
+    }
+  };
+
+  const handleRedo = () => {
+    const area = getFocusArea();
+
+    // 🔒 CLEAR MODE: only atomic re-clear allowed
+    if (clearModeRef.current) {
+      if (!clearRedoRef.current) return;
+
+      const snap = clearRedoRef.current;
+      clearRedoRef.current = null;
+
+      clearUndoRef.current = {
+        title,
+        content: editorRef.current?.getHTML() ?? "<p></p>",
+      };
+
+      isApplyingUndoRedoRef.current = true;
+      editorRef.current?.editor?.commands.setContent(snap.content, {
+        emitUpdate: false,
+      });
+      isApplyingUndoRedoRef.current = false;
+
+      setTitle(snap.title);
+      saveDraftNow(snap.title);
+
+      requestAnimationFrame(() => {
+        (document.activeElement as HTMLElement | null)?.blur();
+        lastFocusedAreaRef.current = "none";
+      });
+
+      return;
+    }
+
+    // 1️⃣ Title redo
+    if (area === "title") {
+      const redo = titleRedoRef.current;
+      if (redo.length === 0) return;
+
+      const next = redo.pop()!;
+      titleHistoryRef.current.push(title);
+
+      isApplyingUndoRedoRef.current = true;
+      setTitle(next);
+      isApplyingUndoRedoRef.current = false;
+
+      refocus("title");
+      return;
+    }
+
+    // 2️⃣ Editor redo
+    if (area === "editor") {
+      if (!editorRef.current?.editor?.can().redo()) return;
+
+      isApplyingUndoRedoRef.current = true;
+      editorRef.current?.editor?.commands.redo();
+      isApplyingUndoRedoRef.current = false;
+      refocus("editor");
+      return;
+    }
+  };
+
+  const suppressBlurOnce = () => {
+    suppressTitleBlurRef.current = true;
+    requestAnimationFrame(() => {
+      suppressTitleBlurRef.current = false;
+    });
   };
 
   /* -------------------------------------------------------------------------- */
@@ -244,7 +573,6 @@ export default function PostForm({
     }
 
     upload.start();
-    onCancel?.();
     setSubmitting(true);
 
     try {
@@ -316,6 +644,14 @@ export default function PostForm({
         video,
       });
 
+      // CLEAR DRAFT
+      if (authorId) {
+        clearDraft(
+          authorId,
+          mode,
+          mode === PostTypes.ANSWER ? questionId : undefined
+        );
+      }
       upload.finish();
     } catch (err) {
       console.error("❌ Error posting:", err);
@@ -354,9 +690,7 @@ export default function PostForm({
       className="flex flex-col min-h-0 bg-white dark:bg-neutral-900 rounded-lg"
     >
       {/* ================= SCROLL AREA ================= */}
-      <div
-        className="flex-1 overflow-y-auto p-4 space-y-4"
-      >
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <>
           <motion.div
             animate={{
@@ -371,6 +705,7 @@ export default function PostForm({
             }`}
           >
             <input
+              ref={titleInputRef}
               type="text"
               placeholder={
                 mode === PostTypes.VIDEO
@@ -382,11 +717,45 @@ export default function PostForm({
               value={title}
               maxLength={200}
               onChange={(e) => {
-                setTitle(e.target.value);
+                if (isApplyingUndoRedoRef.current) {
+                  setTitle(e.target.value);
+                  return;
+                }
+
+                const next = e.target.value;
+                const now = Date.now();
+
+                if (now - lastTitleChangeAtRef.current > TITLE_UNDO_THRESHOLD) {
+                  titleHistoryRef.current.push(title);
+                }
+
+                lastTitleChangeAtRef.current = now;
+                titleRedoRef.current.length = 0;
+
+                setTitle(next);
                 setContentChanged(true);
+                saveDraftNow(next);
               }}
-              onFocus={() => setIsTitleFocused(true)}
-              onBlur={() => setIsTitleFocused(false)}
+              onFocus={() => {
+                clearModeRef.current = false; // 🔓 unlock
+                lastFocusedAreaRef.current = "title";
+                setIsTitleFocused(true);
+              }}
+              onBlur={() => {
+                setIsTitleFocused(false);
+
+                // ✅ ignore blur caused by undo/redo buttons (mousedown) or programmatic ops
+                if (
+                  suppressTitleBlurRef.current ||
+                  isApplyingUndoRedoRef.current
+                )
+                  return;
+
+                const hist = titleHistoryRef.current;
+                if (hist.length === 0 || hist[hist.length - 1] !== title) {
+                  hist.push(title);
+                }
+              }}
               className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
               autoComplete="off"
             />
@@ -397,12 +766,20 @@ export default function PostForm({
         </>
 
         {/* ------------------------------ Editor ------------------------------ */}
-        <div className="overflow-visible rounded-md">
+        <div ref={editorHostRef} className="overflow-visible rounded-md">
           <PostEditorWrapper
-            key={`${resetKey}-${mode}`}
+            key={editorKey}
             ref={editorRef}
-            value={cleanInitialContent}
             onUpdate={handleEditorUpdate}
+            initialValue={editorInitialHTML}
+            onReady={() => {
+              editorReadyRef.current = true;
+            }}
+            onFocus={() => {
+              clearModeRef.current = false; // 🔓 unlock
+              lastFocusedAreaRef.current = "editor";
+              setIsTitleFocused(false);
+            }}
             placeholder={
               mode === PostTypes.POST
                 ? t("placeholder") || "Placeholder"
@@ -588,10 +965,7 @@ export default function PostForm({
       </div>
 
       {/* ------------------------------ Footer ------------------------------ */}
-      <div
-        ref={footerRef}
-        className="sticky b-0 p-3"
-      >
+      <div ref={footerRef} className="sticky b-0 p-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-sm">
             {user ? (
@@ -614,16 +988,40 @@ export default function PostForm({
           </div>
 
           <div className="flex gap-3 items-center">
-            {/* Cancel Button */}
-            {onCancel && (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-              >
-                {t("cancel") || "Cancel"}
-              </button>
-            )}
+            {/* Undo Button */}
+            <button
+              type="button"
+              onMouseDown={suppressBlurOnce}
+              onClick={handleUndo}
+              className="px-3 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300
+             dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
+              title="Undo (Ctrl/Cmd + Z)"
+            >
+              ↩️
+            </button>
+
+            {/* Redo Button */}
+            <button
+              type="button"
+              onMouseDown={suppressBlurOnce}
+              onClick={handleRedo}
+              className="px-3 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300
+             dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
+              title="Redo (Ctrl/Cmd + Shift + Z)"
+            >
+              ↪️
+            </button>
+
+            {/* Clear Content Button */}
+            <button
+              type="button"
+              onClick={handleClearContent}
+              className="px-3 py-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200
+             dark:bg-red-900/30 dark:text-red-400 transition"
+              title="Clear title and content"
+            >
+              🗑️
+            </button>
 
             {/* Image Upload Button */}
             {mode !== PostTypes.VIDEO && (

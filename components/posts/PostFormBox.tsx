@@ -68,16 +68,16 @@ export default function PostFormBox({
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ duration: 0.25 }}
               className="
-  w-full max-w-4xl max-h-[80vh]
-  bg-white dark:bg-neutral-900
-  shadow-lg rounded-2xl
-  border border-gray-200 dark:border-gray-700
-  flex flex-col
-"
+                w-full max-w-4xl max-h-[80vh]
+                bg-white dark:bg-neutral-900
+                shadow-lg rounded-md
+                border border-gray-200 dark:border-gray-700
+                flex flex-col
+              "
               onClick={(e) => e.stopPropagation()}
             >
               {/* ---------------- Header ---------------- */}
-              <header className="p-4 bg-white dark:bg-neutral-900 z-10">
+              <header className="p-4 bg-white dark:bg-neutral-900 z-10 rounded-full">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-semibold">
                     {mode === PostTypes.POST
@@ -142,7 +142,6 @@ export default function PostFormBox({
               <section className="flex-1 flex flex-col min-h-0">
                 <PostForm
                   mode={mode}
-                  onCancel={onClose}
                   onSubmit={async (data) => {
                     await onSubmit(
                       data.postType,

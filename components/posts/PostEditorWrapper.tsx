@@ -4,21 +4,23 @@ import {
   forwardRef,
   useImperativeHandle,
   useRef,
-  useState,
   useEffect,
 } from "react";
 import clsx from "clsx";
 import type { Editor } from "@tiptap/react";
+
+/* -------------------------------------------------------------------------- */
+/* Utilities                                                                  */
+/* -------------------------------------------------------------------------- */
 
 function ensureSafeEnding(html: string): string {
   if (!html) return "<p></p>";
 
   let clean = html.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
 
-  // If content ends with inline atom (math/tag/image/code/etc)
   if (
-    clean.endsWith("</span>") || // math or tag
-    clean.endsWith("/>") || // images
+    clean.endsWith("</span>") ||
+    clean.endsWith("/>") ||
     clean.endsWith("</code>") ||
     clean.endsWith("</strong>") ||
     clean.endsWith("</em>") ||
@@ -27,7 +29,6 @@ function ensureSafeEnding(html: string): string {
     clean += "<p></p>";
   }
 
-  // If there is no ending paragraph at all → force it
   if (!clean.match(/<p[^>]*>.*<\/p>\s*$/)) {
     clean += "<p></p>";
   }
@@ -36,23 +37,34 @@ function ensureSafeEnding(html: string): string {
 }
 
 function removeAllZWSP(html: string): string {
-  if (!html) return "<p></p>";
   return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
 }
 
+/* -------------------------------------------------------------------------- */
+/* Types                                                                      */
+/* -------------------------------------------------------------------------- */
+
 export interface PostEditorWrapperRef {
-  clearEditor: () => void;
+  clearWithHistory: () => void;
   getHTML: () => string;
   focus: () => void;
+
+  // ✅ IMPORTANT: dynamic getter (see useImperativeHandle)
   editor: Editor | null;
 }
 
 interface Props {
-  value: string;
+  initialValue?: string;
   placeholder?: string;
   compact?: boolean;
   onUpdate?: () => void;
+  onReady?: () => void;
+  onFocus?: () => void;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Dynamic Inner Editor                                                       */
+/* -------------------------------------------------------------------------- */
 
 const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
   ssr: false,
@@ -61,69 +73,103 @@ const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
   ),
 });
 
+/* -------------------------------------------------------------------------- */
+/* Wrapper                                                                    */
+/* -------------------------------------------------------------------------- */
+
 const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
-  ({ value, placeholder, compact = false, onUpdate }, ref) => {
+  ({ initialValue, placeholder, onUpdate, onReady, onFocus }, ref) => {
     const editorRef = useRef<Editor | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
-    const [isFocused, setIsFocused] = useState(false);
+    const initializedRef = useRef(false);
+
+    // ✅ stable callbacks stored in refs (so listeners always call latest)
+    const onUpdateRef = useRef(onUpdate);
+    const onFocusRef = useRef(onFocus);
+    const onReadyRef = useRef(onReady);
+
+    useEffect(() => {
+      onUpdateRef.current = onUpdate;
+    }, [onUpdate]);
+
+    useEffect(() => {
+      onFocusRef.current = onFocus;
+    }, [onFocus]);
+
+    useEffect(() => {
+      onReadyRef.current = onReady;
+    }, [onReady]);
 
     useImperativeHandle(ref, () => ({
       getHTML() {
         return editorRef.current?.getHTML() ?? "<p></p>";
       },
-      clearEditor() {
-        editorRef.current?.commands.clearContent(true);
+
+      clearWithHistory() {
+        const editor = editorRef.current;
+        if (!editor) return;
+
+        editor
+          .chain()
+          .command(({ tr, state }) => {
+            tr.setMeta("addToHistory", true);
+            tr.replaceWith(
+              0,
+              state.doc.content.size,
+              state.schema.nodes.paragraph.create()
+            );
+            return true;
+          })
+          .run();
       },
+
       focus() {
         requestAnimationFrame(() => {
           editorRef.current?.commands.focus("end");
         });
       },
-      editor: editorRef.current,
+
+      // ✅ CRITICAL FIX: expose editor as getter so it is NEVER stale
+      get editor() {
+        return editorRef.current;
+      },
     }));
 
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
 
-      // 🔥 Reliable event for detecting actual document changes
-      editor.on("update", () => {
-        onUpdate?.();
+      // ✅ initialize content ONCE
+      if (!initializedRef.current && initialValue !== undefined) {
+        const safe = ensureSafeEnding(removeAllZWSP(initialValue));
+        editor.commands.setContent(safe, { emitUpdate: false });
+        initializedRef.current = true;
+      }
+
+      const handleEditorFocus = () => {
+        onFocusRef.current?.();
+      };
+
+      const handleEditorUpdate = () => {
+        onUpdateRef.current?.();
+      };
+
+      editor.on("focus", handleEditorFocus);
+      editor.on("update", handleEditorUpdate);
+
+      editor.on("destroy", () => {
+        editor.off("focus", handleEditorFocus);
+        editor.off("update", handleEditorUpdate);
       });
+
+      onReadyRef.current?.();
     };
-
-    // focus detection (unchanged)
-    useEffect(() => {
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
-
-      const handleFocusIn = () => setIsFocused(true);
-      const handleFocusOut = (event: FocusEvent) => {
-        if (!wrapper.contains(event.relatedTarget as Node)) {
-          setIsFocused(false);
-        }
-      };
-
-      wrapper.addEventListener("focusin", handleFocusIn);
-      wrapper.addEventListener("focusout", handleFocusOut);
-
-      return () => {
-        wrapper.removeEventListener("focusin", handleFocusIn);
-        wrapper.removeEventListener("focusout", handleFocusOut);
-      };
-    }, []);
 
     return (
       <div
         ref={wrapperRef}
-        className={clsx(
-          "flex flex-col h-full rounded-lg transition"
-        )}
+        className={clsx("flex flex-col h-full rounded-lg transition")}
       >
-        <PostEditorInner
-          value={removeAllZWSP(ensureSafeEnding(value))}
-          placeholder={placeholder}
-          onReady={handleReady}
-        />
+        <PostEditorInner placeholder={placeholder} onReady={handleReady} />
       </div>
     );
   }

@@ -90,8 +90,8 @@ export default function AnswerModal({
                 <div className="flex-1 overflow-y-auto p-2 md:p-0">
                   <PostForm
                     mode={PostTypes.ANSWER}
+                    questionId={questionPost._id}
                     submitLabel={t("postAnswer") || "Post Answer"}
-                    onCancel={onClose}
                     onSubmit={async (data) => {
                       // PostForm からのデータを Answer 用に変換して送信
                       await onSubmit(

@@ -27,6 +27,7 @@ import BulletList from "@tiptap/extension-bullet-list";
 import ListItem from "@tiptap/extension-list-item";
 import Blockquote from "@tiptap/extension-blockquote";
 import ListKeymap from "@tiptap/extension-list-keymap";
+import History from "@tiptap/extension-history";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
@@ -147,7 +148,7 @@ export const TextLimitPlugin = new Plugin({
 /* ----------------------------- COMPONENT ----------------------------- */
 
 interface PostEditorInnerProps {
-  value: string;
+  value?: string;
   placeholder?: string;
   onReady?: (editor: Editor) => void;
 }
@@ -218,6 +219,10 @@ export default function PostEditorInner({
       Placeholder.configure({
         placeholder: finalPlaceholder,
       }),
+      History.configure({
+        depth: 200,
+        newGroupDelay: 300,
+      }),
 
       // ❌ we do NOT inject TextLimitPlugin here to avoid stack overflow
       // If you want to enforce MAX_CHARS later, we'll do a safer approach.
@@ -229,7 +234,7 @@ export default function PostEditorInner({
   const editor = useEditor(
     {
       extensions,
-      content: value?.trim() || "<p></p>",
+      content: "<p></p>",
       editorProps: {
         attributes: {
           class:
