@@ -67,9 +67,7 @@ async function enrichCategories(
   if (!Array.isArray(catIds) || catIds.length === 0) return [];
 
   const validIds = catIds
-    .filter(
-      (c): c is string => typeof c === "string" && ObjectId.isValid(c)
-    )
+    .filter((c): c is string => typeof c === "string" && ObjectId.isValid(c))
     .map((c) => new ObjectId(c));
 
   if (!validIds.length) return [];
@@ -96,7 +94,9 @@ export async function GET(
 ) {
   try {
     const { tag } = await params;
-    const decodedTag = decodeURIComponent(tag);
+    const decodedTag = decodeURIComponent(tag)
+      .toLowerCase()
+      .replaceAll(/_/g, ""); // タグを小文字にしアンダースコアを取り除き正規化
 
     if (!decodedTag) {
       return NextResponse.json(
@@ -128,8 +128,7 @@ export async function GET(
           post.authorId as string | null
         );
 
-        const isAdmin =
-          !!author.email && adminEmails.includes(author.email);
+        const isAdmin = !!author.email && adminEmails.includes(author.email);
 
         const categories = await enrichCategories(
           Array.isArray(post.categories) ? post.categories : [],

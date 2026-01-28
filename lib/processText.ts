@@ -44,6 +44,7 @@ export function extractTagsFromHTML(html: string): string[] {
 
   const tags = Array.from(div.querySelectorAll("a[data-type='tag']"))
     .map((a) => a.getAttribute("data-value") || "")
+    .map((tag) => tag.toLowerCase().replaceAll(/_/g, ""))
     .filter(Boolean);
 
   return Array.from(new Set(tags)); // unique tags
