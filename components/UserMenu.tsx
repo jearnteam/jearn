@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import { FolderPlus, Moon, Sun } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import CategoryRequestModal from "./CategoryRequestModal";
+import { useSession } from "next-auth/react";
 
 interface User {
   _id: string;
@@ -156,7 +157,7 @@ export default function UserMenu({ user }: { user: User }) {
             </button>
 
             {/* ADMIN */}
-            {user.isAdmin && (
+            {(user.isAdmin || useSession().data?.user.role === "admin") && (
               <button
                 onClick={() => {
                   setOpen(false);

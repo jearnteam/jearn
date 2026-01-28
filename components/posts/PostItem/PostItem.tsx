@@ -8,7 +8,6 @@ import PostContent from "./PostContent";
 import PostFooter from "./PostFooter";
 import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
-import Link from "next/link";
 
 /**
  * @param isSingle 全画面表示か
@@ -46,12 +45,27 @@ export default function PostItem({
   const [shareOpen, setShareOpen] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
 
+  const randomSpeed = useRef(2 + Math.random() * 2).current;
+  const randomHue = useRef(Math.floor(Math.random() * 360)).current;
+
   return (
     <>
       <div ref={wrapperRef}>
         <div
           id={`post-${post._id}`}
-          className="relative bg-white dark:bg-neutral-900 border rounded-lg p-4"
+          className={
+            "relative bg-white dark:bg-neutral-900 border rounded-lg p-4 " +
+            (post.isAdmin ? "admin-post-glow" : "")
+          }
+          style={
+            post.isAdmin
+              ? ({
+                  "--speed": `${randomSpeed}s`,
+                  "--glow-hue": randomHue,
+                  "--glow-base": `hsl(${randomHue}, 100%, 65%)`,
+                } as React.CSSProperties)
+              : undefined
+          }
         >
           <PostHeader
             post={post}

@@ -407,6 +407,7 @@ export async function POST(req: Request) {
       upvoters: string[];
       categories: ObjectId[];
       tags: string[];
+      isAdmin?: boolean;
       mediaRefs?: string[];
       video?: {
         url: string;
@@ -428,6 +429,7 @@ export async function POST(req: Request) {
       upvoters: [],
       categories: categories.map((id: string) => new ObjectId(id)),
       tags,
+      isAdmin: session.user.role === "admin",
       mediaRefs,
     };
 
