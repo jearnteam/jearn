@@ -765,7 +765,7 @@ export async function DELETE(req: Request) {
       // Answerが存在するものは削除しない
       posts.updateOne(
         { _id: existing._id },
-        { $set: { authorName: "Anonymous" }, $unset: { authorId: 1 } }
+        { $set: { authorName: "Anonymous", isAdmin: false }, $unset: { authorId: 1 } }
       );
       /* ---------------- SSE ---------------- */
       broadcastSSE({
