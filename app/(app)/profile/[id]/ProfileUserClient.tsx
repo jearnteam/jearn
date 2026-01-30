@@ -7,6 +7,7 @@ import PostList from "@/components/posts/PostList";
 import type { Post } from "@/types/post";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/follow/FollowButton";
+import FollowStats from "@/components/follow/FollowStats";
 
 interface Props {
   userId: string;
@@ -154,7 +155,8 @@ export default function ProfileUserClient({ userId }: Props) {
           <div className="flex-1">
             <h1 className="text-xl font-bold">{user.name}</h1>
             <p className="text-sm text-gray-500">@{user.userId}</p>
-
+            
+            <FollowStats userId={userId} />
             {user.bio && (
               <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                 {user.bio}

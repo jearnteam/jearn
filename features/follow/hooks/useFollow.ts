@@ -5,7 +5,6 @@ export function useFollow(targetUserId: string) {
   const [loading, setLoading] = useState(true);
 
   // 初期状態を取得
-  // 初期状態を取得
   useEffect(() => {
     let alive = true;
     (async () => {

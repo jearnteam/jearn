@@ -9,7 +9,7 @@ export async function GET(
   const { userId } = await params;
 
   const client = await clientPromise;
-  const db = client.db();
+  const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const followers = await db
     .collection("follow")

@@ -13,6 +13,8 @@ import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import type { Post } from "@/types/post";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import { normalizePosts } from "@/lib/normalizePosts";
+import FollowStats from "@/components/follow/FollowStats";
+
 
 interface Props {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -379,6 +381,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
                     using JPG, PNG is Recommended{" "}
                   </p>{" "}
                 </div>
+                <FollowStats userId={user._id} />
                 <input
                   id="avatarInput"
                   type="file"
@@ -387,6 +390,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
                   onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 />
               </div>
+
 
               <label>{t("name") || "Name"}</label>
               <input
