@@ -58,6 +58,7 @@ export interface PostFormProps {
   initialAvailableCategories?: Category[];
   submitLabel?: string;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 // ✅ 修正点1: 空配列の参照を固定するための定数
 const EMPTY_CATEGORIES: Category[] = [];
@@ -73,6 +74,7 @@ export default function PostForm({
   initialSelectedCategories = EMPTY_STRING_ARRAY,
   initialAvailableCategories = EMPTY_CATEGORIES,
   onSuccess,
+  onCancel,
 }: PostFormProps) {
   const [title, setTitle] = useState(initialTitle);
 
