@@ -16,7 +16,12 @@ import {
 } from "@/lib/processText";
 import { useUpload } from "@/components/upload/UploadContext";
 import { xhrUpload } from "@/lib/xhrUpload";
-import { loadDraft, saveDraft, clearDraft } from "@/lib/postDraft";
+import {
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  type PostDraftRecord,
+} from "@/lib/postDraft";
 
 export interface PostFormData {
   postType: PostType;
@@ -52,6 +57,7 @@ export interface PostFormProps {
   initialSelectedCategories?: string[];
   initialAvailableCategories?: Category[];
   submitLabel?: string;
+  onSuccess?: () => void;
 }
 // ✅ 修正点1: 空配列の参照を固定するための定数
 const EMPTY_CATEGORIES: Category[] = [];
@@ -66,7 +72,7 @@ export default function PostForm({
   // ✅ 修正点2: デフォルト値を定数に置き換え
   initialSelectedCategories = EMPTY_STRING_ARRAY,
   initialAvailableCategories = EMPTY_CATEGORIES,
-  submitLabel,
+  onSuccess,
 }: PostFormProps) {
   const [title, setTitle] = useState(initialTitle);
 
@@ -183,15 +189,18 @@ export default function PostForm({
   const authorId = user?._id || null;
   const lastTitleChangeAtRef = useRef<number>(0);
   const TITLE_UNDO_THRESHOLD = 300;
+
+  const draftKey = useMemo(() => {
+    if (!user?._id) return null;
+    return `${user._id}:${mode}:${
+      mode === PostTypes.ANSWER ? questionId ?? "" : ""
+    }`;
+  }, [user?._id, mode, questionId]);
   const editorKey = useMemo(() => {
     if (!user?._id) return "anon";
+    return `editor:${draftKey}`;
+  }, [draftKey]);
 
-    if (mode === PostTypes.ANSWER) {
-      return `editor:${user._id}:ANSWER:${questionId ?? "none"}`;
-    }
-
-    return `editor:${user._id}:${mode}`;
-  }, [user?._id, mode, questionId]);
   const draftReadyRef = useRef(false);
 
   const getDraftScope = () => ({
@@ -199,65 +208,137 @@ export default function PostForm({
     postType: mode,
     questionId: mode === PostTypes.ANSWER ? questionId : undefined,
   });
-  const saveDraftNow = (nextTitle?: string) => {
+
+  const getSanitizedEditorHTML = () => {
+    if (!editorRef.current) return "<p></p>";
+
+    const html = removeZWSP(editorRef.current.getHTML());
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    doc
+      .querySelectorAll("img[data-type='image-placeholder']")
+      .forEach((img) => {
+        img.removeAttribute("src"); // 🔥 prevent blob persistence
+      });
+
+    return doc.body.innerHTML;
+  };
+  const saveDraftNow = async (nextTitle?: string) => {
     if (!user?._id) return;
     if (!editorRef.current) return;
+    if (!editorReadyRef.current) return;
 
-    const content = removeZWSP(editorRef.current.getHTML());
+    const content = getSanitizedEditorHTML();
     const { userId, postType, questionId } = getDraftScope();
+
+    const images = await Promise.all(
+      Array.from(pendingImagesRef.current.entries()).map(
+        async ([id, file]) => ({
+          id,
+          buffer: await file.arrayBuffer(),
+          mime: file.type,
+        })
+      )
+    );
 
     saveDraft(
       userId,
       postType,
       {
-        postType,
         title: (nextTitle ?? title).trim(),
         content,
+        images,
       },
       questionId
     );
   };
 
-  // ✅ 修正点3: 依存配列の問題が解消され、無限ループしなくなります
-  const draftKey = useMemo(() => {
-    if (!user?._id) return null;
-    return `${user._id}:${mode}:${
-      mode === PostTypes.ANSWER ? questionId ?? "" : ""
-    }`;
-  }, [user?._id, mode, questionId]);
+  function collectUsedImageIds(html: string): Set<string> {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const ids = new Set<string>();
 
-  const didInitRef = useRef(false);
-  useEffect(() => {
-    if (!user?._id) return;
-    if (didInitRef.current) return;
+    doc
+      .querySelectorAll("img[data-type='image-placeholder'][data-id]")
+      .forEach((img) => {
+        const id = img.getAttribute("data-id");
+        if (id) ids.add(id);
+      });
 
-    const { userId, postType, questionId } = getDraftScope();
-    const draft = loadDraft(userId, postType, questionId);
+    return ids;
+  }
 
-    if (draft) {
-      setTitle(draft.title ?? "");
-      setEditorInitialHTML(removeZWSP(draft.content ?? "<p></p>"));
-      setContentChanged(false);
-    } else {
-      setTitle(initialTitle);
-      setEditorInitialHTML(removeZWSP(initialContent || "<p></p>"));
-      setContentChanged(!initialContent);
+  function gcDraftImages(draft: PostDraftRecord): PostDraftRecord {
+    const usedIds = collectUsedImageIds(draft.content);
+
+    if (draft.images.length === 0) return draft;
+
+    const filteredImages = draft.images.filter((img) => usedIds.has(img.id));
+
+    // nothing to clean
+    if (filteredImages.length === draft.images.length) {
+      return draft;
     }
 
-    setSelected(initialSelectedCategories);
-    setCategories(initialAvailableCategories);
-    setCategoryReady(initialAvailableCategories.length > 0);
+    return {
+      ...draft,
+      images: filteredImages,
+      updatedAt: Date.now(),
+    };
+  }
 
-    didInitRef.current = true;
-  }, [
-    user?._id,
-    mode,
-    questionId,
-    initialTitle,
-    initialContent,
-    initialSelectedCategories,
-    initialAvailableCategories,
-  ]);
+  // ✅ 修正点3: 依存配列の問題が解消され、無限ループしなくなります
+
+  const pendingDraftRef = useRef<PostDraftRecord | null>(null);
+  const lastLoadedDraftKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user?._id || !draftKey) return;
+    if (lastLoadedDraftKeyRef.current === draftKey) return;
+
+    lastLoadedDraftKeyRef.current = draftKey;
+
+    const init = async () => {
+      const { userId, postType, questionId } = getDraftScope();
+      const rawDraft = await loadDraft(userId, postType, questionId);
+
+      if (rawDraft) {
+        // ✅ GC only here
+        const cleanedDraft = gcDraftImages(rawDraft);
+
+        // persist cleaned version once
+        if (cleanedDraft !== rawDraft) {
+          await saveDraft(
+            userId,
+            postType,
+            {
+              title: cleanedDraft.title,
+              content: cleanedDraft.content,
+              images: cleanedDraft.images,
+            },
+            questionId
+          );
+        }
+
+        pendingDraftRef.current = cleanedDraft;
+        setTitle(cleanedDraft.title);
+      } else {
+        pendingDraftRef.current = {
+          key: "__empty__",
+          postType: mode,
+          title: initialTitle,
+          content: removeZWSP(initialContent || "<p></p>"),
+          images: [],
+          updatedAt: Date.now(),
+        };
+        setTitle(initialTitle);
+      }
+
+      setSelected(initialSelectedCategories);
+      setCategories(initialAvailableCategories);
+      setCategoryReady(initialAvailableCategories.length > 0);
+    };
+
+    init();
+  }, [draftKey]);
 
   useEffect(() => {
     return () => {
@@ -366,14 +447,12 @@ export default function PostForm({
     if (isApplyingUndoRedoRef.current) return;
 
     const html = removeZWSP(editorRef.current.getHTML());
-
     const hasMeaningfulContent =
       extractTextWithMath(html).trim().length > 0 ||
       html.includes("<img") ||
       html.includes("<video") ||
       html.includes("math-inline") ||
       html.includes("math-block");
-
     saveDraftNow(title);
 
     if (mode !== PostTypes.QUESTION && !hasMeaningfulContent) return;
@@ -575,6 +654,8 @@ export default function PostForm({
     upload.start();
     setSubmitting(true);
 
+    onSuccess?.();
+
     try {
       let html = editorRef.current?.getHTML() ?? "";
       html = removeZWSP(html);
@@ -771,9 +852,41 @@ export default function PostForm({
             key={editorKey}
             ref={editorRef}
             onUpdate={handleEditorUpdate}
-            initialValue={editorInitialHTML}
+            initialValue="<p></p>"
             onReady={() => {
-              editorReadyRef.current = true;
+              const draft = pendingDraftRef.current;
+              if (!draft) return;
+
+              // 1️⃣ Restore document structure
+              editorRef.current?.editor?.commands.setContent(draft.content, {
+                emitUpdate: false,
+              });
+
+              // 2️⃣ Defer image hydration until DOM exists
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  draft.images.forEach(({ id, buffer, mime }) => {
+                    const blob = new Blob([buffer], { type: mime });
+                    const file = new File([blob], "image", { type: mime });
+                    const url = URL.createObjectURL(blob);
+
+                    const img = editorHostRef.current?.querySelector(
+                      `img[data-type="image-placeholder"][data-id="${id}"]`
+                    ) as HTMLImageElement | null;
+
+                    if (!img) return;
+
+                    img.src = url;
+                    img.setAttribute("data-status", "local");
+
+                    pendingImagesRef.current.set(id, file);
+                    localBlobUrlsRef.current.set(id, url);
+                  });
+
+                  pendingDraftRef.current = null;
+                  editorReadyRef.current = true;
+                });
+              });
             }}
             onFocus={() => {
               clearModeRef.current = false; // 🔓 unlock
@@ -1044,17 +1157,29 @@ export default function PostForm({
                     editorRef.current?.editor
                       ?.chain()
                       .focus()
-                      .insertImagePlaceholder(
-                        localId,
-                        localUrl, // blob: URL
-                        undefined,
-                        undefined
-                      )
+                      .insertImagePlaceholder(localId, localUrl)
                       .run();
+
+                    // 🔑 mark image as local AFTER insertion
+                    requestAnimationFrame(() => {
+                      const editorEl = editorHostRef.current;
+                      if (!editorEl) return;
+
+                      const img = editorEl.querySelector(
+                        `img[data-type="image-placeholder"][data-id="${localId}"]`
+                      ) as HTMLImageElement | null;
+
+                      if (img) {
+                        img.setAttribute("data-status", "local");
+                      }
+                    });
 
                     // 🔹 STORE references for later submit
                     pendingImagesRef.current.set(localId, file);
                     localBlobUrlsRef.current.set(localId, localUrl);
+
+                    // 🔥 FORCE save AFTER image map is populated
+                    saveDraftNow();
                   };
 
                   input.click();

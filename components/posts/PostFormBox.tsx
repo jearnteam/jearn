@@ -153,6 +153,10 @@ export default function PostFormBox({
                       data.video
                     );
                   }}
+                  onSuccess={() => {
+                    onClose(); // ✅ CLOSE MODAL
+                    setMode(type); // ✅ optional: reset tab
+                  }}
                 />
               </section>
             </motion.div>

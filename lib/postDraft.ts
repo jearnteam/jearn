@@ -1,14 +1,24 @@
+//@/lib/postDraft.ts
+import { openDB, STORE } from "@/lib/postDraftDB";
 import { PostType, PostTypes } from "@/types/post";
 
 /* -------------------------------------------------------------------------- */
-/* Draft Model                                                                 */
+/* Draft Model (IndexedDB)                                                     */
 /* -------------------------------------------------------------------------- */
 
-export interface PostDraft {
+export interface DraftImage {
+  id: string;
+  buffer: ArrayBuffer;
+  mime: string;
+}
+
+export interface PostDraftRecord {
+  key: string;
   postType: PostType;
   title: string;
   content: string;
   updatedAt: number;
+  images: DraftImage[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -34,79 +44,85 @@ export function draftKey(
 /* Load Draft                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function loadDraft(
+export async function loadDraft(
   userId: string,
   postType: PostType,
   questionId?: string
-): PostDraft | null {
-  try {
-    const key = draftKey(userId, postType, questionId);
-    const raw = localStorage.getItem(key);
+): Promise<PostDraftRecord | null> {
+  const key = draftKey(userId, postType, questionId);
+  const db = await openDB();
 
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw) as PostDraft;
-
-    // Basic shape validation (defensive)
-    if (
-      typeof parsed !== "object" ||
-      typeof parsed.title !== "string" ||
-      typeof parsed.content !== "string"
-    ) {
-      return null;
-    }
-
-    return parsed;
-  } catch (err) {
-    console.warn("Failed to load draft:", err);
-    return null;
-  }
+  return new Promise((resolve) => {
+    const tx = db.transaction(STORE, "readonly");
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => resolve(null);
+  });
 }
 
 /* -------------------------------------------------------------------------- */
 /* Save Draft                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export function saveDraft(
+function sanitizeDraftHTML(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  doc.querySelectorAll("img[data-type='image-placeholder']").forEach((img) => {
+    img.removeAttribute("src"); // 🔥 kill blob URLs
+  });
+
+  return doc.body.innerHTML;
+}
+
+export async function saveDraft(
   userId: string,
   postType: PostType,
-  draft: Omit<PostDraft, "updatedAt">,
+  draft: {
+    title: string;
+    content: string;
+    images: DraftImage[];
+  },
   questionId?: string
-) {
-  try {
-    const { title, content } = draft;
+): Promise<void> {
+  const sanitizedContent = sanitizeDraftHTML(draft.content);
 
-    // ❌ Do not save empty drafts
-    if (!title.trim() && (!content || content === "<p></p>")) {
-      return;
-    }
+  if (!isMeaningful(draft.title, sanitizedContent)) return;
 
-    const key = draftKey(userId, postType, questionId);
+  const key = draftKey(userId, postType, questionId);
+  const db = await openDB();
 
-    const payload: PostDraft = {
-      ...draft,
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, "readwrite");
+
+    tx.objectStore(STORE).put({
+      key,
+      postType,
+      title: draft.title,
+      content: sanitizedContent, // ✅ FIXED
+      images: draft.images,
       updatedAt: Date.now(),
-    };
+    });
 
-    localStorage.setItem(key, JSON.stringify(payload));
-  } catch (err) {
-    console.warn("Failed to save draft:", err);
-  }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function isMeaningful(title: string, content: string) {
+  return title.trim() || (content && content !== "<p></p>");
 }
 
 /* -------------------------------------------------------------------------- */
 /* Clear Draft                                                                 */
 /* -------------------------------------------------------------------------- */
 
-export function clearDraft(
+export async function clearDraft(
   userId: string,
   postType: PostType,
   questionId?: string
 ) {
-  try {
-    const key = draftKey(userId, postType, questionId);
-    localStorage.removeItem(key);
-  } catch (err) {
-    console.warn("Failed to clear draft:", err);
-  }
+  const key = draftKey(userId, postType, questionId);
+  const db = await openDB();
+  const tx = db.transaction(STORE, "readwrite");
+  tx.objectStore(STORE).delete(key);
 }
