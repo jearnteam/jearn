@@ -240,7 +240,9 @@ export async function PUT(
     /* ---------------- UPDATE ---------------- */
     const updateFields: Record<string, unknown> = {};
 
-    if (title !== undefined) updateFields.title = title;
+    if (title !== undefined && existing.postType !== PostTypes.QUESTION) {
+      updateFields.title = title;
+    }
     if (content !== undefined) updateFields.content = content;
 
     if (Array.isArray(categories)) {
