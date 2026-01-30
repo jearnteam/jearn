@@ -4,6 +4,7 @@ import HomePage from "./HomePage";
 import Navbar from "@/components/Navbar";
 import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
 import { UploadProvider } from "@/components/upload/UploadContext";
+import { NotificationProvider } from "@/features/notifications/NotificationProvider";
 
 export default function AppLayout({
   children,
@@ -13,7 +14,7 @@ export default function AppLayout({
   overlay?: React.ReactNode;
 }) {
   return (
-    <>
+    <NotificationProvider>
       <Navbar />
       <AppNavigationBridge />
       <UploadProvider>
@@ -21,6 +22,6 @@ export default function AppLayout({
       </UploadProvider>
       {children}
       {overlay}
-    </>
+    </NotificationProvider>
   );
 }

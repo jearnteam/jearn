@@ -10,7 +10,7 @@ import type { Post } from "@/types/post";
 import { useFollowingPosts } from "@/features/posts/hooks/useFollowingPosts";
 
 import NotificationPage from "@/components/notifications/NotificationPage";
-import { useNotifications } from "@/features/notifications/useNotifications";
+import { useNotificationContext } from "@/features/notifications/NotificationProvider";
 
 import PostFormBox from "@/components/posts/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
@@ -75,7 +75,8 @@ export default function HomePage() {
     refresh: refreshFollowing,
   } = useFollowingPosts();
 
-  const { unreadCount, clearUnread, fetchNotifications } = useNotifications();
+  const { unreadCount, clearUnread, fetchNotifications } =
+  useNotificationContext();
 
   /* ---------------------------------------------
    * SCROLL MANAGEMENT (🔥 FIX)
@@ -111,7 +112,7 @@ export default function HomePage() {
         // 🔥 reversed logic
         // scroll DOWN → show
         // scroll UP → hide
-        setNavbarVisible(cur > lastScrollTop.current);
+        setNavbarVisible(cur < lastScrollTop.current);
       }
     }
 

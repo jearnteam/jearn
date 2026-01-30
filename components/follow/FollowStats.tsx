@@ -5,7 +5,9 @@ import { useState } from "react";
 import { useFollowCount } from "@/features/follow/hooks/useFollowCount";
 import FollowListModal from "./FollowListModal";
 
-export default function FollowStats({ userId }: { userId: string }) {
+export default function FollowStats({ userId }: { userId?: string }) {
+  if (!userId) return null;
+
   const { followers, following, loading } = useFollowCount(userId);
   const [open, setOpen] = useState<null | "followers" | "following">(null);
 

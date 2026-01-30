@@ -381,7 +381,7 @@ export default function ProfilePage({ scrollContainerRef }: Props) {
                     using JPG, PNG is Recommended{" "}
                   </p>{" "}
                 </div>
-                <FollowStats userId={user._id} />
+                {user?._id && <FollowStats userId={user._id} />}
                 <input
                   id="avatarInput"
                   type="file"

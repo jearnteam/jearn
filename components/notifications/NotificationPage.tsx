@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { Bell } from "lucide-react";
-import { useNotifications } from "@/features/notifications/useNotifications";
+import { useNotificationContext } from "@/features/notifications/NotificationProvider";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "next/navigation";
 
@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
  * ------------------------------------------- */
 export type Notification = {
   _id: string;
-  type: "post_like" | "comment" | "mention" | "system";
+  type: "post_like" | "comment" | "mention" | "system" | "follow";
   postId?: string;
 
   lastActorName: string;
@@ -34,7 +34,7 @@ export default function NotificationPage() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { items, fetchNotifications } = useNotifications();
+  const { items, fetchNotifications } = useNotificationContext();
 
   /* ---------------------------------------------
    * FETCH ON OPEN
@@ -69,9 +69,7 @@ export default function NotificationPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-500">
         <Bell className="w-10 h-10 mb-3 opacity-50" />
-        <p className="text-sm">
-          {t("no_noti_yet") || "No notifications yet"}
-        </p>
+        <p className="text-sm">{t("no_noti_yet") || "No notifications yet"}</p>
       </div>
     );
   }
@@ -141,10 +139,20 @@ function NotificationItem({
 
       case "system":
         return (
-          notification.postPreview ??
-          t("system_noti") ??
-          "System notification"
+          notification.postPreview ?? t("system_noti") ?? "System notification"
         );
+
+      case "follow": {
+        const count = notification.count ?? 1;
+
+        if (count > 1) {
+          return `${notification.lastActorName} and ${
+            count - 1
+          } others followed you`;
+        }
+
+        return `${notification.lastActorName} followed you`;
+      }
 
       default:
         return t("notifications") || "Notification";

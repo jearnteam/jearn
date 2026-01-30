@@ -6,6 +6,10 @@ import { useTranslation } from "react-i18next";
 import UserMenu from "@/components/UserMenu";
 import { useState, useEffect, useRef, memo } from "react";
 import { Search } from "lucide-react";
+import { useSearch } from "@/features/search/useSearch";
+import SearchResults from "@/features/search/SearchResults";
+import { useRouter } from "next/navigation";
+import { useNotificationContext } from "@/features/notifications/NotificationProvider";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
@@ -17,6 +21,7 @@ const MemoUserMenu = memo(UserMenu);
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
+  const { unreadCount } = useNotificationContext();
 
   /* ---------------------------------------------
    * STATE
@@ -26,6 +31,10 @@ export default function Navbar() {
   const [isCompactLayout, setIsCompactLayout] = useState(false);
 
   const navbarRef = useRef<HTMLElement | null>(null);
+
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const { results, loading: searchLoading } = useSearch(query);
 
   /* ---------------------------------------------
    * HYDRATION GATE
@@ -82,11 +91,7 @@ export default function Navbar() {
           className={`
             flex items-center gap-3 cursor-pointer
             transition-opacity duration-200
-            ${
-              searchActive
-                ? "opacity-0 pointer-events-none"
-                : ""
-            }
+            ${searchActive ? "opacity-0 pointer-events-none" : ""}
           `}
           onClick={() => {
             if (window.location.pathname === "/") {
@@ -116,33 +121,51 @@ export default function Navbar() {
               searchActive
                 ? "absolute inset-0 h-full flex items-center px-4 z-50"
                 : isCompactLayout
-                  ? "relative flex-1 mx-4"
-                  : "absolute left-1/2 -translate-x-1/2 w-[520px]"
+                ? "relative flex-1 mx-4"
+                : "absolute left-1/2 -translate-x-1/2 w-[520px]"
             }
           `}
         >
-          <div
-            className="
-              flex items-center w-full
-              px-4 py-3 lg:py-2
-              bg-white dark:bg-black
-              border border-gray-300
-              rounded-full shadow-sm
-            "
-          >
-            <Search className="w-5 h-5 text-gray-400 mr-3" strokeWidth={3} />
-
-            <input
-              type="text"
-              placeholder={t("search") || "Search"}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
+          <div className="relative w-full">
+            {/* INPUT */}
+            <div
               className="
-                w-full bg-transparent
-                text-gray-700 dark:text-gray-100
-                placeholder-gray-500 dark:placeholder-gray-400
-                focus:outline-none
+                flex items-center w-full
+                px-4 py-3 lg:py-2
+                bg-white dark:bg-black
+                border border-gray-300
+                rounded-full shadow-sm
               "
+            >
+              <Search className="w-5 h-5 text-gray-400 mr-3" strokeWidth={3} />
+
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t("search") || "Search"}
+                onFocus={() => setSearchFocused(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && query.trim().length >= 2) {
+                    router.push(`/search?q=${encodeURIComponent(query)}`);
+                    setSearchFocused(false);
+                  }
+                }}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
+                className="
+                  w-full bg-transparent
+                  text-gray-700 dark:text-gray-100
+                  placeholder-gray-500 dark:placeholder-gray-400
+                  focus:outline-none
+                "
+              />
+            </div>
+
+            {/* RESULTS */}
+            <SearchResults
+              results={results}
+              loading={searchLoading}
+              visible={searchFocused && query.trim().length >= 2}
             />
           </div>
         </div>
@@ -152,11 +175,7 @@ export default function Navbar() {
           className={`
             ml-auto flex items-center gap-3
             transition-opacity duration-200
-            ${
-              searchActive
-                ? "opacity-0 pointer-events-none"
-                : ""
-            }
+            ${searchActive ? "opacity-0 pointer-events-none" : ""}
           `}
         >
           {loading ? (

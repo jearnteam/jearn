@@ -169,6 +169,16 @@ export default function MobileNavbar({
   return (
     <motion.nav
       ref={navRef}
+      initial={false}
+      animate={{
+        y: visible ? 0 : 80,
+        opacity: visible ? 1 : 0,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 400,
+        damping: 35,
+      }}
       style={{
         ["--mobile-navbar-h" as any]: "80px",
       }}
