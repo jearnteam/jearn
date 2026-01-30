@@ -99,7 +99,7 @@ export default function PostFooter({
   return (
     <>
       {/* CENTER: ANSWER */}
-      {post.postType === PostTypes.QUESTION && (
+      {post.postType === PostTypes.QUESTION && post.authorId && (
         <button
           onClick={(e) => {
             e.stopPropagation();

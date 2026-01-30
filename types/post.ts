@@ -45,8 +45,8 @@ export interface Post {
 
   createdAt?: string;
 
-  authorId: string;
-  authorName: string;
+  authorId?: string;
+  authorName?: string;
   authorUserId?: string;
 
   // 🔥 EXISTING FIELD (avatar URL)

@@ -5,7 +5,7 @@ import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
-import { PostTypes } from "@/types/post";
+import { PostType, PostTypes } from "@/types/post";
 import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
@@ -17,6 +17,7 @@ export const runtime = "nodejs";
 /* -------------------------------------------------------------------------- */
 
 type RawPost = WithId<Document> & {
+  postType?: PostType;
   authorId?: string;
   authorName?: string;
   authorAvatar?: string;
@@ -200,6 +201,7 @@ export async function GET(req: Request) {
       const parents = await posts.find({ _id: { $in: parentIds } }).toArray();
 
       // ✅ 変更: 親投稿も通常投稿と同様に enrich する
+      // TODO: このロジックがN+1か検証
       await Promise.all(
         parents.map(async (p) => {
           const categories = await enrichCategories(
@@ -391,12 +393,19 @@ export async function POST(req: Request) {
       safeParentId = target.parentId || target._id.toString();
     }
 
+    if (postType === PostTypes.ANSWER && (await posts.countDocuments({ _id: safeParentId, authorId: { $exists: true } })) === 0) {
+      return NextResponse.json(
+        { error: "Target question is closed" },
+        { status: 403 }
+      );
+    }
+
     /* ------------------------------------------------------------------ */
     /* INSERT                                                             */
     /* ------------------------------------------------------------------ */
 
     type PostInsertDoc = {
-      postType: string;
+      postType: PostType;
       title: string;
       content: string;
       authorId: string;
@@ -688,57 +697,83 @@ export async function DELETE(req: Request) {
       return new Response("Forbidden", { status: 403 });
     }
 
-    /* ---------------- DELETE POST + COMMENTS MEDIA ---------------- */
-    const toDelete = await posts
-      .find({ $or: [{ _id: new ObjectId(id) }, { parentId: id }] })
-      .toArray();
+    const isQuestionDeletable = await (async (questionPost: RawPost) => {
+      if (questionPost.postType !== PostTypes.QUESTION) {
+        return true;
+      }
 
-    for (const p of toDelete) {
-      for (const key of p.mediaRefs ?? []) {
-        try {
-          if (!key.startsWith("posts/")) continue;
+      return (
+        (await posts.countDocuments({
+          parentId: questionPost._id.toString(),
+        })) === 0
+      );
+    })(existing as RawPost);
 
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME!,
-              Key: key,
-            })
-          );
-        } catch (err) {
-          console.error("❌ Failed to delete image:", key, err);
+    if (isQuestionDeletable) {
+      /* ---------------- DELETE POST + COMMENTS MEDIA ---------------- */
+      const toDelete = await posts
+        .find({ $or: [{ _id: new ObjectId(id) }, { parentId: id }] })
+        .toArray();
+
+      for (const p of toDelete) {
+        for (const key of p.mediaRefs ?? []) {
+          try {
+            if (!key.startsWith("posts/")) continue;
+
+            await r2.send(
+              new DeleteObjectCommand({
+                Bucket: process.env.R2_BUCKET_NAME!,
+                Key: key,
+              })
+            );
+          } catch (err) {
+            console.error("❌ Failed to delete image:", key, err);
+          }
         }
       }
-    }
 
-    /* ---------------- DELETE VIDEO + THUMBNAIL ---------------- */
-    if (existing.postType === PostTypes.VIDEO && existing.video) {
-      await Promise.all([
-        deleteR2ByUrl(existing.video.url),
-        deleteR2ByUrl(existing.video.thumbnailUrl),
-      ]);
-    }
+      /* ---------------- DELETE VIDEO + THUMBNAIL ---------------- */
+      if (existing.postType === PostTypes.VIDEO && existing.video) {
+        await Promise.all([
+          deleteR2ByUrl(existing.video.url),
+          deleteR2ByUrl(existing.video.thumbnailUrl),
+        ]);
+      }
 
-    /* ---------------- DELETE POSTS ---------------- */
-    await posts.deleteMany({
-      $or: [{ _id: new ObjectId(id) }, { parentId: id }],
-    });
-
-    /* ---------------- DELETE AI FEEDBACK ---------------- */
-    try {
-      await db.collection("ai_feedback").deleteMany({
-        postId: new ObjectId(id),
+      /* ---------------- DELETE POSTS ---------------- */
+      await posts.deleteMany({
+        $or: [{ _id: new ObjectId(id) }, { parentId: id }],
       });
-      console.log("🧠 Deleted AI feedback for post:", id);
-    } catch (err) {
-      console.error("❌ Failed to delete AI feedback:", err);
-    }
 
-    /* ---------------- SSE ---------------- */
-    broadcastSSE({
-      type: existing.parentId ? "delete-comment" : "delete-post",
-      txId,
-      postId: id,
-    });
+      /* ---------------- DELETE AI FEEDBACK ---------------- */
+      try {
+        await db.collection("ai_feedback").deleteMany({
+          postId: new ObjectId(id),
+        });
+        console.log("🧠 Deleted AI feedback for post:", id);
+      } catch (err) {
+        console.error("❌ Failed to delete AI feedback:", err);
+      }
+
+      /* ---------------- SSE ---------------- */
+      broadcastSSE({
+        type: existing.parentId ? "delete-comment" : "delete-post",
+        txId,
+        postId: id,
+      });
+    } else {
+      // Answerが存在するものは削除しない
+      posts.updateOne(
+        { _id: existing._id },
+        { $set: { authorName: "Anonymous" }, $unset: { authorId: 1 } }
+      );
+      /* ---------------- SSE ---------------- */
+      broadcastSSE({
+        type: existing.parentId ? "delete-comment" : "delete-post",
+        txId,
+        postId: id,
+      });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
