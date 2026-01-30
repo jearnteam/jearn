@@ -5,7 +5,6 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import UserMenu from "@/components/UserMenu";
 import { useState, useEffect, useRef, memo } from "react";
-import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
@@ -13,84 +12,85 @@ const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   loading: () => null,
 });
 
-// Memoize to avoid rerenders
 const MemoUserMenu = memo(UserMenu);
 
 export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
-  const router = useRouter();
 
+  /* ---------------------------------------------
+   * STATE
+   * ------------------------------------------- */
   const [mounted, setMounted] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
+
   const navbarRef = useRef<HTMLElement | null>(null);
 
-  // ✅ hydration gate
+  /* ---------------------------------------------
+   * HYDRATION GATE
+   * ------------------------------------------- */
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Prevent accidental touch-scroll on navbar
+  /* ---------------------------------------------
+   * LAYOUT MODE (matches HomePage < lg)
+   * ------------------------------------------- */
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)"); // < lg
+    const update = () => setIsCompactLayout(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const searchActive = isCompactLayout && searchFocused;
+
+  /* ---------------------------------------------
+   * PREVENT TOUCH SCROLL
+   * ------------------------------------------- */
   useEffect(() => {
     const el = navbarRef.current;
     if (!el) return;
 
     const prevent = (e: TouchEvent) => e.preventDefault();
     el.addEventListener("touchmove", prevent, { passive: false });
-
     return () => el.removeEventListener("touchmove", prevent);
   }, []);
 
-  /* ------------------------------------------------
-   * SSR-SAFE SHELL (NO HYDRATION MISMATCH)
-   * ------------------------------------------------ */
+  /* ---------------------------------------------
+   * SSR SAFE SHELL
+   * ------------------------------------------- */
   if (!mounted) {
     return (
-      <header
-        ref={navbarRef}
-        className="
-          fixed top-0 left-0 w-full z-50
-          bg-white dark:bg-neutral-900
-          border-b shadow-sm
-        "
-      >
-        <div className="mx-auto flex justify-between items-center px-4 h-16">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12" />
-            <h1
-              className="text-4xl font-bold"
-              style={{ fontFamily: "var(--font-shadows-into-light)" }}
-            >
-              JEARN
-            </h1>
-          </div>
-
-          <div className="w-full max-w-md h-10 rounded-full bg-gray-100 dark:bg-neutral-800" />
-
-          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-neutral-700" />
-        </div>
-      </header>
+      <header className="fixed top-0 left-0 w-full h-16 bg-white dark:bg-neutral-900 border-b shadow-sm" />
     );
   }
 
-  /* ------------------------------------------------
-   * CLIENT RENDER (SAFE)
-   * ------------------------------------------------ */
+  /* ---------------------------------------------
+   * RENDER
+   * ------------------------------------------- */
   return (
     <header
-      className="
-    fixed top-0 left-0 w-full z-50
-    h-16 box-border
-    bg-white dark:bg-neutral-900
-    border-b shadow-sm
-  "
+      ref={navbarRef}
+      className="fixed top-0 left-0 w-full h-16 z-50 bg-white dark:bg-neutral-900 border-b shadow-sm"
     >
-      <div className="mx-auto flex gap-4 justify-between items-center px-4 h-16">
-        {/* Logo */}
+      <div className="relative h-full px-4 flex items-center">
+        {/* LEFT — LOGO */}
         <div
-          className="flex items-center gap-3 cursor-pointer"
+          className={`
+            flex items-center gap-3 cursor-pointer
+            transition-opacity duration-200
+            ${
+              searchActive
+                ? "opacity-0 pointer-events-none"
+                : ""
+            }
+          `}
           onClick={() => {
             if (window.location.pathname === "/") {
-              window.location.reload(); // 🔥 true refresh
+              window.location.reload();
             } else {
               window.location.href = "/";
             }
@@ -108,25 +108,35 @@ export default function Navbar() {
           </h1>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center w-full max-w-md">
-          <label htmlFor="search-input" className="sr-only">
-            {t("search") || "Search"}
-          </label>
-
+        {/* CENTER — SEARCH */}
+        <div
+          className={`
+            transition-all duration-300 ease-out
+            ${
+              searchActive
+                ? "absolute inset-0 h-full flex items-center px-4 z-50"
+                : isCompactLayout
+                  ? "relative flex-1 mx-4"
+                  : "absolute left-1/2 -translate-x-1/2 w-[520px]"
+            }
+          `}
+        >
           <div
             className="
-              flex items-center w-full px-4 py-2
+              flex items-center w-full
+              px-4 py-3 lg:py-2
               bg-white dark:bg-black
-              border border-gray-300 rounded-full
-              shadow-sm
-              focus-within:ring-2 focus-within:ring-blue-500
+              border border-gray-300
+              rounded-full shadow-sm
             "
           >
-            <Search className="w-6 h-6 text-gray-400 mr-3" strokeWidth={3} />
+            <Search className="w-5 h-5 text-gray-400 mr-3" strokeWidth={3} />
+
             <input
               type="text"
               placeholder={t("search") || "Search"}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               className="
                 w-full bg-transparent
                 text-gray-700 dark:text-gray-100
@@ -137,8 +147,18 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Right */}
-        <div className="flex flex-shrink-0 items-center gap-3">
+        {/* RIGHT — USER */}
+        <div
+          className={`
+            ml-auto flex items-center gap-3
+            transition-opacity duration-200
+            ${
+              searchActive
+                ? "opacity-0 pointer-events-none"
+                : ""
+            }
+          `}
+        >
           {loading ? (
             <span className="text-sm text-gray-500 dark:text-gray-400">
               {t("loading")}...
