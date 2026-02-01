@@ -156,13 +156,17 @@ html.dark {
   color: #9ca3af; /* gray-400 */
 }
 
-/* ---------- Inline code ---------- */
-.math-content code {
+/* Inline code ONLY (never code blocks) */
+.math-content :not(pre) > code {
   color: #29a425;
-  padding: 3px;
+  padding: 3px 5px;
   border-radius: 4px;
-  display: inline-block;
+  background: rgba(0, 0, 0, 0.05);
   white-space: pre-wrap;
+}
+
+.dark .math-content :not(pre) > code {
+  color: #39c945;
 }
 
 .math-content a {
@@ -173,11 +177,6 @@ html.dark {
 .math-content a:hover {
   text-decoration: underline;
 }
-
-.dark .math-content code {
-  color: #39c945;
-}
-
 /* -------------------------------------------------------------------------- */
 
 /* Other blocks */
@@ -191,13 +190,71 @@ html.dark {
 .ProseMirror ol {
   padding-left: 1.5rem;
 }
-.ProseMirror code {
-  color: #29b935;
-  padding: 3px;
+/* ============================================================
+ * PRISM CODE BLOCKS (SAFE + TOKEN-PRESERVING)
+ * ========================================================== */
+
+pre[data-prism] {
+  background: #1e1e1e;
+  color: #d4d4d4; /* base text color */
+  white-space: pre;
+  overflow-x: auto;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+}
+
+pre[data-prism] {
+  font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* ❗ DO NOT touch Prism token colors */
+pre[data-prism] .token {
+  background: none;
+}
+
+/* Reset ONLY non-token text inside code blocks */
+pre[data-prism] code {
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Typography / prose safety */
+.prose pre code,
+.prose-invert pre code {
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* ============================================================
+ * TAILWIND TYPOGRAPHY SAFETY
+ * ========================================================== */
+
+.prose pre code,
+.prose-invert pre code {
+  color: inherit;
+  background: none;
+  padding: 0;
+}
+
+/* Inline code ONLY (never inside pre) */
+.ProseMirror :not(pre) > code,
+.math-content :not(pre) > code {
+  color: #29a425;
+  padding: 3px 5px;
   border-radius: 4px;
-  display: inline-block;
+  background: rgba(0, 0, 0, 0.05);
   white-space: pre-wrap;
 }
+
+.dark .ProseMirror :not(pre) > code,
+.dark .math-content :not(pre) > code {
+  color: #39c945;
+}
+
 .ProseMirror:focus {
   outline: none !important;
   box-shadow: none !important;
@@ -258,21 +315,6 @@ html.dark {
 /* ---------------------------------------------------------- */
 /*                  INLINE CODE STYLING                       */
 /* ---------------------------------------------------------- */
-code {
-  color: #29a425;
-  padding: 3px;
-  border-radius: 4px;
-  display: inline-block;
-  white-space: pre-wrap;
-}
-
-.dark code {
-  color: #39c945;
-  padding: 3px;
-  border-radius: 4px;
-  display: inline-block;
-  white-space: pre-wrap;
-}
 
 /* Mention node */
 .mention {

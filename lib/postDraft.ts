@@ -68,7 +68,7 @@ function sanitizeDraftHTML(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   doc.querySelectorAll("img[data-type='image-placeholder']").forEach((img) => {
-    img.removeAttribute("src"); // 🔥 kill blob URLs
+    img.setAttribute("src", "__DRAFT_IMAGE__"); // 🔒 keep node alive
   });
 
   return doc.body.innerHTML;
@@ -86,8 +86,6 @@ export async function saveDraft(
 ): Promise<void> {
   const sanitizedContent = sanitizeDraftHTML(draft.content);
 
-  if (!isMeaningful(draft.title, sanitizedContent)) return;
-
   const key = draftKey(userId, postType, questionId);
   const db = await openDB();
 
@@ -97,8 +95,8 @@ export async function saveDraft(
     tx.objectStore(STORE).put({
       key,
       postType,
-      title: draft.title,
-      content: sanitizedContent, // ✅ FIXED
+      title: draft.title, // "" allowed
+      content: sanitizedContent, // "<p></p>" allowed
       images: draft.images,
       updatedAt: Date.now(),
     });

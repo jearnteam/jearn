@@ -4,16 +4,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Extension, ChainedCommands } from "@tiptap/core";
 
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
-
-import { Plugin, PluginKey } from "prosemirror-state";
+import "@/lib/prism";
+import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
 
 import Underline from "@tiptap/extension-underline";
 import Strike from "@tiptap/extension-strike";
-import Code from "@tiptap/extension-code";
 import Bold from "@tiptap/extension-bold";
 import Italic from "@tiptap/extension-italic";
 import Document from "@tiptap/extension-document";
@@ -31,61 +31,27 @@ import History from "@tiptap/extension-history";
 
 import { MathExtension } from "@/components/math/MathExtension";
 import { Tag } from "@/features/Tag";
+import { SafeCode } from "@/features/SafeCode";
 import { Mention } from "@/features/Mention";
 import { MentionSuggestion } from "@/features/MentionSuggestion";
 import { NoRulesStarterKit } from "@/features/NoRulesStarterKit";
+import { PreserveEmptyLinesOnPaste } from "@/features/PreserveEmptyLinesOnPaste";
 import { ImagePlaceholder } from "@/features/ImagePlaceholder";
 import { CursorExitFix } from "@/features/CursorExitFix";
 import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
 import { FixHeadingEnter } from "@/features/ExitHeadingOnEnter";
 
-import { Extension, ChainedCommands } from "@tiptap/core";
 import { useTranslation } from "react-i18next";
 import type { Level } from "@tiptap/extension-heading";
 import { AtomBoundaryFix } from "@/features/AtomBoundaryFix";
 import { BackspaceExitListLikeEnter } from "@/features/BackspaceExitListLikeEnter";
-import { SmartBackspaceBlockquote } from "@/features/SmartBackspaceBlockquote";
+import { RestorePrismBlockOnDelete } from "@/features/RestorePrismBlockOnDelete";
 import { FloatingMenuIndexedShortcuts } from "@/features/FloatingMenuIndexedShortcuts";
 import { ClearFormatting } from "@/features/ClearFormatting";
 import clsx from "clsx";
-/* ----------------------- ZERO WIDTH (PASTE ONLY) ----------------------- */
 
-const zeroWidthCleanupKey = new PluginKey("zero-width-cleanup");
-
-const ZeroWidthCleanup = Extension.create({
-  name: "zeroWidthCleanup",
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: zeroWidthCleanupKey,
-        props: {
-          handlePaste(view, event) {
-            const clipboard = event.clipboardData;
-            if (!clipboard) return false;
-
-            const html = clipboard.getData("text/html");
-
-            // ✅ If HTML exists → let ProseMirror handle it
-            if (html) return false;
-
-            // 🧼 Plain-text only
-            const text = clipboard.getData("text/plain");
-            if (!text) return false;
-
-            const clean = text.replace(/[\u200B-\u200D\uFEFF]/g, "");
-            view.dispatch(view.state.tr.insertText(clean));
-            return true;
-          },
-
-          transformPastedHTML(html) {
-            // 🧼 Clean HTML but KEEP formatting
-            return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
-          },
-        },
-      }),
-    ];
-  },
-});
+import { PrismBlockWithView } from "@/features/PrismBlockWithView";
+import { CodeFenceHandler } from "@/features/CodeFenceHandler";
 
 /* ----------------------- CHARACTER COUNT (NO HARD LIMIT) ----------------------- */
 
@@ -178,8 +144,11 @@ export default function PostEditorInner({
   const extensions = useMemo(
     () => [
       Document,
+      RestorePrismBlockOnDelete,
       Paragraph,
       Text,
+      PreserveEmptyLinesOnPaste,
+
       Heading.configure({ levels: [1, 2, 3] }),
 
       HorizontalRule,
@@ -191,7 +160,9 @@ export default function PostEditorInner({
       Italic,
       Underline,
       Strike,
-      Code,
+      SafeCode,
+      PrismBlockWithView,
+      CodeFenceHandler,
 
       Tag,
       Mention,
@@ -200,7 +171,6 @@ export default function PostEditorInner({
       InlineBackspaceFix,
       AtomBoundaryFix,
       MathExtension,
-      ZeroWidthCleanup,
       Link,
       BulletList,
       ListItem,
@@ -209,8 +179,8 @@ export default function PostEditorInner({
       // behavior overrides
       FixHeadingEnter,
       ListKeymap,
+
       BackspaceExitListLikeEnter,
-      SmartBackspaceBlockquote,
       FloatingMenuIndexedShortcuts,
       ClearFormatting,
 
@@ -245,6 +215,7 @@ export default function PostEditorInner({
       onUpdate: ({ editor }) => {
         setCharCount(countCharactersWithMath(editor.state.doc));
       },
+
       immediatelyRender: false,
     },
     []

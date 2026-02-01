@@ -2,7 +2,9 @@
 
 import { memo, useEffect, useRef } from "react";
 import katex from "katex";
+import Prism from "@/lib/prism";
 import "katex/dist/katex.min.css";
+import { lucide } from "@/lib/lucide-icons";
 
 /**
  * @deprecated
@@ -541,6 +543,88 @@ function setupTags(el: HTMLElement) {
 }
 
 /* ----------------------------------------------------------
+ *  Prism code highlighting
+ * ---------------------------------------------------------- */
+function renderPrism(el: HTMLElement) {
+  const blocks = el.querySelectorAll("pre > code[class*='language-']");
+
+  blocks.forEach((code) => {
+    const codeEl = code as HTMLElement;
+
+    // 🔑 Reset to raw text before highlighting
+    const text = codeEl.textContent ?? "";
+    codeEl.innerHTML = "";
+    codeEl.textContent = text;
+
+    Prism.highlightElement(codeEl);
+  });
+}
+
+function stripEditorUI(el: HTMLElement) {
+  el.querySelectorAll("[data-editor-only]").forEach((n) => n.remove());
+}
+
+function addCopyButtons(el: HTMLElement) {
+  const blocks = el.querySelectorAll("pre > code");
+
+  blocks.forEach((code) => {
+    const pre = code.parentElement as HTMLElement | null;
+    if (!pre || pre.querySelector("[data-copy-btn]")) return;
+
+    const btn = document.createElement("button");
+    btn.setAttribute("data-copy-btn", "true");
+
+    btn.innerHTML = lucide.copy;
+
+    btn.className = `
+      absolute top-2 right-2
+      h-7 w-7
+      flex items-center justify-center
+      rounded
+      bg-black/60 hover:bg-black/80
+      text-white
+      transition
+    `;
+
+    let timeout: number | null = null;
+
+    btn.onclick = async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const text = code.textContent ?? "";
+
+      try {
+        await navigator.clipboard.writeText(text);
+
+        btn.innerHTML = lucide.check;
+        btn.classList.add("bg-green-600");
+
+        if (timeout) window.clearTimeout(timeout);
+
+        timeout = window.setTimeout(() => {
+          btn.innerHTML = lucide.copy;
+          btn.classList.remove("bg-green-600");
+        }, 1200);
+      } catch {
+        btn.innerHTML = lucide.x;
+        btn.classList.add("bg-red-600");
+
+        if (timeout) window.clearTimeout(timeout);
+
+        timeout = window.setTimeout(() => {
+          btn.innerHTML = lucide.copy;
+          btn.classList.remove("bg-red-600");
+        }, 1200);
+      }
+    };
+
+    pre.classList.add("relative", "group");
+    pre.appendChild(btn);
+  });
+}
+
+/* ----------------------------------------------------------
  *  MAIN RENDERER
  * ---------------------------------------------------------- */
 function MathRendererBase({ html }: { html: string }) {
@@ -550,11 +634,15 @@ function MathRendererBase({ html }: { html: string }) {
     const el = ref.current;
     if (!el) return;
 
+    stripEditorUI(el);
+
     renderMath(el);
     styleMentions(el);
     setupMentions(el);
     setupTags(el);
     setupLegacyImages(el);
+    renderPrism(el);
+    addCopyButtons(el);
 
     return () => {
       document.querySelectorAll(".mention-popup").forEach((p) => p.remove());

@@ -36,10 +36,6 @@ function ensureSafeEnding(html: string): string {
   return clean;
 }
 
-function removeAllZWSP(html: string): string {
-  return html.replace(/[\u200B-\u200D\uFEFF]/g, "");
-}
-
 /* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -78,7 +74,7 @@ const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
 /* -------------------------------------------------------------------------- */
 
 const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
-  ({ initialValue, placeholder, onUpdate, onReady, onFocus }, ref) => {
+  ({ placeholder, onUpdate, onReady, onFocus }, ref) => {
     const editorRef = useRef<Editor | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const initializedRef = useRef(false);
@@ -137,13 +133,6 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
 
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
-
-      // ✅ initialize content ONCE
-      if (!initializedRef.current && initialValue !== undefined) {
-        const safe = ensureSafeEnding(removeAllZWSP(initialValue));
-        editor.commands.setContent(safe, { emitUpdate: false });
-        initializedRef.current = true;
-      }
 
       const handleEditorFocus = () => {
         onFocusRef.current?.();

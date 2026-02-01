@@ -87,6 +87,14 @@ export default function PostForm({
   const editorHostRef = useRef<HTMLDivElement>(null);
   const lastFocusedAreaRef = useRef<FocusArea>("none");
 
+  type GlobalSnapshot = {
+    title: string;
+    content: string;
+  };
+
+  const globalUndoRef = useRef<GlobalSnapshot | null>(null);
+  const globalRedoRef = useRef<GlobalSnapshot | null>(null);
+
   type ClearSnapshot = {
     title: string;
     content: string;
@@ -142,10 +150,6 @@ export default function PostForm({
   const titleHistoryRef = useRef<string[]>([]);
   const titleRedoRef = useRef<string[]>([]);
 
-  const [editorInitialHTML, setEditorInitialHTML] = useState<string>(
-    removeZWSP(initialContent || "<p></p>")
-  );
-
   const [footerHeight, setFooterHeight] = useState(0);
   const pendingImagesRef = useRef<Map<string, File>>(new Map());
   const localBlobUrlsRef = useRef<Map<string, string>>(new Map());
@@ -190,6 +194,43 @@ export default function PostForm({
 
   const authorId = user?._id || null;
   const lastTitleChangeAtRef = useRef<number>(0);
+
+  // ================= DRAFT SAVE FIX =================
+
+  // always keep latest title (avoids stale closure)
+  const latestTitleRef = useRef(title);
+  useEffect(() => {
+    latestTitleRef.current = title;
+  }, [title]);
+
+  // prevent out-of-order async overwrites
+  const saveSeqRef = useRef(0);
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+
+  // serialize + last-write-wins
+  const saveDraftSafe = (nextTitle?: string) => {
+    const seq = ++saveSeqRef.current;
+
+    const run = async () => {
+      if (saveInFlightRef.current) {
+        try {
+          await saveInFlightRef.current;
+        } catch {}
+      }
+
+      // skip outdated saves
+      if (seq !== saveSeqRef.current) return;
+
+      await saveDraftNow(
+        nextTitle !== undefined ? nextTitle : latestTitleRef.current
+      );
+    };
+
+    const p = run();
+    saveInFlightRef.current = p;
+    return p;
+  };
+
   const TITLE_UNDO_THRESHOLD = 300;
 
   const draftKey = useMemo(() => {
@@ -212,7 +253,7 @@ export default function PostForm({
   });
 
   const getSanitizedEditorHTML = () => {
-    if (!editorRef.current) return "<p></p>";
+    if (!editorRef.current) return "";
 
     const html = removeZWSP(editorRef.current.getHTML());
     const doc = new DOMParser().parseFromString(html, "text/html");
@@ -220,16 +261,20 @@ export default function PostForm({
     doc
       .querySelectorAll("img[data-type='image-placeholder']")
       .forEach((img) => {
-        img.removeAttribute("src"); // 🔥 prevent blob persistence
+        img.setAttribute("src", "__DRAFT_IMAGE__");
       });
 
     return doc.body.innerHTML;
   };
+  const pendingSaveRef = useRef(false);
   const saveDraftNow = async (nextTitle?: string) => {
     if (!user?._id) return;
-    if (!editorRef.current) return;
-    if (!editorReadyRef.current) return;
 
+    // ⏸ editor not ready → queue save
+    if (!editorRef.current || !editorRef.current.editor) {
+      pendingSaveRef.current = true;
+      return;
+    }
     const content = getSanitizedEditorHTML();
     const { userId, postType, questionId } = getDraftScope();
 
@@ -247,7 +292,7 @@ export default function PostForm({
       userId,
       postType,
       {
-        title: (nextTitle ?? title).trim(),
+        title: nextTitle !== undefined ? nextTitle : title,
         content,
         images,
       },
@@ -292,18 +337,26 @@ export default function PostForm({
 
   const pendingDraftRef = useRef<PostDraftRecord | null>(null);
   const lastLoadedDraftKeyRef = useRef<string | null>(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
   useEffect(() => {
     if (!user?._id || !draftKey) return;
-    if (lastLoadedDraftKeyRef.current === draftKey) return;
 
+    // 🔒 prevent double-load for same draftKey
+    if (lastLoadedDraftKeyRef.current === draftKey) return;
     lastLoadedDraftKeyRef.current = draftKey;
+
+    let cancelled = false;
 
     const init = async () => {
       const { userId, postType, questionId } = getDraftScope();
       const rawDraft = await loadDraft(userId, postType, questionId);
 
+      if (cancelled) return;
+
+      let finalDraft: PostDraftRecord;
+
       if (rawDraft) {
-        // ✅ GC only here
         const cleanedDraft = gcDraftImages(rawDraft);
 
         // persist cleaned version once
@@ -320,27 +373,35 @@ export default function PostForm({
           );
         }
 
-        pendingDraftRef.current = cleanedDraft;
-        setTitle(cleanedDraft.title);
+        finalDraft = cleanedDraft;
       } else {
-        pendingDraftRef.current = {
+        finalDraft = {
           key: "__empty__",
           postType: mode,
           title: initialTitle,
-          content: removeZWSP(initialContent || "<p></p>"),
+          content: removeZWSP(initialContent || ""),
           images: [],
           updatedAt: Date.now(),
         };
-        setTitle(initialTitle);
       }
 
+      pendingDraftRef.current = finalDraft;
+
+      // 🔑 commit state AFTER draft is ready
+      setTitle(finalDraft.title);
       setSelected(initialSelectedCategories);
       setCategories(initialAvailableCategories);
       setCategoryReady(initialAvailableCategories.length > 0);
+
+      setDraftLoaded(true); // ✅ THIS WAS MISSING
     };
 
     init();
-  }, [draftKey]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, user?._id]);
 
   useEffect(() => {
     return () => {
@@ -366,13 +427,22 @@ export default function PostForm({
       if (!(e.ctrlKey || e.metaKey)) return;
 
       if (e.key === "z" && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
+        const active = document.activeElement;
+
+        // 🔑 only hijack when title input is focused
+        if (active === titleInputRef.current) {
+          e.preventDefault();
+          handleUndo();
+        }
       }
 
       if ((e.key === "z" && e.shiftKey) || e.key === "y") {
-        e.preventDefault();
-        handleRedo();
+        const active = document.activeElement;
+
+        if (active === titleInputRef.current) {
+          e.preventDefault();
+          handleRedo();
+        }
       }
     };
 
@@ -381,8 +451,13 @@ export default function PostForm({
   }, []);
 
   useEffect(() => {
+    // 🔥 FULL RESET on mode / question change
     editorReadyRef.current = false;
     draftReadyRef.current = false;
+
+    pendingDraftRef.current = null;
+    lastLoadedDraftKeyRef.current = null;
+    setDraftLoaded(false);
   }, [mode, questionId]);
 
   /* -------------------------------------------------------------------------- */
@@ -448,19 +523,10 @@ export default function PostForm({
     if (!editorRef.current) return;
     if (isApplyingUndoRedoRef.current) return;
 
-    const html = removeZWSP(editorRef.current.getHTML());
-    const hasMeaningfulContent =
-      extractTextWithMath(html).trim().length > 0 ||
-      html.includes("<img") ||
-      html.includes("<video") ||
-      html.includes("math-inline") ||
-      html.includes("math-block");
-    saveDraftNow(title);
-
-    if (mode !== PostTypes.QUESTION && !hasMeaningfulContent) return;
-
+    saveDraftSafe();
     setContentChanged(true);
   };
+
   const clearModeRef = useRef(false);
   const handleClearContent = () => {
     const editor = editorRef.current?.editor;
@@ -468,30 +534,52 @@ export default function PostForm({
 
     const content = editor.getHTML();
 
-    clearUndoRef.current = { title, content };
-    clearRedoRef.current = null;
+    // 🔑 save global snapshot
+    globalUndoRef.current = { title, content };
+    globalRedoRef.current = null;
 
-    clearModeRef.current = true; // 🔒 lock undo mode
+    clearModeRef.current = true;
 
     editorRef.current?.clearWithHistory();
     setTitle("");
     setContentChanged(true);
 
     (document.activeElement as HTMLElement | null)?.blur();
+    lastFocusedAreaRef.current = "none";
 
     if (authorId) {
-      clearDraft(
-        authorId,
-        mode,
-        mode === PostTypes.ANSWER ? questionId : undefined
-      );
+      saveDraftSafe("");
     }
   };
-
   const handleUndo = () => {
     const area = getFocusArea();
 
-    // 🔒 CLEAR MODE: only atomic clear undo allowed
+    /* 🔥 GLOBAL UNDO (no focus) */
+    if (area === "none") {
+      if (!globalUndoRef.current) return;
+
+      const snap = globalUndoRef.current;
+      globalUndoRef.current = null;
+
+      globalRedoRef.current = {
+        title,
+        content: editorRef.current?.getHTML() ?? "",
+      };
+
+      isApplyingUndoRedoRef.current = true;
+
+      setTitle(snap.title);
+      editorRef.current?.editor?.commands.setContent(snap.content, {
+        emitUpdate: false,
+      });
+
+      isApplyingUndoRedoRef.current = false;
+
+      saveDraftNow(snap.title);
+      return;
+    }
+
+    /* 🔒 CLEAR MODE (focused case) */
     if (clearModeRef.current) {
       if (!clearUndoRef.current) return;
 
@@ -500,31 +588,24 @@ export default function PostForm({
 
       clearRedoRef.current = {
         title,
-        content: editorRef.current?.getHTML() ?? "<p></p>",
+        content: editorRef.current?.getHTML() ?? "",
       };
 
       isApplyingUndoRedoRef.current = true;
+      setTitle(snap.title);
       editorRef.current?.editor?.commands.setContent(snap.content, {
         emitUpdate: false,
       });
       isApplyingUndoRedoRef.current = false;
 
-      setTitle(snap.title);
       saveDraftNow(snap.title);
-
-      requestAnimationFrame(() => {
-        (document.activeElement as HTMLElement | null)?.blur();
-        lastFocusedAreaRef.current = "none";
-      });
-
       return;
     }
 
-    // 1️⃣ Title undo
+    /* 🎯 Title undo */
     if (area === "title") {
       const history = titleHistoryRef.current;
 
-      // ✅ drop duplicates of current
       while (history.length && history[history.length - 1] === title) {
         history.pop();
       }
@@ -542,22 +623,47 @@ export default function PostForm({
       return;
     }
 
-    // 2️⃣ Editor undo
+    /* 📝 Editor undo */
     if (area === "editor") {
       if (!editorRef.current?.editor?.can().undo()) return;
 
       isApplyingUndoRedoRef.current = true;
-      editorRef.current?.editor?.commands.undo();
+      editorRef.current.editor.commands.undo();
       isApplyingUndoRedoRef.current = false;
+
       refocus("editor");
-      return;
     }
   };
 
   const handleRedo = () => {
     const area = getFocusArea();
 
-    // 🔒 CLEAR MODE: only atomic re-clear allowed
+    /* 🔥 GLOBAL REDO (no focus) */
+    if (area === "none") {
+      if (!globalRedoRef.current) return;
+
+      const snap = globalRedoRef.current;
+      globalRedoRef.current = null;
+
+      globalUndoRef.current = {
+        title,
+        content: editorRef.current?.getHTML() ?? "",
+      };
+
+      isApplyingUndoRedoRef.current = true;
+
+      setTitle(snap.title);
+      editorRef.current?.editor?.commands.setContent(snap.content, {
+        emitUpdate: false,
+      });
+
+      isApplyingUndoRedoRef.current = false;
+
+      saveDraftNow(snap.title);
+      return;
+    }
+
+    /* 🔒 CLEAR MODE */
     if (clearModeRef.current) {
       if (!clearRedoRef.current) return;
 
@@ -566,27 +672,21 @@ export default function PostForm({
 
       clearUndoRef.current = {
         title,
-        content: editorRef.current?.getHTML() ?? "<p></p>",
+        content: editorRef.current?.getHTML() ?? "",
       };
 
       isApplyingUndoRedoRef.current = true;
+      setTitle(snap.title);
       editorRef.current?.editor?.commands.setContent(snap.content, {
         emitUpdate: false,
       });
       isApplyingUndoRedoRef.current = false;
 
-      setTitle(snap.title);
       saveDraftNow(snap.title);
-
-      requestAnimationFrame(() => {
-        (document.activeElement as HTMLElement | null)?.blur();
-        lastFocusedAreaRef.current = "none";
-      });
-
       return;
     }
 
-    // 1️⃣ Title redo
+    /* 🎯 Title redo */
     if (area === "title") {
       const redo = titleRedoRef.current;
       if (redo.length === 0) return;
@@ -602,23 +702,16 @@ export default function PostForm({
       return;
     }
 
-    // 2️⃣ Editor redo
+    /* 📝 Editor redo */
     if (area === "editor") {
       if (!editorRef.current?.editor?.can().redo()) return;
 
       isApplyingUndoRedoRef.current = true;
-      editorRef.current?.editor?.commands.redo();
+      editorRef.current.editor.commands.redo();
       isApplyingUndoRedoRef.current = false;
-      refocus("editor");
-      return;
-    }
-  };
 
-  const suppressBlurOnce = () => {
-    suppressTitleBlurRef.current = true;
-    requestAnimationFrame(() => {
-      suppressTitleBlurRef.current = false;
-    });
+      refocus("editor");
+    }
   };
 
   /* -------------------------------------------------------------------------- */
@@ -817,7 +910,7 @@ export default function PostForm({
 
                 setTitle(next);
                 setContentChanged(true);
-                saveDraftNow(next);
+                saveDraftSafe(next);
               }}
               onFocus={() => {
                 clearModeRef.current = false; // 🔓 unlock
@@ -850,61 +943,58 @@ export default function PostForm({
 
         {/* ------------------------------ Editor ------------------------------ */}
         <div ref={editorHostRef} className="overflow-visible rounded-md">
-          <PostEditorWrapper
-            key={editorKey}
-            ref={editorRef}
-            onUpdate={handleEditorUpdate}
-            initialValue="<p></p>"
-            onReady={() => {
-              const draft = pendingDraftRef.current;
-              if (!draft) return;
+          {draftLoaded && (
+            <PostEditorWrapper
+              key={editorKey}
+              ref={editorRef}
+              onUpdate={handleEditorUpdate}
+              onFocus={() => {
+                clearModeRef.current = false;
+                lastFocusedAreaRef.current = "editor";
+              }}
+              onReady={() => {
+                editorReadyRef.current = true;
 
-              // 1️⃣ Restore document structure
-              editorRef.current?.editor?.commands.setContent(draft.content, {
-                emitUpdate: false,
-              });
+                if (!draftLoaded || !pendingDraftRef.current) return;
 
-              // 2️⃣ Defer image hydration until DOM exists
-              requestAnimationFrame(() => {
+                const draft = pendingDraftRef.current;
+
+                editorRef.current?.editor?.commands.setContent(draft.content, {
+                  emitUpdate: false,
+                });
+
                 requestAnimationFrame(() => {
-                  draft.images.forEach(({ id, buffer, mime }) => {
-                    const blob = new Blob([buffer], { type: mime });
-                    const file = new File([blob], "image", { type: mime });
+                  const host = editorHostRef.current;
+                  const draft = pendingDraftRef.current;
+                  if (!host || !draft) return;
+
+                  for (const img of draft.images) {
+                    const blob = new Blob([img.buffer], { type: img.mime });
                     const url = URL.createObjectURL(blob);
 
-                    const img = editorHostRef.current?.querySelector(
-                      `img[data-type="image-placeholder"][data-id="${id}"]`
-                    ) as HTMLImageElement | null;
+                    localBlobUrlsRef.current.set(img.id, url);
 
-                    if (!img) return;
-
-                    img.src = url;
-                    img.setAttribute("data-status", "local");
-
-                    pendingImagesRef.current.set(id, file);
-                    localBlobUrlsRef.current.set(id, url);
-                  });
+                    host
+                      .querySelectorAll(`img[data-type="image-placeholder"]`)
+                      .forEach((el) => {
+                        if (el.getAttribute("data-id") === img.id) {
+                          (el as HTMLImageElement).src = url;
+                          el.setAttribute("data-status", "local");
+                        }
+                      });
+                  }
 
                   pendingDraftRef.current = null;
-                  editorReadyRef.current = true;
+
+                  // flush queued save
+                  if (pendingSaveRef.current) {
+                    pendingSaveRef.current = false;
+                    saveDraftSafe();
+                  }
                 });
-              });
-            }}
-            onFocus={() => {
-              clearModeRef.current = false; // 🔓 unlock
-              lastFocusedAreaRef.current = "editor";
-              setIsTitleFocused(false);
-            }}
-            placeholder={
-              mode === PostTypes.POST
-                ? t("placeholder") || "Placeholder"
-                : mode === PostTypes.QUESTION
-                ? "質問内容を詳しく書いてください"
-                : mode === PostTypes.ANSWER
-                ? "Answer"
-                : "Placeholder(Illegal Statement)"
-            }
-          />
+              }}
+            />
+          )}
         </div>
 
         {/* ------------------------------ Categories ------------------------------ */}
@@ -1106,7 +1196,7 @@ export default function PostForm({
             {/* Undo Button */}
             <button
               type="button"
-              onMouseDown={suppressBlurOnce}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleUndo}
               className="px-3 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
@@ -1118,7 +1208,7 @@ export default function PostForm({
             {/* Redo Button */}
             <button
               type="button"
-              onMouseDown={suppressBlurOnce}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={handleRedo}
               className="px-3 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
@@ -1181,7 +1271,7 @@ export default function PostForm({
                     localBlobUrlsRef.current.set(localId, localUrl);
 
                     // 🔥 FORCE save AFTER image map is populated
-                    saveDraftNow();
+                    saveDraftSafe();
                   };
 
                   input.click();
