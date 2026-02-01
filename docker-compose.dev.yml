@@ -29,3 +29,18 @@ services:
     volumes:
       - ./ai-service:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  ws:
+    build: ./ws
+    container_name: jearn-ws
+    restart: unless-stopped
+    ports:
+      - "3535:3535"
+    env_file:
+      - .env.local
+    volumes:
+      - ./ws:/app
+      - /app/node_modules
+    command: npm run dev
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
