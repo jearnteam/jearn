@@ -12,6 +12,19 @@
   scrollbar-width: none;
 }
 
+.no-scroll-anchor {
+  overflow-anchor: none;
+}
+
+.select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.touch-none {
+  touch-action: manipulation;
+}
+
 /* ✅ Fix hydration flicker by applying background early (before JS runs) */
 html {
   background-color: #ffffff; /* Light mode */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { PostList } from "@/components/posts";
 import { usePosts } from "@/features/posts/hooks/usePosts";
@@ -26,20 +27,24 @@ import VideosPage from "@/components/videos/VideosPage";
 import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
 
 import { useScrollBus } from "@/components/3d_spinner/ScrollContext";
+import ChatListClient from "@/components/chat/ChatListClient";
+import ChatRoomClient from "@/components/chat/ChatRoomClient";
 
 /* ---------------------------------------------
  * VIEW TYPE
  * ------------------------------------------- */
-type HomeView = "home" | "notify" | "users" | "videos";
+type HomeView = "home" | "notify" | "users" | "videos" | "chat";
 
 export default function HomePage() {
   const { t } = useTranslation();
   const { emitScroll } = useScrollBus();
+  const router = useRouter();
 
   /* ---------------------------------------------
    * STATE
    * ------------------------------------------- */
   const [activeView, setActiveView] = useState<HomeView>("home");
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
@@ -76,7 +81,7 @@ export default function HomePage() {
   } = useFollowingPosts();
 
   const { unreadCount, clearUnread, fetchNotifications } =
-  useNotificationContext();
+    useNotificationContext();
 
   /* ---------------------------------------------
    * SCROLL MANAGEMENT (🔥 FIX)
@@ -90,6 +95,7 @@ export default function HomePage() {
     notify: 0,
     users: 0,
     videos: 0,
+    chat: 0,
   });
 
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
@@ -97,6 +103,12 @@ export default function HomePage() {
 
     const delta = cur - lastScrollTop.current;
     emitScroll(delta);
+
+    if (activeView === "chat") {
+      setNavbarVisible(true);
+      lastScrollTop.current = cur;
+      return;
+    }
 
     // 🎥 Videos page: mobile navbar always visible
     if (activeView === "videos") {
@@ -402,6 +414,12 @@ export default function HomePage() {
                   onClick={() => changeView("videos")}
                 />
               </div>
+
+              <SidebarItem
+                label="Chat"
+                active={activeView === "chat"}
+                onClick={() => changeView("chat")}
+              />
             </nav>
           </aside>
 
@@ -411,7 +429,7 @@ export default function HomePage() {
               ref={scrollRef}
               onScroll={onScroll}
               className={`
-              flex-1 overflow-y-auto no-scrollbar
+              flex-1 min-h-0 overflow-y-auto no-scrollbar
               ${
                 activeView === "videos"
                   ? "snap-y snap-mandatory"
@@ -499,6 +517,24 @@ export default function HomePage() {
                   <VideosPage />
                 </div>
               )}
+
+              {/* CHAT */}
+              <div
+                className={
+                  activeView === "chat"
+                    ? "flex flex-col h-full"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                {activeRoomId ? (
+                  <ChatRoomClient
+                    roomId={activeRoomId}
+                    onClose={() => setActiveRoomId(null)} // 🔑 THIS IS THE FIX
+                  />
+                ) : (
+                  <ChatListClient onOpenRoom={setActiveRoomId} />
+                )}
+              </div>
             </main>
           </VideoSettingsProvider>
 

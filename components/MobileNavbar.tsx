@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useUpload } from "@/components/upload/UploadContext";
 
-type HomeView = "home" | "notify" | "users" | "videos";
+export type HomeView = "home" | "notify" | "users" | "videos" | "chat";
 
 interface MobileNavbarProps {
   visible: boolean;
@@ -52,7 +52,9 @@ export default function MobileNavbar({
   const updateIndicator = useCallback(() => {
     if (!navRef.current) return;
 
-    const map: Record<HomeView, React.RefObject<HTMLButtonElement | null>> = {
+    const map: Partial<
+      Record<HomeView, React.RefObject<HTMLButtonElement | null>>
+    > = {
       home: homeRef,
       users: usersRef,
       notify: notifyRef,
