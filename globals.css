@@ -16,6 +16,10 @@
   overflow-anchor: none;
 }
 
+:root {
+  --mobile-bottom-inset: 80px;
+}
+
 .select-text {
   -webkit-user-select: text;
   user-select: text;

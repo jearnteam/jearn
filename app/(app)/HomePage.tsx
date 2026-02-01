@@ -522,14 +522,14 @@ export default function HomePage() {
               <div
                 className={
                   activeView === "chat"
-                    ? "flex flex-col h-full"
+                    ? "block h-full"
                     : "invisible h-0 overflow-hidden"
                 }
               >
                 {activeRoomId ? (
                   <ChatRoomClient
                     roomId={activeRoomId}
-                    onClose={() => setActiveRoomId(null)} // 🔑 THIS IS THE FIX
+                    onClose={() => setActiveRoomId(null)}
                   />
                 ) : (
                   <ChatListClient onOpenRoom={setActiveRoomId} />
@@ -564,6 +564,8 @@ function getSidebarIndicatorTop(view: HomeView) {
       return 88;
     case "videos":
       return 132;
+    case "chat":
+      return 176;
     default:
       return 0;
   }
