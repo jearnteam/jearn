@@ -21,7 +21,14 @@ export async function GET(
     );
   }
 
-  const myUid = session.user.uid;
+  if (!ObjectId.isValid(session.user.uid)) {
+    return NextResponse.json(
+      { error: "Invalid session user" },
+      { status: 401 }
+    );
+  }
+  
+  const myObjectId = new ObjectId(session.user.uid);
 
   if (!ObjectId.isValid(params.roomId)) {
     return NextResponse.json(
@@ -46,7 +53,7 @@ export async function GET(
    * ────────────────────────────── */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myUid,
+    members: myObjectId,
   });
 
   if (!room) {
@@ -59,11 +66,11 @@ export async function GET(
   /* ──────────────────────────────
    * 4️⃣ Get partner UID
    * ────────────────────────────── */
-  const partnerUid = room.members.find(
-    (uid: string) => uid !== myUid
+  const partnerId = room.members.find(
+    (id: ObjectId) => !id.equals(myObjectId)
   );
 
-  if (!partnerUid || !ObjectId.isValid(partnerUid)) {
+  if (!partnerId || !ObjectId.isValid(partnerId)) {
     return NextResponse.json(
       { error: "Invalid room" },
       { status: 400 }
@@ -74,10 +81,11 @@ export async function GET(
    * 5️⃣ Fetch partner info (FIXED)
    * ────────────────────────────── */
   const partner = await usersCol.findOne(
-    { _id: new ObjectId(partnerUid) },
+    { _id: new ObjectId(partnerId) },
     {
       projection: {
         name: 1,
+        bio: 1,
         avatar: 1,
         avatarUpdatedAt: 1, // ✅ ADD THIS
       },
@@ -96,6 +104,7 @@ export async function GET(
     partner: {
       uid: partner._id.toString(),
       name: partner.name,
+      bio: partner.bio,
       avatar: typeof partner.avatar === "string" ? partner.avatar : null,
       avatarUpdatedAt: partner.avatarUpdatedAt ?? null,
     },

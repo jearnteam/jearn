@@ -20,6 +20,7 @@ interface MeResponse {
 interface Partner {
   uid: string;
   name: string;
+  bio?: string;
   avatar?: string | null;
   avatarUpdatedAt?: string | null;
 }
@@ -34,6 +35,7 @@ export interface Message {
 interface MessagesResponse {
   messages: Message[]; // newest → oldest
   nextCursor: string | null;
+  isLastPage: boolean;
 }
 
 type Anchor = {
@@ -67,10 +69,38 @@ function formatTime(ts: string) {
 function copyText(text: string) {
   navigator.clipboard?.writeText(text).catch(() => {});
 }
+
+function ChatInfoBlock({ partner }: { partner: Partner }) {
+  const avatarSrc = resolveAvatar({
+    avatar: partner.avatar,
+    userId: partner.uid,
+    avatarUpdatedAt: partner.avatarUpdatedAt,
+  });
+
+  return (
+    <div className="flex flex-col items-center py-8 text-center text-gray-500">
+      <img
+        src={avatarSrc}
+        className="w-16 h-16 rounded-full mb-3"
+        alt={partner.name}
+      />
+      <div className="font-medium text-gray-800 dark:text-gray-200">
+        {partner.name}
+      </div>
+      {partner.bio && (
+        <div className="text-sm text-gray-400">{partner.bio.slice(0, 8)}</div>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────── COMPONENT ───────────────── */
 
 export default function ChatRoomClient({ roomId, onClose }: Props) {
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hasAnyMessages, setHasAnyMessages] = useState<boolean | null>(null);
+  const [reachedBeginning, setReachedBeginning] = useState(false);
   const [activeMsgId, setActiveMsgId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showOlderLoading, setShowOlderLoading] = useState(false);
@@ -103,15 +133,6 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       .catch(() => setMe(null));
   }, []);
 
-  /* ───────── LOAD ROOM INFO ───────── */
-
-  useEffect(() => {
-    fetch(`/api/chat/room/${roomId}`)
-      .then((r) => r.json())
-      .then((d) => setPartner(d.partner))
-      .catch(() => setPartner(null));
-  }, [roomId]);
-
   /* ───────── INITIAL LOAD ───────── */
 
   useEffect(() => {
@@ -120,17 +141,55 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
     didInitialScrollRef.current = false;
     hasMoreRef.current = true;
 
-    (async () => {
-      const res = await fetch(`/api/chat/messages?roomId=${roomId}`);
-      const data: MessagesResponse = await res.json();
-      if (cancelled) return;
+    setMessages([]);
+    setCursor(null);
+    setInitialLoaded(false);
+    setHasAnyMessages(null); // 🔑 reset authoritative state
+    setReachedBeginning(false);
 
-      setMessages(
-        (data.messages ?? []).slice().reverse().map(normalizeMessage)
-      );
-      setCursor(data.nextCursor);
-      hasMoreRef.current = Boolean(data.nextCursor);
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat/messages?roomId=${roomId}`);
+        const data: MessagesResponse = await res.json();
+        if (cancelled) return;
+
+        const msgs = (data.messages ?? [])
+          .slice()
+          .reverse()
+          .map(normalizeMessage);
+
+        setMessages(msgs);
+        setCursor(data.nextCursor);
+        hasMoreRef.current = Boolean(data.nextCursor);
+
+        setHasAnyMessages(msgs.length > 0);
+        setReachedBeginning(data.isLastPage); // 🔥 IMPORTANT
+      } finally {
+        if (!cancelled) setInitialLoaded(true);
+      }
     })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId]);
+
+  /* ───────── LOAD ROOM INFO ───────── */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setPartner(null); // reset on room switch
+
+    fetch(`/api/chat/room/${roomId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setPartner(d.partner);
+      })
+      .catch(() => {
+        if (!cancelled) setPartner(null);
+      });
 
     return () => {
       cancelled = true;
@@ -141,12 +200,6 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
 
   useLayoutEffect(() => {
     if (!messages.length) return;
-
-    if (!didInitialScrollRef.current) {
-      scrollToBottom(true);
-      didInitialScrollRef.current = true;
-      return;
-    }
 
     if (pendingRestoreRef.current && anchorRef.current) {
       restoreAnchor();
@@ -220,23 +273,32 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       );
       const data: MessagesResponse = await res.json();
 
-      if (!data.messages?.length) {
-        hasMoreRef.current = false;
-        setCursor(null);
-        return;
-      }
-
       setMessages((prev) => [
         ...data.messages.slice().reverse().map(normalizeMessage),
         ...prev,
       ]);
       setCursor(data.nextCursor);
       hasMoreRef.current = Boolean(data.nextCursor);
+
+      if (data.isLastPage) {
+        setReachedBeginning(true); // 🔥 reached top
+      }
     } finally {
       loadingMoreRef.current = false;
       setShowOlderLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!initialLoaded) return;
+    if (didInitialScrollRef.current) return;
+
+    // Force scroll AFTER paint
+    requestAnimationFrame(() => {
+      scrollToBottom(true);
+      didInitialScrollRef.current = true;
+    });
+  }, [initialLoaded]);
 
   /* ───────── RESIZE HANDLING ───────── */
 
@@ -394,7 +456,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       {showOlderLoading && (
         <div className="absolute top-14 inset-x-0 flex justify-center z-20">
           <div className="px-3 py-1 rounded-full text-xs bg-black/70 text-white">
-            Loading earlier messages…
+            Loading messages…
           </div>
         </div>
       )}
@@ -418,6 +480,10 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
           if (nearBottom) setUnreadCount(0);
         }}
       >
+        {/* BEGINNING OF CHAT (API CONFIRMED) */}
+        {initialLoaded && partner && reachedBeginning && (
+          <ChatInfoBlock partner={partner} />
+        )}
         {messages.map((m, i) => {
           const next = messages[i + 1];
           const isMe = m.senderId === me.uid;

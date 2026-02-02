@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const myUid = session.user.uid;
+  const myUid = new ObjectId(session.user.uid).toString();
 
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");

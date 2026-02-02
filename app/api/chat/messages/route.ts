@@ -1,12 +1,13 @@
-// app/api/chat/messages/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 
+const PAGE_SIZE = 30;
+
 /* -------------------------------------------------
- * GET /api/chat/messages?roomId=xxx&cursor=xxx
+ * GET /api/chat/messages
  * ------------------------------------------------- */
 export async function GET(req: Request) {
   const session = await getServerSession(authConfig);
@@ -14,7 +15,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const myUid = session.user.uid;
+  if (!ObjectId.isValid(session.user.uid)) {
+    return NextResponse.json(
+      { error: "Invalid session user" },
+      { status: 401 }
+    );
+  }
+
+  const myId = new ObjectId(session.user.uid);
 
   const { searchParams } = new URL(req.url);
   const roomIdStr = searchParams.get("roomId");
@@ -32,26 +40,29 @@ export async function GET(req: Request) {
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
 
+  /* 1️⃣ Check room membership */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myUid,
+    members: myId, // ✅ ObjectId
   });
 
   if (!room) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  /* 2️⃣ Build message query */
   const match: any = { roomId };
+
   if (cursor && ObjectId.isValid(cursor)) {
     match._id = { $lt: new ObjectId(cursor) };
   }
 
-  // 🔥 IMPORTANT: DO NOT reverse
+  /* 3️⃣ Fetch messages */
   const docs = await messagesCol
     .aggregate([
       { $match: match },
-      { $sort: { _id: -1 } }, // newest → oldest
-      { $limit: 30 },
+      { $sort: { _id: -1 } },
+      { $limit: PAGE_SIZE + 1 },
       {
         $project: {
           _id: 1,
@@ -63,15 +74,20 @@ export async function GET(req: Request) {
     ])
     .toArray();
 
+  const hasMore = docs.length > PAGE_SIZE;
+  const pageDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
+
   return NextResponse.json({
-    messages: docs.map((m) => ({
+    messages: pageDocs.map((m) => ({
       id: m._id.toString(),
-      senderId: m.senderId,
+      senderId: m.senderId.toString(),
       text: m.text,
       createdAt: m.createdAt,
     })),
-    // 👇 cursor = OLDEST in this page
-    nextCursor: docs.length > 0 ? docs[docs.length - 1]._id.toString() : null,
+    nextCursor: hasMore
+      ? pageDocs[pageDocs.length - 1]._id.toString()
+      : null,
+    isLastPage: !hasMore,
   });
 }
 
@@ -80,12 +96,18 @@ export async function GET(req: Request) {
  * ------------------------------------------------- */
 export async function POST(req: Request) {
   const session = await getServerSession(authConfig);
-
   if (!session?.user?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const myUid = session.user.uid; // _id as string
+  if (!ObjectId.isValid(session.user.uid)) {
+    return NextResponse.json(
+      { error: "Invalid session user" },
+      { status: 401 }
+    );
+  }
+
+  const myId = new ObjectId(session.user.uid);
 
   const body = await req.json().catch(() => null);
   const roomIdStr = body?.roomId;
@@ -107,53 +129,38 @@ export async function POST(req: Request) {
 
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
-  const usersCol = db.collection("users");
 
-  /* ---------------------------------------------
-   * 1️⃣ Check room membership
-   * ------------------------------------------- */
+  /* 1️⃣ Check room membership */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myUid,
+    members: myId, // ✅ ObjectId
   });
 
   if (!room) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  /* ---------------------------------------------
-   * 2️⃣ Insert message
-   * ------------------------------------------- */
+  /* 2️⃣ Insert message */
   const now = new Date();
 
   const doc = {
     roomId,
-    senderId: myUid, // string _id
+    senderId: myId,
     text: text.trim(),
     createdAt: now,
-    readBy: [myUid],
+    readBy: [myId],
   };
 
   const result = await messagesCol.insertOne(doc);
 
-  /* ---------------------------------------------
-   * 3️⃣ Update room metadata
-   * ------------------------------------------- */
-  await roomsCol.updateOne({ _id: roomId }, { $set: { lastMessageAt: now } });
-
-  /* ---------------------------------------------
-   * 4️⃣ Attach sender info
-   * ------------------------------------------- */
-  const sender = await usersCol.findOne(
-    { _id: new ObjectId(myUid) },
-    { projection: { name: 1, avatar: 1 } }
+  await roomsCol.updateOne(
+    { _id: roomId },
+    { $set: { lastMessageAt: now } }
   );
 
   return NextResponse.json({
     id: result.insertedId.toString(),
-    senderId: myUid,
-    senderName: sender?.name ?? "Unknown",
-    senderAvatar: sender?.avatar ?? null,
+    senderId: myId.toString(),
     text: doc.text,
     createdAt: doc.createdAt,
   });
