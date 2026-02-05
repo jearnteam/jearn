@@ -41,14 +41,12 @@ export default function UserMenu({ user }: { user: User }) {
         body: JSON.stringify({ theme: nextTheme }),
       });
     } catch (err) {
-      console.error("❌ Failed to save theme", err);
+      console.error("Failed to save theme", err);
     }
   };
 
   const toggleTheme = () => {
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
-
-    console.log("🎨 toggle theme →", nextTheme);
 
     // 🔵 start animated overlay
     window.dispatchEvent(

@@ -366,13 +366,13 @@ export default function HomePage() {
                 layout
                 layoutId="sidebar-indicator"
                 className="
-        absolute left-0 right-0
-        h-[40px]
-        rounded-lg
-        bg-blue-600
-        z-0
-        pointer-events-none
-      "
+                  absolute left-0 right-0
+                  h-[40px]
+                  rounded-lg
+                  bg-blue-600
+                  z-0
+                  pointer-events-none
+                "
                 style={{ top: getSidebarIndicatorTop(activeView) }}
                 transition={{
                   type: "spring",

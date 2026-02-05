@@ -10,6 +10,8 @@ import { useSearch } from "@/features/search/useSearch";
 import SearchResults from "@/features/search/SearchResults";
 import { useRouter } from "next/navigation";
 import { useNotificationContext } from "@/features/notifications/NotificationProvider";
+import { usePathname } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
@@ -19,6 +21,8 @@ const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
 const MemoUserMenu = memo(UserMenu);
 
 export default function Navbar() {
+  const pathname = usePathname();
+  const isHome = pathname === "/";
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
   const { unreadCount } = useNotificationContext();
@@ -94,15 +98,30 @@ export default function Navbar() {
             ${searchActive ? "opacity-0 pointer-events-none" : ""}
           `}
           onClick={() => {
-            if (window.location.pathname === "/") {
+            if (isHome) {
               window.location.reload();
             } else {
-              window.location.href = "/";
+              router.push("/");
             }
           }}
         >
           <div className="w-12 h-12 flex items-center justify-center">
-            <ThreeBall />
+            {isHome ? (
+              <ThreeBall />
+            ) : (
+              <button
+                onClick={() => router.back()}
+                aria-label="Go back"
+                className="
+        flex items-center justify-center
+        w-10 h-10 rounded-full
+        hover:bg-gray-100 dark:hover:bg-neutral-800
+        transition-colors
+      "
+              >
+                <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
 
           <h1
