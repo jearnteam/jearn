@@ -275,6 +275,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ items: enriched, nextCursor });
   } catch (err) {
     console.error("❌ GET /api/posts/following error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        items: [],
+        nextCursor: null,
+        error: "Server error",
+      },
+      { status: 500 }
+    );
   }
 }

@@ -11,10 +11,15 @@ export function useFollow(targetUserId: string) {
       try {
         const res = await fetch(`/api/follow/status/${targetUserId}`, {
           cache: "no-store",
-          credentials: "include", 
+          credentials: "include",
         });
+
+        if (!res.ok) {
+          throw new Error(`Status ${res.status}`);
+        }
+
         const data = await res.json();
-        if (alive) setFollowing(!!data.following);
+        if (alive) setFollowing(Boolean(data.following));
       } catch (e) {
         console.error("Failed to fetch follow status:", e);
       } finally {
