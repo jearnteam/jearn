@@ -7,7 +7,7 @@ import PostEditorWrapper, {
   PostEditorWrapperRef,
 } from "@/components/posts/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import i18n from "@/lib/i18n";
+import i18n from "@/lib/i18n/index";
 import { PostType, PostTypes } from "@/types/post";
 import {
   extractTagsFromHTML,

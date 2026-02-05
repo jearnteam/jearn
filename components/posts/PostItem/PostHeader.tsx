@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import i18n from "@/lib/i18n";
+import i18n from "@/lib/i18n/index";
 import PostMenu from "./PostMenu";
 import { Network } from "lucide-react";
 import type { Post } from "@/types/post";

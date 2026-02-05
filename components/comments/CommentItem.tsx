@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from "react";
 import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import i18n from "@/lib/i18n";
+import i18n from "@/lib/i18n/index";
 import { MoreVertical, ArrowBigUp, Reply } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";

@@ -13,7 +13,7 @@ import { PostTypes, type Post } from "@/types/post";
 import clsx from "clsx";
 import dayjs from "@/lib/dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import i18n from "@/lib/i18n";
+import i18n from "@/lib/i18n/index";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState, useCallback } from "react";
 
