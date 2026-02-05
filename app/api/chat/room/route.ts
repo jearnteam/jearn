@@ -7,99 +7,151 @@ import { ObjectId } from "mongodb";
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  /* 1️⃣ AUTH */
-  const session = await getServerSession(authConfig);
+  try {
+    console.log("🟢 CHAT ROOM: request received");
 
-  if (!session?.user?.uid) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+    /* ──────────────────────────────
+     * 1️⃣ AUTH
+     * ────────────────────────────── */
+    const session = await getServerSession(authConfig);
 
-  if (!ObjectId.isValid(session.user.uid)) {
-    return NextResponse.json(
-      { error: "Invalid session user" },
-      { status: 401 }
-    );
-  }
-
-  const myId = new ObjectId(session.user.uid);
-
-  /* 2️⃣ BODY */
-  const body = await req.json().catch(() => null);
-  const targetUid =
-    body && typeof body.targetUserId === "string"
-      ? body.targetUserId
-      : null;
-
-  if (!targetUid || targetUid === session.user.uid) {
-    return NextResponse.json(
-      { error: "Invalid target user" },
-      { status: 400 }
-    );
-  }
-
-  if (!ObjectId.isValid(targetUid)) {
-    return NextResponse.json(
-      { error: "Invalid target user" },
-      { status: 400 }
-    );
-  }
-
-  const targetId = new ObjectId(targetUid);
-
-  /* 3️⃣ DB */
-  const client = await clientPromise;
-  const db = client.db(process.env.MONGODB_DB || "jearn");
-
-  const roomsCol = db.collection("chat_rooms");
-  const usersCol = db.collection("users");
-
-  /* 4️⃣ VERIFY TARGET USER EXISTS */
-  const exists = await usersCol.findOne(
-    { _id: targetId },
-    { projection: { _id: 1 } }
-  );
-
-  if (!exists) {
-    return NextResponse.json(
-      { error: "Invalid target user" },
-      { status: 400 }
-    );
-  }
-
-  /* 5️⃣ NORMALIZE MEMBERS */
-  const members = [myId, targetId].sort((a, b) =>
-    a.toString().localeCompare(b.toString())
-  );
-
-  /* 6️⃣ ATOMIC UPSERT (Mongo v6 SAFE) */
-  const now = new Date();
-
-  const result = await roomsCol.findOneAndUpdate(
-    { type: "direct", members },
-    {
-      $setOnInsert: {
-        type: "direct",
-        members,
-        createdAt: now,
-        lastMessageAt: null,
-      },
-    },
-    {
-      upsert: true,
-      returnDocument: "after",
-      includeResultMetadata: true, // 🔥 REQUIRED
+    if (!session?.user?.uid || !ObjectId.isValid(session.user.uid)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-  );
 
-  if (!result.value) {
+    const myUid = session.user.uid;
+
+    /* ──────────────────────────────
+     * 2️⃣ BODY
+     * ────────────────────────────── */
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        { status: 400 }
+      );
+    }
+
+    const targetUid =
+      typeof body?.targetUserId === "string"
+        ? body.targetUserId
+        : null;
+
+    if (!targetUid || !ObjectId.isValid(targetUid)) {
+      return NextResponse.json(
+        { error: "Invalid targetUserId" },
+        { status: 400 }
+      );
+    }
+
+    if (targetUid === myUid) {
+      return NextResponse.json(
+        { error: "Cannot chat with yourself" },
+        { status: 400 }
+      );
+    }
+
+    /* ──────────────────────────────
+     * 3️⃣ DB
+     * ────────────────────────────── */
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB || "jearn");
+
+    const roomsCol = db.collection("chat_rooms");
+    const usersCol = db.collection("users");
+
+    /* ──────────────────────────────
+     * 4️⃣ VERIFY TARGET USER
+     * ────────────────────────────── */
+    const exists = await usersCol.findOne(
+      { _id: new ObjectId(targetUid) },
+      { projection: { _id: 1 } }
+    );
+
+    if (!exists) {
+      return NextResponse.json(
+        { error: "Target user not found" },
+        { status: 404 }
+      );
+    }
+
+    /* ──────────────────────────────
+     * 5️⃣ MEMBERS (SORTED)
+     * ────────────────────────────── */
+    const members = [myUid, targetUid].sort();
+
+    /* ──────────────────────────────
+     * 6️⃣ UPSERT (E11000 SAFE)
+     * ────────────────────────────── */
+    const now = new Date();
+    let room: any = null;
+
+    try {
+      const upsertResult = await roomsCol.findOneAndUpdate(
+        { type: "direct", members },
+        {
+          $setOnInsert: {
+            type: "direct",
+            members,
+            createdAt: now,
+            lastMessageAt: null,
+          },
+        },
+        {
+          upsert: true,
+          returnDocument: "after",
+        }
+      );
+
+      room =
+        upsertResult?.value ??
+        (await roomsCol.findOne({ type: "direct", members }));
+    } catch (e: any) {
+      // 🔥 DUPLICATE KEY = ROOM ALREADY EXISTS
+      if (e?.code === 11000) {
+        room = await roomsCol.findOne({ type: "direct", members });
+      } else {
+        console.error("🔴 MONGO ERROR:", e);
+        return NextResponse.json(
+          {
+            error: "Mongo error",
+            code: e?.code,
+            message: e?.message,
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    if (!room) {
+      console.error("🔴 ROOM NOT FOUND AFTER DUPLICATE");
+      return NextResponse.json(
+        { error: "Room creation failed" },
+        { status: 500 }
+      );
+    }
+
+    console.log("🟢 ROOM OK:", room._id.toString());
+
+    /* ──────────────────────────────
+     * 7️⃣ RESPONSE
+     * ────────────────────────────── */
+    return NextResponse.json({
+      roomId: room._id.toString(),
+      created:
+        room.createdAt instanceof Date &&
+        room.createdAt.getTime() === now.getTime(),
+    });
+  } catch (err: any) {
+    console.error("🔴 UNHANDLED ERROR:", err);
     return NextResponse.json(
-      { error: "Failed to create chat room" },
+      {
+        error: "Unhandled error",
+        message: err?.message,
+      },
       { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    roomId: result.value._id.toString(),
-    created: Boolean(result.lastErrorObject?.upserted),
-  });
 }

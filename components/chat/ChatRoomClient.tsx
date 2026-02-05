@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { resolveAvatar } from "@/lib/avatar";
 
 /* ───────────────── TYPES ───────────────── */
@@ -123,7 +123,34 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
   const didInitialScrollRef = useRef(false);
   const pendingRestoreRef = useRef(false);
   const anchorRef = useRef<Anchor | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const MAX_TEXTAREA_HEIGHT = 120; // px (~5–6 lines)
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // Reset height so shrink works
+    el.style.height = "auto";
+
+    const next = Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT);
+    el.style.height = `${next}px`;
+
+    // Enable scroll only when max reached
+    el.style.overflowY =
+      el.scrollHeight > MAX_TEXTAREA_HEIGHT ? "auto" : "hidden";
+  }, [input]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const update = () => setIsMobile(mq.matches);
+
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   /* ───────── LOAD ME ───────── */
 
   useEffect(() => {
@@ -379,7 +406,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
   async function send() {
     if (sendingRef.current || !me) return;
 
-    const text = input.replace(/^\s+|\s+$/g, "");
+    const text = input.replace(/[ \t]+$/g, "");
     if (!text) return;
 
     sendingRef.current = true;
@@ -405,10 +432,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
         })
       );
 
-      requestAnimationFrame(() => {
-        scrollToBottom(true);
-        requestAnimationFrame(() => scrollToBottom(true));
-      });
+      requestAnimationFrame(() => scrollToBottom(true));
     } finally {
       sendingRef.current = false;
     }
@@ -464,11 +488,14 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       {/* MESSAGE LIST */}
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 space-y-2 no-scrollbar"
+        className="
+    flex-1 flex flex-col
+    overflow-y-auto overflow-x-hidden
+    py-3 space-y-2 no-scrollbar
+  "
         onScroll={(e) => {
           if (loadingMoreRef.current) return;
 
-          // 🔓 user took control
           pendingRestoreRef.current = false;
           anchorRef.current = null;
 
@@ -480,95 +507,102 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
           if (nearBottom) setUnreadCount(0);
         }}
       >
-        {/* BEGINNING OF CHAT (API CONFIRMED) */}
-        {initialLoaded && partner && reachedBeginning && (
-          <ChatInfoBlock partner={partner} />
-        )}
-        {messages.map((m, i) => {
-          const next = messages[i + 1];
-          const isMe = m.senderId === me.uid;
-          const isLast = i === messages.length - 1;
+        {/* CENTERED CHAT COLUMN */}
+        <div className="mx-auto w-full max-w-[720px] py-3 space-y-1 flex flex-col flex-1">
+          {/* PUSH CONTENT DOWN */}
+          <div className="flex-1" />
+          {/* BEGINNING OF CHAT (API CONFIRMED) */}
+          {initialLoaded &&
+            partner &&
+            (messages.length === 0 || reachedBeginning) && (
+              <ChatInfoBlock partner={partner} />
+            )}
+          {messages.map((m, i) => {
+            const next = messages[i + 1];
+            const isMe = m.senderId === me.uid;
+            const isLast = i === messages.length - 1;
 
-          const showTime =
-            !next ||
-            next.senderId !== m.senderId ||
-            !sameMinute(m.createdAt, next.createdAt);
+            const showTime =
+              !next ||
+              next.senderId !== m.senderId ||
+              !sameMinute(m.createdAt, next.createdAt);
 
-          return (
-            <div
-              key={m.id}
-              ref={isLast ? bottomMsgRef : null}
-              data-msg-id={m.id}
-              className={clsx(
-                "relative flex px-12 max-w-full overflow-hidden transition-colors",
-                isMe ? "justify-end" : "justify-start",
-                activeMsgId === m.id && "bg-black/5 dark:bg-white/5 rounded-lg"
-              )}
-              onMouseEnter={() => setActiveMsgId(m.id)}
-              onMouseLeave={() => setActiveMsgId(null)}
-              onPointerDown={() => {
-                const timer = window.setTimeout(() => {
-                  setActiveMsgId(m.id);
-                }, 450);
+            return (
+              <div
+                key={m.id}
+                ref={isLast ? bottomMsgRef : null}
+                data-msg-id={m.id}
+                className={clsx(
+                  "relative flex max-w-full px-2 overflow-hidden transition-colors",
+                  isMe ? "justify-end" : "justify-start",
+                  activeMsgId === m.id &&
+                    "bg-black/5 dark:bg-white/5 rounded-lg"
+                )}
+                onMouseEnter={() => setActiveMsgId(m.id)}
+                onMouseLeave={() => setActiveMsgId(null)}
+                onPointerDown={() => {
+                  const timer = window.setTimeout(() => {
+                    setActiveMsgId(m.id);
+                  }, 450);
 
-                const clear = () => {
-                  clearTimeout(timer);
-                  window.removeEventListener("pointerup", clear);
-                  window.removeEventListener("pointercancel", clear);
-                };
+                  const clear = () => {
+                    clearTimeout(timer);
+                    window.removeEventListener("pointerup", clear);
+                    window.removeEventListener("pointercancel", clear);
+                  };
 
-                window.addEventListener("pointerup", clear);
-                window.addEventListener("pointercancel", clear);
-              }}
-            >
-              {/* COPY BUTTON */}
-              {activeMsgId === m.id && (
-                <div
-                  className={clsx(
-                    "absolute top-1/2 -translate-y-1/2 z-20",
-                    isMe ? "left-2" : "right-2"
+                  window.addEventListener("pointerup", clear);
+                  window.addEventListener("pointercancel", clear);
+                }}
+              >
+                <div className="max-w-[75%] relative">
+                  {/* COPY BUTTON */}
+                  {activeMsgId === m.id && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyText(m.text);
+                        setActiveMsgId(null);
+                      }}
+                      className={clsx(
+                        "absolute top-1/2 -translate-y-1/2 z-20",
+                        isMe ? "-left-14" : "-right-14",
+                        "px-2 py-1 rounded-md text-xs",
+                        "bg-black/80 text-white hover:bg-black"
+                      )}
+                    >
+                      Copy
+                    </button>
                   )}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyText(m.text);
-                      setActiveMsgId(null);
-                    }}
-                    className="px-2 py-1 rounded-md text-xs bg-black/80 text-white hover:bg-black"
-                  >
-                    Copy
-                  </button>
-                </div>
-              )}
 
-              <div className="max-w-[75%]">
-                <div
-                  className={clsx(
-                    "px-3 py-2 rounded-[7px] text-sm break-words break-all",
-                    "ring-1 ring-black/5 dark:ring-white/10",
-                    isMe
-                      ? "bg-emerald-600 text-white"
-                      : "bg-stone-200 text-stone-900 dark:bg-stone-800 dark:text-stone-100"
-                  )}
-                >
-                  {m.text.trim()}
-                </div>
-
-                {showTime && (
                   <div
                     className={clsx(
-                      "mt-1 text-[10px] text-gray-400",
-                      isMe ? "text-right" : "text-left"
+                      "px-3 py-2 rounded-[7px] text-sm",
+                      "whitespace-pre-wrap break-words",
+                      "ring-1 ring-black/5 dark:ring-white/10",
+                      isMe
+                        ? "bg-emerald-600 text-white"
+                        : "bg-stone-200 text-stone-900 dark:bg-stone-800 dark:text-stone-100"
                     )}
                   >
-                    {formatTime(m.createdAt)}
+                    {m.text}
                   </div>
-                )}
+
+                  {showTime && (
+                    <div
+                      className={clsx(
+                        "mt-1 text-[10px] text-gray-400",
+                        isMe ? "text-right" : "text-left"
+                      )}
+                    >
+                      {formatTime(m.createdAt)}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* UNREAD */}
@@ -585,20 +619,59 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       )}
 
       {/* INPUT */}
-      <div className="border-t p-3 flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          className="flex-1 border rounded-full px-4 py-2 text-sm"
-          placeholder="Message…"
-        />
-        <button
-          onClick={send}
-          className="bg-blue-600 text-white px-4 rounded-full"
-        >
-          Send
-        </button>
+      <div className="shrink-0 bg-white dark:bg-black mb-2 lg:mb-0">
+        <div className="mx-auto max-w-[720px] border-t">
+          <div className="px-3 py-3 flex gap-2">
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+
+                // 📱 Mobile: Enter = newline (default behavior)
+                if (isMobile) {
+                  return; // allow <br>
+                }
+
+                // 🖥 Desktop
+                if (!e.shiftKey) {
+                  e.preventDefault();
+                  send();
+                }
+              }}
+              rows={1}
+              className="
+          flex-1 resize-none
+          border rounded-2xl px-4 py-2
+          text-base sm:text-sm
+          leading-5
+          focus:outline-none
+          overflow-hidden
+          no-scrollbar
+        "
+              placeholder="Message…"
+            />
+
+            <button
+              onClick={send}
+              disabled={!input.trim()}
+              className="
+          shrink-0
+          h-10 w-10
+          flex items-center justify-center
+          rounded-full
+          bg-blue-600 text-white
+          disabled:opacity-40
+          disabled:cursor-not-allowed
+          active:scale-95
+          transition
+        "
+            >
+              <Send size={18} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

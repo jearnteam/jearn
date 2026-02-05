@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Home, Users, Bell, Banana } from "lucide-react";
+import { Plus, Home, Users, Bell, Banana,MessageCircle  } from "lucide-react";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useUpload } from "@/components/upload/UploadContext";
@@ -39,6 +39,7 @@ export default function MobileNavbar({
   const usersRef = useRef<HTMLButtonElement | null>(null);
   const notifyRef = useRef<HTMLButtonElement | null>(null);
   const videosRef = useRef<HTMLButtonElement | null>(null);
+  const chatRef = useRef<HTMLButtonElement | null>(null);
   const { uploading, progress } = useUpload();
 
   /* ------------------------------------------------------------------ */
@@ -59,6 +60,7 @@ export default function MobileNavbar({
       users: usersRef,
       notify: notifyRef,
       videos: videosRef,
+      chat: chatRef,
     };
 
     const btn = map[activeView]?.current;
@@ -241,6 +243,12 @@ export default function MobileNavbar({
         badge={unreadCount}
         buttonRef={notifyRef}
       />
+
+<NavButton
+  tab="chat"
+  icon={<MessageCircle size={24} />}
+  buttonRef={chatRef}
+/>
 
       <NavButton
         tab="videos"

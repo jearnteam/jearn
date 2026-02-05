@@ -58,24 +58,40 @@ export default function ChatListClient({
         body: JSON.stringify({ targetUserId: targetUid }),
       });
 
-      if (!res.ok) return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        console.error("Failed to create room:", err);
+        return;
+      }
 
       const { roomId } = await res.json();
 
-      setRooms((prev) =>
-        prev.map((r) =>
-          r.type === "new" && r.partner.uid === targetUid
-            ? {
-                ...r,
-                type: "room",
-                roomId,
-                lastMessage: null,
-                unreadCount: 0,
-              }
-            : r
-        )
-      );
+      console.log("🟢 redirecting to room:", roomId);
 
+      // 🔥 Ensure room exists in list (insert if missing)
+      setRooms((prev) => {
+        const exists = prev.some(
+          (r) => r.type === "room" && r.roomId === roomId
+        );
+
+        if (exists) return prev;
+
+        const target = prev.find((r) => r.partner.uid === targetUid);
+
+        if (!target) return prev;
+
+        const newRoom: ChatRoomItem = {
+          type: "room",
+          roomId,
+          partner: target.partner,
+          lastMessage: null,
+          unreadCount: 0,
+        };
+
+        return [newRoom, ...prev.filter((r) => r.partner.uid !== targetUid)];
+      });
+
+      // 🔥 Redirect must NOT depend on state update
       onOpenRoom(roomId);
     } finally {
       setCreatingUid(null);
@@ -97,9 +113,7 @@ export default function ChatListClient({
         )}
 
         {!loading && rooms.length === 0 && (
-          <div className="p-4 text-sm text-gray-500">
-            No conversations yet
-          </div>
+          <div className="p-4 text-sm text-gray-500">No conversations yet</div>
         )}
 
         {rooms.map((r) => {
@@ -146,9 +160,7 @@ export default function ChatListClient({
               <div className="flex-1 min-w-0">
                 {/* TOP ROW */}
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium truncate">
-                    {r.partner.name}
-                  </div>
+                  <div className="font-medium truncate">{r.partner.name}</div>
 
                   {r.type === "room" &&
                     r.unreadCount !== undefined &&
@@ -172,13 +184,10 @@ export default function ChatListClient({
 
                 {/* LAST MESSAGE + TIME */}
                 <div className="flex items-center gap-2">
-                  {/* MESSAGE TEXT */}
                   <div
                     className={clsx(
                       "flex-1 min-w-0 truncate text-sm",
-                      r.lastMessage
-                        ? "text-gray-500"
-                        : "text-gray-400 italic"
+                      r.lastMessage ? "text-gray-500" : "text-gray-400 italic"
                     )}
                   >
                     {isCreating
@@ -188,7 +197,6 @@ export default function ChatListClient({
                       : "Start chatting"}
                   </div>
 
-                  {/* TIME */}
                   {r.type === "room" && r.lastMessage && (
                     <div className="shrink-0 text-xs text-gray-400">
                       {formatTime(r.lastMessage.createdAt)}

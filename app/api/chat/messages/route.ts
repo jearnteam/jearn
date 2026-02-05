@@ -15,14 +15,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!ObjectId.isValid(session.user.uid)) {
-    return NextResponse.json(
-      { error: "Invalid session user" },
-      { status: 401 }
-    );
-  }
-
-  const myId = new ObjectId(session.user.uid);
+  const myUid = session.user.uid; // 🔥 STRING UID
 
   const { searchParams } = new URL(req.url);
   const roomIdStr = searchParams.get("roomId");
@@ -40,10 +33,10 @@ export async function GET(req: Request) {
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
 
-  /* 1️⃣ Check room membership */
+  /* 1️⃣ Check room membership (🔥 STRING MATCH) */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myId, // ✅ ObjectId
+    members: myUid,
   });
 
   if (!room) {
@@ -80,7 +73,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     messages: pageDocs.map((m) => ({
       id: m._id.toString(),
-      senderId: m.senderId.toString(),
+      senderId: m.senderId, // 🔥 STRING
       text: m.text,
       createdAt: m.createdAt,
     })),
@@ -100,14 +93,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!ObjectId.isValid(session.user.uid)) {
-    return NextResponse.json(
-      { error: "Invalid session user" },
-      { status: 401 }
-    );
-  }
-
-  const myId = new ObjectId(session.user.uid);
+  const myUid = session.user.uid; // 🔥 STRING UID
 
   const body = await req.json().catch(() => null);
   const roomIdStr = body?.roomId;
@@ -130,10 +116,10 @@ export async function POST(req: Request) {
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
 
-  /* 1️⃣ Check room membership */
+  /* 1️⃣ Check room membership (🔥 STRING MATCH) */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myId, // ✅ ObjectId
+    members: myUid,
   });
 
   if (!room) {
@@ -145,10 +131,10 @@ export async function POST(req: Request) {
 
   const doc = {
     roomId,
-    senderId: myId,
+    senderId: myUid, // 🔥 STRING
     text: text.trim(),
     createdAt: now,
-    readBy: [myId],
+    readBy: [myUid],
   };
 
   const result = await messagesCol.insertOne(doc);
@@ -160,7 +146,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     id: result.insertedId.toString(),
-    senderId: myId.toString(),
+    senderId: myUid,
     text: doc.text,
     createdAt: doc.createdAt,
   });

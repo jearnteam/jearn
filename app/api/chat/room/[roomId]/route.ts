@@ -5,42 +5,42 @@ import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 
+export const runtime = "nodejs";
+
 export async function GET(
   _req: Request,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   /* ──────────────────────────────
    * 1️⃣ AUTH
    * ────────────────────────────── */
   const session = await getServerSession(authConfig);
 
-  if (!session?.user?.uid) {
+  if (!session?.user?.uid || !ObjectId.isValid(session.user.uid)) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401 }
     );
   }
 
-  if (!ObjectId.isValid(session.user.uid)) {
-    return NextResponse.json(
-      { error: "Invalid session user" },
-      { status: 401 }
-    );
-  }
-  
-  const myObjectId = new ObjectId(session.user.uid);
+  const myUid = session.user.uid; // 🔥 STRING UID
 
-  if (!ObjectId.isValid(params.roomId)) {
+  /* ──────────────────────────────
+   * 2️⃣ PARAMS (🔥 MUST AWAIT)
+   * ────────────────────────────── */
+  const { roomId } = await params;
+
+  if (!ObjectId.isValid(roomId)) {
     return NextResponse.json(
       { error: "Invalid room" },
       { status: 400 }
     );
   }
 
-  const roomId = new ObjectId(params.roomId);
+  const roomObjectId = new ObjectId(roomId);
 
   /* ──────────────────────────────
-   * 2️⃣ DB
+   * 3️⃣ DB
    * ────────────────────────────── */
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
@@ -49,11 +49,11 @@ export async function GET(
   const usersCol = db.collection("users");
 
   /* ──────────────────────────────
-   * 3️⃣ Find room & validate membership
+   * 4️⃣ Find room & validate membership
    * ────────────────────────────── */
   const room = await roomsCol.findOne({
-    _id: roomId,
-    members: myObjectId,
+    _id: roomObjectId,
+    members: myUid, // 🔥 STRING MATCH
   });
 
   if (!room) {
@@ -64,13 +64,13 @@ export async function GET(
   }
 
   /* ──────────────────────────────
-   * 4️⃣ Get partner UID
+   * 5️⃣ Get partner UID
    * ────────────────────────────── */
-  const partnerId = room.members.find(
-    (id: ObjectId) => !id.equals(myObjectId)
+  const partnerUid = room.members.find(
+    (uid: string) => uid !== myUid
   );
 
-  if (!partnerId || !ObjectId.isValid(partnerId)) {
+  if (!partnerUid || !ObjectId.isValid(partnerUid)) {
     return NextResponse.json(
       { error: "Invalid room" },
       { status: 400 }
@@ -78,16 +78,16 @@ export async function GET(
   }
 
   /* ──────────────────────────────
-   * 5️⃣ Fetch partner info (FIXED)
+   * 6️⃣ Fetch partner info
    * ────────────────────────────── */
   const partner = await usersCol.findOne(
-    { _id: new ObjectId(partnerId) },
+    { _id: new ObjectId(partnerUid) },
     {
       projection: {
         name: 1,
         bio: 1,
         avatar: 1,
-        avatarUpdatedAt: 1, // ✅ ADD THIS
+        avatarUpdatedAt: 1,
       },
     }
   );
@@ -100,11 +100,11 @@ export async function GET(
   }
 
   return NextResponse.json({
-    roomId: roomId.toString(),
+    roomId: roomObjectId.toString(),
     partner: {
       uid: partner._id.toString(),
-      name: partner.name,
-      bio: partner.bio,
+      name: partner.name ?? null,
+      bio: partner.bio ?? null,
       avatar: typeof partner.avatar === "string" ? partner.avatar : null,
       avatarUpdatedAt: partner.avatarUpdatedAt ?? null,
     },
