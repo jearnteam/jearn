@@ -31,9 +31,18 @@ export default function FullScreenLoader({ text }: { text?: string }) {
         </div>
 
         <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">
-          {text || t("loading") || "Loading"}...
+          {text || t("loading") || "Loading"}
+          <AnimatedDots />
         </p>
       </div>
     </motion.div>
+  );
+}
+
+function AnimatedDots() {
+  return (
+    <span className="inline-block w-[2ch] text-left">
+      <span className="animate-dots"></span>
+    </span>
   );
 }
