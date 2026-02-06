@@ -1,12 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export function useFollow(targetUserId: string) {
   const [following, setFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 初期状態を取得
   useEffect(() => {
+    // ⭐ ここ重要
+    if (!targetUserId) {
+      setLoading(false); // ← 必ず止める
+      return;
+    }
+
     let alive = true;
+
     (async () => {
       try {
         const res = await fetch(`/api/follow/status/${targetUserId}`, {
@@ -14,26 +20,26 @@ export function useFollow(targetUserId: string) {
           credentials: "include",
         });
 
-        if (!res.ok) {
-          throw new Error(`Status ${res.status}`);
-        }
+        if (!res.ok) throw new Error("status fetch failed");
 
         const data = await res.json();
-        if (alive) setFollowing(Boolean(data.following));
+        if (alive) {
+          setFollowing(!!data.following);
+        }
       } catch (e) {
-        console.error("Failed to fetch follow status:", e);
+        console.error("follow status error", e);
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setLoading(false); // ← 絶対ここで止まる
       }
     })();
+
     return () => {
       alive = false;
     };
   }, [targetUserId]);
 
-  // フォロー / アンフォロー
-  async function toggleFollow() {
-    if (loading) return;
+  const toggleFollow = useCallback(async () => {
+    if (!targetUserId) return;
 
     setLoading(true);
     try {
@@ -41,20 +47,19 @@ export function useFollow(targetUserId: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetUserId }),
-        credentials: "include", // Cookie を送る
+        credentials: "include",
       });
+
       const data = await res.json();
-      if (data.ok) {
-        setFollowing(data.action === "followed");
-      } else {
-        console.error("Follow API returned not ok:", data);
-      }
+
+      if (data.action === "followed") setFollowing(true);
+      if (data.action === "unfollowed") setFollowing(false);
     } catch (e) {
-      console.error("Follow API error:", e);
+      console.error("toggle follow error", e);
     } finally {
-      setLoading(false);
+      setLoading(false); // ← ここも必須
     }
-  }
+  }, [targetUserId]);
 
   return { following, loading, toggleFollow };
 }

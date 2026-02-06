@@ -5,7 +5,15 @@ import { useState } from "react";
 import { useFollowCount } from "@/features/follow/hooks/useFollowCount";
 import FollowListModal from "./FollowListModal";
 
-export default function FollowStats({ userId }: { userId?: string }) {
+interface FollowStatsProps {
+  userId?: string;
+  direction?: "row" | "column";
+}
+
+export default function FollowStats({
+  userId,
+  direction = "row",
+}: FollowStatsProps) {
   if (!userId) return null;
 
   const { followers, following, loading } = useFollowCount(userId);
@@ -13,24 +21,36 @@ export default function FollowStats({ userId }: { userId?: string }) {
 
   if (loading) return null;
 
+  const isColumn = direction === "column";
+
   return (
     <>
-      <div className="flex gap-6 text-sm mt-2">
+      {/* Stats */}
+      <div
+        className={
+          isColumn
+            ? "flex flex-col items-start gap-1 text-sm mt-2"
+            : "flex items-center gap-6 text-sm mt-2"
+        }
+      >
         <button
           onClick={() => setOpen("followers")}
-          className="hover:underline"
+          className="hover:underline text-left"
         >
-          <span className="font-semibold">{followers}</span> Followers
+          <span className="font-semibold">{followers}</span>{" "}
+          <span className="text-neutral-500">Followers</span>
         </button>
 
         <button
           onClick={() => setOpen("following")}
-          className="hover:underline"
+          className="hover:underline text-left"
         >
-          <span className="font-semibold">{following}</span> Following
+          <span className="font-semibold">{following}</span>{" "}
+          <span className="text-neutral-500">Following</span>
         </button>
       </div>
 
+      {/* Modal */}
       {open && (
         <FollowListModal
           userId={userId}

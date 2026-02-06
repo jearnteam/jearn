@@ -5,6 +5,7 @@ import { Check, HelpCircle, UserPlus } from "lucide-react";
 import { useFollow } from "@/features/follow/hooks/useFollow";
 
 interface FollowButtonProps {
+  /** ObjectId */
   targetUserId: string;
 }
 

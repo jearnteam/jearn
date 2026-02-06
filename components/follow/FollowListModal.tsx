@@ -1,9 +1,14 @@
-// components/follow/FollowListModal.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import FollowButton from "./FollowButton";
+
+type FollowUser = {
+  uid: string;
+  name: string;
+  userId?: string;
+};
 
 export default function FollowListModal({
   userId,
@@ -14,12 +19,12 @@ export default function FollowListModal({
   type: "followers" | "following";
   onClose: () => void;
 }) {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<FollowUser[]>([]);
 
   useEffect(() => {
     fetch(`/api/follow/${type}/${userId}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then(setUsers);
+      .then((data) => setUsers(data.users ?? data));
   }, [userId, type]);
 
   return (

@@ -1,23 +1,23 @@
 // app/api/follow/count/[userId]/route.ts
 import clientPromise from "@/lib/mongodb";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function GET(
-  _: NextRequest,
-  { params }: { params: Promise<{ userId: string }> }
+  _req: Request,
+  { params }: { params: { userId: string } }
 ) {
-  const { userId } = await params;
-
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
-  const followers = await db
-    .collection("follow")
-    .countDocuments({ followingId: userId });
+  const follows = db.collection("follow");
 
-  const following = await db
-    .collection("follow")
-    .countDocuments({ followerId: userId });
+  const followers = await follows.countDocuments({
+    followingId: params.userId,
+  });
+
+  const following = await follows.countDocuments({
+    followerId: params.userId,
+  });
 
   return NextResponse.json({ followers, following });
 }

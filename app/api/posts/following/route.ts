@@ -147,11 +147,11 @@ export async function GET(req: Request) {
      * ------------------------------------------------- */
     const query: any = {
       authorId: { $in: followingIds },
-      postType: { $ne: PostTypes.COMMENT },
+      postType: { $nin: ["COMMENT", "Comment", "comment"] }, // ← 修正
       $or: [
         { parentId: null },
         { parentId: { $exists: false } },
-        { postType: PostTypes.ANSWER },
+        { postType: { $in: ["ANSWER", "Answer", "answer"] } },
       ],
     };
 

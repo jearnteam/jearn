@@ -15,6 +15,7 @@ import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import FollowButton from "@/components/follow/FollowButton";
 import { normalizePosts } from "@/lib/normalizePosts";
+import FollowStats from "@/components/follow/FollowStats";
 
 /* ---------------------------------------------
  * TYPES
@@ -44,7 +45,8 @@ type UIUserPost = Post & {
 export default function UserPage() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
-  const id = params.id;
+  /** objectId */
+  const id = params.id;  
 
   const { user: currentUser } = useCurrentUser();
 
@@ -234,6 +236,9 @@ export default function UserPage() {
               <div className="flex-1 relative">
                 <h1 className="text-2xl font-bold">{safeUser.name}</h1>
                 <p className="text-gray-500">@{safeUser.userId}</p>
+
+                {/* TODO: 適切な位置にスタイリング */}
+                <FollowStats userId={id}/>
 
                 {safeUser.bio && (
                   <p className="text-gray-500">{safeUser.bio}</p>
