@@ -132,6 +132,7 @@ export default function EditPostModal({
 
                   onClose();
                 }}
+                isEdit={true}
               />
             </div>
           </motion.div>

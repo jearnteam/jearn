@@ -59,6 +59,7 @@ export interface PostFormProps {
   submitLabel?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+  isEdit?: boolean;
 }
 // ✅ 修正点1: 空配列の参照を固定するための定数
 const EMPTY_CATEGORIES: Category[] = [];
@@ -75,6 +76,7 @@ export default function PostForm({
   initialAvailableCategories = EMPTY_CATEGORIES,
   onSuccess,
   onCancel,
+  isEdit = false,
 }: PostFormProps) {
   const [title, setTitle] = useState(initialTitle);
 
@@ -932,8 +934,9 @@ export default function PostForm({
                   hist.push(title);
                 }
               }}
-              className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none"
+              className="w-full text-xl px-2 py-3 bg-transparent focus:outline-none disabled:opacity-30"
               autoComplete="off"
+              disabled={isEdit && mode === PostTypes.QUESTION}
             />
           </motion.div>
           <p className="text-right text-xs text-gray-500 dark:text-gray-400 px-1 pb-1">
