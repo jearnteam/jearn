@@ -43,11 +43,12 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, avatarUpdatedAt: 1 } }
+      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
     );
   }
 
   const authorName = post.authorName ?? user?.name ?? "Unknown";
+  const authorUserId = user?.userId;
   const avatarId = user?._id?.toString() ?? post.authorId;
 
   const timestamp = user?.avatarUpdatedAt
@@ -64,6 +65,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     _id: post._id.toString(),
     authorId: post.authorId,
     authorName,
+    authorUserId,
     authorAvatar,
   };
 }

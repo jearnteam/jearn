@@ -68,7 +68,15 @@ export default function PostHeader({
             alt={`${authorName} avatar`}
           />
           <div>
-            <p className="font-semibold">{authorName}</p>
+            <div className="flex gap-1.5">
+              <p className="font-semibold">{authorName}</p>
+              {post.authorUserId && (
+                <>
+                  <p className="text-sm text-gray-500"> - </p>
+                  <p className="text-sm text-gray-500">@{post.authorUserId}</p>
+                </>
+              )}
+            </div>
             <p className="text-xs text-gray-500">
               {dayjs(post.createdAt).locale(i18n.language).fromNow()}
             </p>
