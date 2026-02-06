@@ -5,7 +5,7 @@ import { ObjectId, Collection, WithId, Document } from "mongodb"; // WithId, Doc
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
-import { PostTypes } from "@/types/post";
+import { PostTypes, RawPost } from "@/types/post";
 import { deleteMediaUrls } from "@/lib/media/deleteMedia";
 
 export const runtime = "nodejs";
@@ -15,17 +15,6 @@ type EnrichedCategory = {
   name: string;
   jname: string;
   myname: string;
-};
-
-// RawPost 型定義を追加
-type RawPost = WithId<Document> & {
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
-  createdAt?: Date;
-  categories?: unknown[];
-  tags?: string[];
-  mediaRefs?: string[];
 };
 
 type CategoryDoc = {

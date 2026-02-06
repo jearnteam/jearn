@@ -2,26 +2,11 @@
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
-import { PostTypes } from "@/types/post";
+import { PostTypes, RawPost } from "@/types/post";
 
 /* -------------------------------------------------------------------------- */
 /* Types                                                                       */
 /* -------------------------------------------------------------------------- */
-
-type RawPost = WithId<Document> & {
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
-  createdAt?: Date;
-  categories?: unknown[];
-  tags?: string[];
-  video?: {
-    url: string;
-    thumbnailUrl?: string;
-    duration?: number;
-    aspectRatio?: number;
-  };
-};
 
 type CategoryDoc = {
   _id: ObjectId;
@@ -116,7 +101,7 @@ export async function GET() {
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const postsColl = db.collection("posts");
+    const postsColl = db.collection<RawPost>("posts");
     const usersColl = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 

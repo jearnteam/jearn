@@ -5,7 +5,7 @@ import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
-import { PostType, PostTypes } from "@/types/post";
+import { PostType, PostTypes, RawPost } from "@/types/post";
 import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
@@ -15,22 +15,6 @@ export const runtime = "nodejs";
 /* -------------------------------------------------------------------------- */
 /*                         ENRICH POST WITH USER DATA                         */
 /* -------------------------------------------------------------------------- */
-
-type RawPost = WithId<Document> & {
-  postType?: PostType;
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
-  createdAt?: Date;
-  categories?: unknown[];
-  tags?: string[];
-  video?: {
-    url: string;
-    thumbnailUrl?: string;
-    duration?: number;
-    aspectRatio?: number;
-  };
-};
 
 type CategoryDoc = {
   _id: ObjectId;
@@ -133,7 +117,7 @@ export async function GET(req: Request) {
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const posts = db.collection("posts");
+    const posts = db.collection<RawPost>("posts");
     const users = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
@@ -187,7 +171,7 @@ export async function GET(req: Request) {
       ...new Set(
         answerDocs
           .map((d) => {
-            if (ObjectId.isValid(d.parentId)) return new ObjectId(d.parentId);
+            if (d.parentId != undefined && ObjectId.isValid(d.parentId)) return new ObjectId(d.parentId);
             return null;
           })
           .filter((id): id is ObjectId => id !== null)
@@ -479,7 +463,7 @@ export async function POST(req: Request) {
     /* ------------------------------------------------------------------ */
 
     const enrichedNoCats = await enrichPost(
-      { ...doc, _id: result.insertedId },
+      { ...doc, _id: result.insertedId } as RawPost,
       users
     );
 

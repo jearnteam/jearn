@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
-import { PostTypes } from "@/types/post";
+import { PostTypes, RawPost } from "@/types/post";
 
 export const runtime = "nodejs";
 
@@ -15,20 +15,6 @@ function normalizePostType(postType?: string) {
 /* -------------------------------------------------------------------------- */
 /*                               TYPES                                         */
 /* -------------------------------------------------------------------------- */
-
-type RawPost = WithId<Document> & {
-  title?: string;
-  content?: string;
-  postType?: string;
-  parentId?: string | null;
-
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
-  createdAt?: Date;
-  categories?: unknown[];
-  tags?: string[];
-};
 
 type CategoryDoc = {
   _id: ObjectId;
@@ -138,7 +124,7 @@ export async function GET(req: Request) {
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const postsColl = db.collection("posts");
+    const postsColl = db.collection<RawPost>("posts");
     const usersColl = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 

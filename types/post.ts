@@ -1,5 +1,7 @@
 // /types/post.ts
 
+import { ObjectId } from "mongodb";
+
 export interface CategoryObject {
   id: string;          // ObjectId as string
   name: string;        // English ("programming")
@@ -7,7 +9,7 @@ export interface CategoryObject {
   myname?: string;
 }
 
-/** Object */
+/** 投稿種別 Object */
 export const PostTypes = {
   POST: "Post",
   QUESTION: "Question",
@@ -15,7 +17,8 @@ export const PostTypes = {
   COMMENT: "Comment",
   VIDEO: "VIDEO",
 } as const;
-/** Union */
+
+/** 投稿種別 Union */
 export type PostType = typeof PostTypes[keyof typeof PostTypes];
 
 export type UpvoteResponse = {
@@ -24,6 +27,9 @@ export type UpvoteResponse = {
   error?: string;
 };
 
+/**
+ * 投稿
+ */
 export interface Post {
   txId: any;
   _id: string;
@@ -70,3 +76,24 @@ export interface Post {
   edited?: boolean;
   editedAt?: string;
 }
+
+export type RawPost = {
+  _id: ObjectId | string;
+  postType?: PostType;
+  title?: string;
+  content?: string;
+  parentId?: string;
+  authorId?: string;
+  authorName?: string;
+  authorAvatar?: string;
+  createdAt?: Date;
+  categories?: unknown[];
+  tags?: string[];
+  mediaRefs?: string[];
+  video?: {
+    url: string;
+    thumbnailUrl?: string;
+    duration?: number;
+    aspectRatio?: number;
+  };
+};

@@ -1,22 +1,13 @@
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
-import { PostTypes } from "@/types/post";
+import { PostTypes, RawPost } from "@/types/post";
 
 export const runtime = "nodejs";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                    */
 /* -------------------------------------------------------------------------- */
-
-type RawPost = WithId<Document> & {
-  authorId?: string;
-  authorName?: string;
-  authorAvatar?: string;
-  createdAt?: Date;
-  categories?: unknown[];
-  tags?: string[];
-};
 
 type CategoryDoc = {
   _id: ObjectId;
