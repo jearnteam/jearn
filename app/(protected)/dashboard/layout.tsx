@@ -1,13 +1,11 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
-import HomePage from "./HomePage";
 import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
-
-import { UploadProvider } from "@/components/upload/UploadContext";
 import { NotificationProvider } from "@/features/notifications/NotificationProvider";
+import React from "react";
 
-export default function AppLayout({
+export default function DashboardLayout({
   children,
   overlay,
 }: {
@@ -18,9 +16,6 @@ export default function AppLayout({
     <NotificationProvider>
       <Navbar />
       <AppNavigationBridge />
-      <UploadProvider>
-        <HomePage />
-      </UploadProvider>
       {children}
       {overlay}
     </NotificationProvider>

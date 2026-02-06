@@ -148,7 +148,7 @@ export default function UserMenu({ user }: { user: User }) {
                 setShowCategoryRequest(true);
                 setOpen(false);
               }}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-neutral-800 text-gray-700 dark:text-gray-200 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
             >
               <FolderPlus size={18} />
               <span>{t("requestCategory") || "Request Category"}</span>
