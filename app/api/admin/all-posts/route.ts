@@ -1,4 +1,5 @@
 //@/app/api/admin/all-posts/route.ts
+import { requireAdmin } from "@/lib/admin";
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 
@@ -6,6 +7,8 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    await requireAdmin();
+
     const client = await clientPromise;
     const db = client.db("jearn");
 

@@ -3,14 +3,11 @@ import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
+import { requireAdmin } from "@/lib/admin";
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authConfig);
-    // 管理者チェック
-    if ((!session?.user?.role || !["admin"].includes(session.user.role)) && false || !session?.user /* TODO */) {
-       return new Response("Forbidden", { status: 403 });
-    }
+    const session = await requireAdmin();
 
     const { requestId, name, jname, myname } = await req.json();
 

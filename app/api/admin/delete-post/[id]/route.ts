@@ -1,12 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { requireAdmin } from "@/lib/admin";
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdmin();
+    
     const { id } = await params;
 
     if (!ObjectId.isValid(id)) {

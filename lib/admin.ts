@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth";
-import { authConfig } from "@/features/auth/auth"; // あなたのauthConfigのパスに合わせてください
+import { authConfig } from "@/features/auth/auth";
 
 /**
  * 環境変数から管理者メールアドレスのリストを取得し、整形して返します。
