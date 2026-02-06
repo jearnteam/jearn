@@ -1,5 +1,10 @@
 const CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
 
+/**
+ * @deprecated
+ * @param param0 
+ * @returns 
+ */
 export function resolveAvatar({
   avatar,
   userId,

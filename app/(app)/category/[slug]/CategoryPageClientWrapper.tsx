@@ -1,3 +1,4 @@
+// app/(app)/categories/[slug]/CategoryPageClientWrapper.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -6,6 +7,10 @@ import FullScreenLoader from "@/components/common/FullScreenLoader";
 import type { Post } from "@/types/post";
 import { normalizePosts } from "@/lib/normalizePosts";
 
+/**
+ * Raw category shape returned by API
+ * (fields may be missing depending on backend source)
+ */
 type Category = {
   id: string;
   name?: string;
@@ -13,6 +18,10 @@ type Category = {
   myname?: string;
 };
 
+/**
+ * UI-safe category shape
+ * (all fields normalized to strings)
+ */
 type UICategory = {
   id: string;
   name: string;
@@ -20,6 +29,19 @@ type UICategory = {
   myname: string;
 };
 
+/**
+ * CategoryPageClientWrapper
+ *
+ * Responsibilities:
+ * - Resolve category from slug
+ * - Fetch initial posts for category
+ * - Handle infinite scroll pagination
+ * - Fetch usage count
+ * - Convert raw API data → UI-safe data
+ *
+ * This component owns ALL side effects.
+ * Rendering is delegated to CategoryPageClient.
+ */
 export default function CategoryPageClientWrapper({
   slug,
   scrollContainerRef,
@@ -27,6 +49,9 @@ export default function CategoryPageClientWrapper({
   slug: string;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }) {
+  /* --------------------------------------------------
+   * State
+   * ------------------------------------------------ */
   const [category, setCategory] = useState<Category | null>(null);
 
   const [posts, setPosts] = useState<Post[]>([]);
@@ -39,6 +64,9 @@ export default function CategoryPageClientWrapper({
 
   /* --------------------------------------------------
    * Initial load
+   * - Resolve category by slug
+   * - Fetch first few posts
+   * - Fetch usage count
    * ------------------------------------------------ */
   useEffect(() => {
     let cancelled = false;
@@ -58,7 +86,7 @@ export default function CategoryPageClientWrapper({
 
         setCategory(cat);
 
-        /* ----------------- fetch posts (FIXED) ----------------- */
+        /* ----------------- fetch initial posts ----------------- */
         const postsRes = await fetch(
           `/api/posts?categoryId=${encodeURIComponent(cat.id)}&limit=10`,
           { cache: "no-store" }
@@ -71,7 +99,7 @@ export default function CategoryPageClientWrapper({
         setCursor(data.nextCursor ?? null);
         setHasMore(Boolean(data.nextCursor));
 
-        /* ----------------- fetch usage count ----------------- */
+        /* ----------------- fetch category usage count ----------------- */
         const countRes = await fetch(`/api/category/usage/bulk`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -83,10 +111,12 @@ export default function CategoryPageClientWrapper({
           setCount(usage.usage?.[cat.id] ?? 0);
         }
       } finally {
+        // Always exit loading state unless unmounted
         if (!cancelled) setLoading(false);
       }
     })();
 
+    // Prevent state updates after unmount / slug change
     return () => {
       cancelled = true;
     };
@@ -94,6 +124,8 @@ export default function CategoryPageClientWrapper({
 
   /* --------------------------------------------------
    * Load more (infinite scroll)
+   * - Cursor-based pagination
+   * - Guarded against double requests
    * ------------------------------------------------ */
   const loadMore = useCallback(async () => {
     if (!category || !hasMore || loadingMore || !cursor) return;
@@ -124,6 +156,7 @@ export default function CategoryPageClientWrapper({
   if (loading) return <FullScreenLoader text="Loading category…" />;
   if (!category) return <div className="p-10">Category not found</div>;
 
+  // Normalize category for UI (never pass undefined to UI)
   const uiCategory: UICategory = {
     id: category.id,
     name: category.name ?? "",

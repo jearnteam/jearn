@@ -2,33 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-
-import { PostList } from "@/components/posts";
-import { usePosts } from "@/features/posts/hooks/usePosts";
-import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
-import { PullToRefreshIndicator } from "@/components/common/PullToRefreshIndicator";
+import { useTranslation } from "react-i18next";
+import { motion } from "framer-motion";
 import type { Post } from "@/types/post";
-import { useFollowingPosts } from "@/features/posts/hooks/useFollowingPosts";
 
+import MobileNavbar from "@/components/MobileNavbar";
+import FullScreenLoader from "@/components/common/FullScreenLoader";
 import NotificationPage from "@/components/notifications/NotificationPage";
-import { useNotificationContext } from "@/features/notifications/NotificationProvider";
-
+import VideosPage from "@/components/videos/VideosPage";
 import PostFormBox from "@/components/posts/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
-import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
-import { useUpload } from "@/components/upload/UploadContext";
-
-import FullScreenLoader from "@/components/common/FullScreenLoader";
-import MobileNavbar from "@/components/MobileNavbar";
-import { useTranslation } from "react-i18next";
 import AnswerModal from "@/components/posts/AnswerModal";
-import { motion } from "framer-motion";
-import VideosPage from "@/components/videos/VideosPage";
-import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
-
-import { useScrollBus } from "@/components/3d_spinner/ScrollContext";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 import ChatListClient from "@/components/chat/ChatListClient";
 import ChatRoomClient from "@/components/chat/ChatRoomClient";
+
+import { useScrollBus } from "@/components/3d_spinner/ScrollContext";
+import { useNotificationContext } from "@/features/notifications/NotificationProvider";
+import { usePullToRefresh } from "@/features/posts/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/common/PullToRefreshIndicator";
+import { usePosts } from "@/features/posts/hooks/usePosts";
+import { useUpload } from "@/components/upload/UploadContext";
+import { PostList } from "@/components/posts";
+import { useFollowingPosts } from "@/features/posts/hooks/useFollowingPosts";
+import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
 
 /* ---------------------------------------------
  * VIEW TYPE
@@ -43,23 +40,27 @@ export default function HomePage() {
   /* ---------------------------------------------
    * STATE
    * ------------------------------------------- */
+  //current active page
   const [activeView, setActiveView] = useState<HomeView>("home");
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-
+  //mobile bottom navbar visibility when scrolling
+  const [navbarVisible, setNavbarVisible] = useState(true);
+  //one modal active at a time (post, edit and answer)
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [answeringPost, setAnsweringPost] = useState<Post | null>(null);
-
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  //for deleting post(select post -> open delete modal -> cleanup after delete)
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  //make sure not to occur conflicting uploads 
   const { uploading, progress } = useUpload();
-
-  const [navbarVisible, setNavbarVisible] = useState(true);
+  //storing latest chatroomId
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
 
   /* ---------------------------------------------
    * DATA
    * ------------------------------------------- */
+  //main feed
   const {
     posts,
     hasMore,
@@ -71,7 +72,7 @@ export default function HomePage() {
     deletePost,
     loading,
   } = usePosts();
-
+  //followers' feed
   const {
     posts: followingPosts,
     hasMore: followingHasMore,
@@ -79,7 +80,7 @@ export default function HomePage() {
     fetchNext: fetchFollowingNext,
     refresh: refreshFollowing,
   } = useFollowingPosts();
-
+  //Global notification state
   const { unreadCount, clearUnread, fetchNotifications } =
     useNotificationContext();
 
@@ -89,7 +90,7 @@ export default function HomePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTop = useRef(0);
   const restoringScrollRef = useRef(false);
-
+  //store scrollpositions for each page to restored position back instantly when switch back
   const scrollPositions = useRef<Record<HomeView, number>>({
     home: 0,
     notify: 0,
@@ -98,6 +99,12 @@ export default function HomePage() {
     chat: 0,
   });
 
+  /**
+   * always checking for mobile navbar should be shown or not, whenever user scroll
+   *  
+   * @param e 
+   * @returns 
+   */
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
     const cur = e.currentTarget.scrollTop;
 
@@ -110,7 +117,7 @@ export default function HomePage() {
       return;
     }
 
-    // 🎥 Videos page: mobile navbar always visible
+    // Videos page: mobile navbar always visible
     if (activeView === "videos") {
       setNavbarVisible(true);
       lastScrollTop.current = cur;
@@ -121,7 +128,7 @@ export default function HomePage() {
       if (cur <= 0) {
         setNavbarVisible(true);
       } else {
-        // 🔥 reversed logic
+        // navbar logic
         // scroll DOWN → show
         // scroll UP → hide
         setNavbarVisible(cur < lastScrollTop.current);
@@ -131,11 +138,15 @@ export default function HomePage() {
     lastScrollTop.current = cur;
   }
 
+  /**
+   * handle the page navigation
+   * @param next 
+   * @returns 
+   */
   function changeView(next: HomeView) {
     const el = scrollRef.current;
     if (!el) return;
-
-    // BEFORE anything else
+    // save the states of video page, if the current activeView is Video Page.
     if (activeView === "videos") {
       window.dispatchEvent(new Event("videos:save-state"));
       window.dispatchEvent(new Event("videos:disable"));
@@ -144,14 +155,12 @@ export default function HomePage() {
     if (next === "videos") {
       window.dispatchEvent(new Event("videos:enable"));
     }
-
-    // 🔔 clear unread when opening notifications
+    // clear unread when opening notifications
     if (next === "notify") {
-      fetchNotifications(); // FETCH LIST HERE
-      clearUnread(); // MARK READ
+      fetchNotifications(); // Fetch the notifications list
+      clearUnread(); // MARK AS READ
     }
-
-    // TAP HOME AGAIN → SCROLL TO TOP
+    // TAP HOME ICON AGAIN → SCROLL TO TOP
     if (next === "home" && activeView === "home") {
       restoringScrollRef.current = true;
       setNavbarVisible(true);
@@ -186,7 +195,6 @@ export default function HomePage() {
   /* ---------------------------------------------
    * PULL TO REFRESH
    * ------------------------------------------- */
-
   const { pullY, refreshing } = usePullToRefresh(scrollRef, async () => {
     if (activeView === "home") {
       await refresh();
@@ -200,11 +208,18 @@ export default function HomePage() {
   /* ---------------------------------------------
    * DELETE
    * ------------------------------------------- */
+  /**
+   * store target post id and opens the delete modal
+   * @param id 
+   */
   function requestDelete(id: string) {
     setDeletePostId(id);
     setConfirmDeleteOpen(true);
   }
-
+  /**
+   * delete the targeted post
+   * @returns 
+   */
   async function confirmDelete() {
     if (!deletePostId) return;
     try {
@@ -216,7 +231,9 @@ export default function HomePage() {
       setDeletePostId(null);
     }
   }
-
+  /* ---------------------------------------------
+   * DESKTOP DETECTION
+   * ------------------------------------------- */
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
@@ -230,7 +247,7 @@ export default function HomePage() {
   }, []);
 
   /* ---------------------------------------------
-   * EFFECTS
+   * SCROLL RESTORATION
    * ------------------------------------------- */
   const prevViewRef = useRef<HomeView>(activeView);
 
@@ -241,7 +258,7 @@ export default function HomePage() {
     const prev = prevViewRef.current;
     prevViewRef.current = activeView;
 
-    // ✅ DO NOT restore scroll if view did not actually change
+    // DO NOT restore scroll if view did not actually change
     if (prev === activeView) {
       restoringScrollRef.current = false;
       return;
@@ -260,7 +277,7 @@ export default function HomePage() {
   }, [activeView]);
 
   /* ---------------------------------------------
-   * UPVOTE
+   * UPVOTE + NOTIFICATION EMIT
    * ------------------------------------------- */
   async function upvotePost(id: string) {
     const res = await apiFetch(`/api/posts/${id}/upvote`, {
@@ -553,7 +570,11 @@ export default function HomePage() {
     </>
   );
 }
-
+/**
+ * returns the positions of left sidebar tags of current view page
+ * @param view 
+ * @returns 
+ */
 function getSidebarIndicatorTop(view: HomeView) {
   switch (view) {
     case "home":
@@ -570,7 +591,9 @@ function getSidebarIndicatorTop(view: HomeView) {
       return 0;
   }
 }
-
+/**
+ * api fetch function
+ */
 export async function apiFetch(url: string, init?: RequestInit) {
   return fetch(url, {
     credentials: "include",
