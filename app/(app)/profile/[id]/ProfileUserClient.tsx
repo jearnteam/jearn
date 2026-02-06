@@ -15,7 +15,7 @@ interface Props {
 
 type ApiUser = {
   _id: string;
-  userId: string;
+  uniqueId: string;
   name?: string;
   bio?: string;
   picture?: string;
@@ -23,7 +23,7 @@ type ApiUser = {
 
 type UIUser = {
   _id: string;
-  userId: string;
+  uniqueId: string;
   name: string;
   bio: string;
 };
@@ -88,7 +88,7 @@ export default function ProfileUserClient({ userId }: Props) {
 
         setUser({
           _id: apiUser._id,
-          userId: apiUser.userId,
+          uniqueId: apiUser.uniqueId,
           name: apiUser.name ?? "Unnamed User",
           bio: apiUser.bio ?? "",
         });
@@ -154,7 +154,7 @@ export default function ProfileUserClient({ userId }: Props) {
 
           <div className="flex-1">
             <h1 className="text-xl font-bold">{user.name}</h1>
-            <p className="text-sm text-gray-500">@{user.userId}</p>
+            <p className="text-sm text-gray-500">@{user.uniqueId}</p>
 
             <FollowStats userId={user._id} />
             {user.bio && (

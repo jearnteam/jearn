@@ -4,7 +4,7 @@ import { Node } from "@tiptap/core";
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     mention: {
-      insertMention: (attrs: { uid: string; userId: string }) => ReturnType;
+      insertMention: (attrs: { uid: string; uniqueId: string }) => ReturnType;
     };
   }
 }
@@ -24,11 +24,11 @@ export const Mention = Node.create({
         parseHTML: (element) => element.getAttribute("data-uid"),
         renderHTML: (attrs) => (attrs.uid ? { "data-uid": attrs.uid } : {}),
       },
-      userId: {
+      uniqueId: {
         default: null,
-        parseHTML: (element) => element.getAttribute("data-userid"),
+        parseHTML: (element) => element.getAttribute("data-uniqueId"),
         renderHTML: (attrs) =>
-          attrs.userId ? { "data-userid": attrs.userId } : {},
+          attrs.uniqueId ? { "data-uniqueId": attrs.uniqueId } : {},
       },
     };
   },
@@ -38,13 +38,13 @@ export const Mention = Node.create({
         tag: "span[data-mention]",
         getAttrs: (node) => ({
           uid: (node as HTMLElement).getAttribute("data-uid"),
-          userId: (node as HTMLElement).getAttribute("data-userid"),
+          uniqueId: (node as HTMLElement).getAttribute("data-uniqueId"),
         }),
       },
     ];
   },
   renderHTML({ node, HTMLAttributes }) {
-    const { uid, userId } = node.attrs;
+    const { uid, uniqueId } = node.attrs;
 
     return [
       "span",
@@ -52,10 +52,10 @@ export const Mention = Node.create({
         ...HTMLAttributes,
         "data-mention": "true",
         "data-uid": uid,
-        "data-userid": userId,
+        "data-uniqueId": uniqueId,
         class: "mention",
       },
-      `@${userId}`,
+      `@${uniqueId}`,
     ];
   },
   addNodeView() {
@@ -64,9 +64,9 @@ export const Mention = Node.create({
 
       dom.dataset.mention = "true";
       dom.dataset.uid = node.attrs.uid ?? "";
-      dom.dataset.userid = node.attrs.userId ?? "";
+      dom.dataset.uniqueId = node.attrs.uniqueId ?? "";
 
-      dom.textContent = `@${node.attrs.userId}`;
+      dom.textContent = `@${node.attrs.uniqueId}`;
       dom.className = "mention";
 
       return {

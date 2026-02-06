@@ -17,7 +17,7 @@ export default function SearchResultsList({
             return (
               <li key={`user-${item.data._id}`}>
                 <Link
-                  href={`/users/${item.data.userId}`}
+                  href={`/users/${item.data.uniqueId}`}
                   className="
                     flex items-center gap-3
                     px-4 py-3 rounded-xl
@@ -33,9 +33,9 @@ export default function SearchResultsList({
                     <div className="font-medium">
                       {item.data.name}
                     </div>
-                    {item.data.userId && (
+                    {item.data.uniqueId && (
                       <div className="text-xs text-gray-500">
-                        @{item.data.userId}
+                        @{item.data.uniqueId}
                       </div>
                     )}
                   </div>

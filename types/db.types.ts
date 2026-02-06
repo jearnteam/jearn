@@ -65,7 +65,7 @@ export interface UserDoc extends Document {
   /** ユーザー名 */
   name: string;
   /** ユーザーID */
-  userId: string;
+  uniqueId: string;
   /** アバター画像データ */
   picture?: Binary;
   /** アバター画像のMIME Type */

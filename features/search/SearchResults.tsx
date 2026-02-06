@@ -43,7 +43,7 @@ export default function SearchResults({
                 return (
                   <li key={`u-${i}`}>
                     <Link
-                      href={`/profile/${item.data.userId ?? item.data._id}`}
+                      href={`/profile/${item.data.uniqueId ?? item.data._id}`}
                       className="
                         flex items-center gap-2
                         px-3 py-2
@@ -60,9 +60,9 @@ export default function SearchResults({
                           {item.data.name}
                         </div>
 
-                        {item.data.userId && (
+                        {item.data.uniqueId && (
                           <div className="text-[11px] text-gray-500 truncate">
-                            @{item.data.userId}
+                            @{item.data.uniqueId}
                           </div>
                         )}
                         {item.data.bio && (

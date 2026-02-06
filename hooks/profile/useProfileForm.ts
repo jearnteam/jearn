@@ -6,7 +6,7 @@ export function useProfileForm() {
   const { user, loading, update } = useCurrentUser();
 
   const [name, setName] = useState("");
-  const [userId, setUserId] = useState("");
+  const [uniqueId, setUniqueId] = useState("");
   const [bio, setBio] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
@@ -16,7 +16,7 @@ export function useProfileForm() {
   useEffect(() => {
     if (!loading && user) {
       setName(user.name ?? "");
-      setUserId(user.userId ?? "");
+      setUniqueId(user.uniqueId ?? "");
       setBio(user.bio ?? "");
       setPreview(avatarUrl(user._id, user.avatarUpdatedAt));
     }
@@ -37,7 +37,7 @@ export function useProfileForm() {
     const fd = new FormData();
     fd.append("user_id", user._id);
     fd.append("name", name);
-    fd.append("userId", userId);
+    fd.append("uniqueId", uniqueId);
     fd.append("bio", bio);
     if (file) fd.append("picture", file);
 
@@ -62,7 +62,7 @@ export function useProfileForm() {
 
   return {
     name, setName,
-    userId, setUserId,
+    uniqueId, setUniqueId,
     bio, setBio,
     preview,
     setFile,

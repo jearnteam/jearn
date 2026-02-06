@@ -217,9 +217,9 @@ export default function CommentItem({
                   {comment.authorName || "Anonymous"}
                 </p>
 
-                {comment.authorUserId && (
+                {comment.authorUniqueId && (
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    @{comment.authorUserId}
+                    @{comment.authorUniqueId}
                   </p>
                 )}
               </div>

@@ -5,8 +5,8 @@ export default function ProfileHeader({
   user,
   name,
   setName,
-  userId,
-  setUserId,
+  uniqueId,
+  setUniqueId,
   bio,
   setBio,
   preview,
@@ -99,14 +99,14 @@ export default function ProfileHeader({
           />
         </div>
 
-        {/* User ID */}
+        {/* Unique ID */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            User ID
+            Unique ID
           </label>
           <input
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
+            value={uniqueId}
+            onChange={(e) => setUniqueId(e.target.value)}
             className="
               w-full px-3 py-2 rounded-md
               border border-neutral-300 dark:border-neutral-700

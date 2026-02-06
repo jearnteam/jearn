@@ -20,8 +20,8 @@ export async function GET(req: Request) {
     let users = await db
       .collection("users")
       .find(
-        { $or: [{ userId: regex }, { name: regex }] },
-        { projection: { _id: 1, userId: 1, name: 1 } }
+        { $or: [{ uniqueId: regex }, { name: regex }] },
+        { projection: { _id: 1, uniqueId: 1, name: 1 } }
       )
       .limit(20)
       .toArray();
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     users = users
       .map((u) => {
         const qLower = q.toLowerCase();
-        const id = String(u.userId || "").toLowerCase();
+        const id = String(u.uniqueId || "").toLowerCase();
         const nm = String(u.name || "").toLowerCase();
 
         let score = 0;
@@ -50,7 +50,7 @@ export async function GET(req: Request) {
       ok: true,
       users: users.map((u) => ({
         _id: u._id.toString(),
-        userId: u.userId ?? null,
+        uniqueId: u.uniqueId ?? null,
         name: u.name,
         picture: `${CDN}/avatars/${u._id.toString()}.webp`,
       })),

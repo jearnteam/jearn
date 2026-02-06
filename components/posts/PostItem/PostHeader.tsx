@@ -70,10 +70,10 @@ export default function PostHeader({
           <div>
             <div className="flex gap-1.5">
               <p className="font-semibold">{authorName}</p>
-              {post.authorUserId && (
+              {post.authorUniqueId && (
                 <>
                   <p className="text-sm text-gray-500"> - </p>
-                  <p className="text-sm text-gray-500">@{post.authorUserId}</p>
+                  <p className="text-sm text-gray-500">@{post.authorUniqueId}</p>
                 </>
               )}
             </div>

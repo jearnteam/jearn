@@ -13,10 +13,10 @@ async function resolveAuthor(
   authorId?: string | null
 ): Promise<{
   name: string;
-  userId: string | null;
+  uniqueId: string | null;
 }> {
   if (!authorId) {
-    return { name: "Anonymous", userId: null };
+    return { name: "Anonymous", uniqueId: null };
   }
 
   let user: WithId<Document> | null = null;
@@ -25,7 +25,7 @@ async function resolveAuthor(
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1, userId: 1 } }
+      { projection: { name: 1, uniqueId: 1 } }
     );
   }
 
@@ -33,13 +33,13 @@ async function resolveAuthor(
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1, userId: 1 } }
+      { projection: { name: 1, uniqueId: 1 } }
     );
   }
 
   return {
     name: (user?.name as string | undefined) ?? "Anonymous",
-    userId: (user?.userId as string | undefined) ?? null,
+    uniqueId: (user?.uniqueId as string | undefined) ?? null,
   };
 }
 
@@ -75,7 +75,7 @@ export async function GET(
           ...c,
           _id: c._id.toString(),
           authorName: author.name,
-          authorUserId: author.userId,
+          authorUniqueId: author.uniqueId,
         };
       })
     );

@@ -28,14 +28,14 @@ async function resolveAuthor(
   authorId?: string | null
 ): Promise<{
   name: string;
-  userId: string | null;
+  uniqueId: string | null;
   avatarUpdatedAt: Date | null;
   email: string | null;
 }> {
   if (!authorId) {
     return {
       name: "Anonymous",
-      userId: null,
+      uniqueId: null,
       avatarUpdatedAt: null,
       email: null,
     };
@@ -46,20 +46,20 @@ async function resolveAuthor(
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1, email: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1, email: 1 } }
     );
   }
 
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1, email: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1, email: 1 } }
     );
   }
 
   return {
     name: (user?.name as string | undefined) ?? "Anonymous",
-    userId: (user?.userId as string | undefined) ?? null,
+    uniqueId: (user?.uniqueId as string | undefined) ?? null,
     avatarUpdatedAt: (user?.avatarUpdatedAt as Date | undefined) ?? null,
     email: (user?.email as string | undefined) ?? null,
   };
@@ -186,7 +186,7 @@ export async function GET(
 
           authorId,
           authorName: author.name,
-          authorUserId: author.userId,
+          authorUniqueId: author.uniqueId,
           authorAvatar: buildAuthorAvatar(authorId, author.avatarUpdatedAt),
           authorAvatarUpdatedAt: author.avatarUpdatedAt,
 

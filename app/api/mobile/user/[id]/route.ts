@@ -25,7 +25,7 @@ export async function GET(
       {
         projection: {
           name: 1,
-          userId: 1,
+          uniqueId: 1,
           bio: 1,
           avatarR2Key: 1, // optional: if stored
           picture: 1, // backward compatibility
@@ -56,7 +56,7 @@ export async function GET(
       user: {
         uid: id,
         name: user.name ?? "Anonymous",
-        userId: user.userId ?? null,
+        uniqueId: user.uniqueId ?? null,
         bio: user.bio ?? "",
         picture: avatarUrl,
       },

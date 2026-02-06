@@ -15,7 +15,7 @@ export type SearchMode =
 
 export type SearchUser = {
   _id: string;
-  userId: string | null;
+  uniqueId: string | null;
   name: string;
   picture: string;
   bio?: string;

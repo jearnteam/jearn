@@ -10,7 +10,7 @@ import "tippy.js/dist/tippy.css";
 
 export interface MentionUser {
   uid: string;
-  userId: string;
+  uniqueId: string;
   name: string;
   picture?: string | null;
 }
@@ -59,17 +59,17 @@ export const MentionSuggestion = Extension.create({
           const users = Array.isArray(data.users ?? data) ? data.users : [];
 
           return users.map((u: any) => {
-            const fallbackUserId =
-              typeof u.userId === "string" && u.userId.trim() !== ""
-                ? u.userId
+            const fallbackUniqueId =
+              typeof u.uniqueId === "string" && u.uniqueId.trim() !== ""
+                ? u.uniqueId
                 : u.name.replace(/\s+/g, "_").toLowerCase(); // convert name → safe id
 
             return {
               uid: u._id,
-              userId: fallbackUserId,
+              uniqueId: fallbackUniqueId,
               name: u.name,
               picture: u.picture ?? null,
-              hasNoUserId: !u.userId,
+              hasNoUniqueId: !u.uniqueId,
             };
           });
         },
@@ -84,7 +84,7 @@ export const MentionSuggestion = Extension.create({
             .deleteRange(range)
             .insertMention({
               uid: props.uid,
-              userId: props.userId,
+              uniqueId: props.uniqueId,
             })
             .run();
         },
@@ -155,7 +155,7 @@ export const MentionSuggestion = Extension.create({
               };
 
               const label = document.createElement("span");
-              label.textContent = `@${u.userId} — ${u.name}`;
+              label.textContent = `@${u.uniqueId} — ${u.name}`;
 
               row.appendChild(img);
               row.appendChild(label);

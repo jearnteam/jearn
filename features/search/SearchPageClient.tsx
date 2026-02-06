@@ -78,8 +78,8 @@ export default function SearchPageClient({
           {(mode === "all" || mode === "users") &&
             userResults.map((u) => (
               <Link
-                key={u.data.userId}
-                href={`/users/${u.data.userId}`}
+                key={u.data.uniqueId}
+                href={`/users/${u.data.uniqueId}`}
                 className="block p-4 border rounded-xl"
               >
                 👤 {u.data.name}

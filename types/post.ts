@@ -53,7 +53,7 @@ export interface Post {
 
   authorId?: string;
   authorName?: string;
-  authorUserId?: string;
+  authorUniqueId?: string;
 
   // 🔥 EXISTING FIELD (avatar URL)
   authorAvatar: string | null;

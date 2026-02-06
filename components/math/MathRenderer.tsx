@@ -409,13 +409,13 @@ function setupMentions(el: HTMLElement) {
 
   mentions.forEach((mentionEl) => {
     const uid = mentionEl.dataset.uid || "";
-    const userId = mentionEl.dataset.userid || "";
+    const uniqueId = mentionEl.dataset.uniqueId || "";
 
     mentionEl.style.cursor = "pointer";
 
     mentionEl.addEventListener("click", (e) => {
       e.stopPropagation();
-      const target = uid || userId;
+      const target = uid || uniqueId;
       if (target)
         window.dispatchEvent(
           new CustomEvent("app:navigate", {
@@ -451,7 +451,7 @@ function setupMentions(el: HTMLElement) {
       popup.style.left = rect.left + "px";
 
       let user: {
-        userId?: string;
+        uniqueId?: string;
         name?: string;
         bio?: string;
         picture?: string;
@@ -486,7 +486,7 @@ function setupMentions(el: HTMLElement) {
 
       const handle = document.createElement("span");
       handle.className = "font-semibold";
-      handle.textContent = `@${user?.userId ?? userId}`;
+      handle.textContent = `@${user?.uniqueId ?? uniqueId}`;
 
       const name = document.createElement("span");
       name.className = "text-gray-600 dark:text-gray-300 text-xs";

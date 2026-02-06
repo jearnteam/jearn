@@ -7,7 +7,7 @@ import FollowButton from "./FollowButton";
 type FollowUser = {
   uid: string;
   name: string;
-  userId?: string;
+  uniqueId?: string;
 };
 
 export default function FollowListModal({

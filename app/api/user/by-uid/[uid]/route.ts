@@ -28,7 +28,7 @@ export async function GET(
           projection: {
             _id: 1,
             name: 1,
-            userId: 1,
+            uniqueId: 1,
             bio: 1,
             avatarUrl: 1,
             avatarUpdatedAt: 1,
@@ -52,7 +52,7 @@ export async function GET(
       user: {
         uid: user._id.toString(),
         name: user.name ?? "Unknown",
-        userId: user.userId ?? null,
+        uniqueId: user.uniqueId ?? null,
         bio: user.bio ?? "",
         picture: avatarUrl,
         avatarUpdatedAt: user.avatarUpdatedAt ?? null,

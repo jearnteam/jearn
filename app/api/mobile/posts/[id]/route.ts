@@ -21,13 +21,13 @@ async function resolveAuthor(
   authorId?: string | null
 ): Promise<{
   name: string;
-  userId: string | null;
+  uniqueId: string | null;
   avatarUpdatedAt: Date | null;
 }> {
   if (!authorId) {
     return {
       name: "Anonymous",
-      userId: null,
+      uniqueId: null,
       avatarUpdatedAt: null,
     };
   }
@@ -37,20 +37,20 @@ async function resolveAuthor(
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
     );
   }
 
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
     );
   }
 
   return {
     name: user?.name ?? "Anonymous",
-    userId: user?.userId ?? null,
+    uniqueId: user?.uniqueId ?? null,
     avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
   };
 }
@@ -110,7 +110,7 @@ export async function GET(
       ...post,
       _id: id,
       authorName: author.name,
-      authorUserId: author.userId,
+      authorUniqueId: author.uniqueId,
       authorAvatarUpdatedAt: author.avatarUpdatedAt,
       commentCount,
       categories: populatedCategories,
@@ -215,7 +215,7 @@ export async function PUT(
       ...updated,
       _id: String(updated?._id),
       authorName: author.name,
-      authorUserId: author.userId,
+      authorUniqueId: author.uniqueId,
       authorAvatarUpdatedAt: author.avatarUpdatedAt,
       categories: enrichedCategories,
       tags: updated?.tags ?? [],

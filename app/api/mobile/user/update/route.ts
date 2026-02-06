@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const user_id_raw = form.get("user_id");
     const name_raw = form.get("name");
-    const userId_raw = form.get("userId");
+    const uniqueId_raw = form.get("uniqueId");
     const bio_raw = form.get("bio");
     const file = form.get("picture");
 
@@ -59,14 +59,14 @@ export async function POST(req: NextRequest) {
 
     const user_id = user_id_raw;
     const name = typeof name_raw === "string" ? name_raw : "";
-    const userId = typeof userId_raw === "string" ? userId_raw : "";
+    const uniqueId = typeof uniqueId_raw === "string" ? uniqueId_raw : "";
     const bio = typeof bio_raw === "string" ? bio_raw : "";
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
     /* -------------------------------------------------
-     * Name & UserID validation
+     * Name & UniqueId validation
      * ------------------------------------------------ */
     if (name.length < 4 || name.length > 32) {
       return NextResponse.json(
@@ -75,29 +75,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const userIdUpdate: Record<string, unknown> = {};
+    const uniqueIdUpdate: Record<string, unknown> = {};
 
-    if (userId) {
-      if (userId.length < 3 || userId.length > 32) {
+    if (uniqueId) {
+      if (uniqueId.length < 3 || uniqueId.length > 32) {
         return NextResponse.json(
-          { ok: false, error: "UserID must be 3–32 characters" },
+          { ok: false, error: "UniqueId must be 3–32 characters" },
           { status: 400 }
         );
       }
 
       const exists = await db.collection("users").findOne({
-        userId,
+        uniqueId,
         _id: { $ne: new ObjectId(user_id) },
       });
 
       if (exists) {
         return NextResponse.json(
-          { ok: false, error: "UserID already taken" },
+          { ok: false, error: "UniqueId already taken" },
           { status: 400 }
         );
       }
 
-      userIdUpdate.userId = userId;
+      uniqueIdUpdate.uniqueId = uniqueId;
     }
 
     /* -------------------------------------------------
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       name,
       bio,
       updatedAt: new Date(),
-      ...userIdUpdate,
+      ...uniqueIdUpdate,
       ...pictureUpdate,
     };
 

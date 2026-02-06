@@ -21,9 +21,9 @@ export async function findUserByAuthorId(
   // ❌ REMOVED: string _id lookup (invalid in strict Mongo typing)
   // await users.findOne({ _id: authorId });
 
-  // 3️⃣ public userId
-  const byUserId = await users.findOne({ userId: authorId });
-  if (byUserId) return byUserId;
+  // 3️⃣ public uniqueId
+  const byUniqueId = await users.findOne({ uniqueId: authorId });
+  if (byUniqueId) return byUniqueId;
 
   // 4️⃣ email fallback
   const byEmail = await users.findOne({ email: authorId });

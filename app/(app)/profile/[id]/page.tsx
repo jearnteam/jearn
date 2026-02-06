@@ -22,14 +22,14 @@ import FollowStats from "@/components/follow/FollowStats";
  * ------------------------------------------- */
 type ApiUser = {
   _id: string;
-  userId?: string;
+  uniqueId?: string;
   name?: string;
   bio?: string;
 };
 
 type UIUser = {
   _id: string;
-  userId: string;
+  uniqueId: string;
   name: string;
   bio: string;
   picture: string;
@@ -80,7 +80,7 @@ export default function UserPage() {
 
       setUser({
         _id: apiUser._id,
-        userId: apiUser.userId ?? "",
+        uniqueId: apiUser.uniqueId ?? "",
         name: apiUser.name ?? "Unnamed User",
         bio: apiUser.bio ?? "",
         picture: `https://cdn.jearn.site/avatars/${id}?t=${Date.now()}`,
@@ -235,7 +235,7 @@ export default function UserPage() {
 
               <div className="flex-1 relative">
                 <h1 className="text-2xl font-bold">{safeUser.name}</h1>
-                <p className="text-gray-500">@{safeUser.userId}</p>
+                <p className="text-gray-500">@{safeUser.uniqueId}</p>
 
                 {/* TODO: 適切な位置にスタイリング */}
                 <FollowStats userId={id}/>

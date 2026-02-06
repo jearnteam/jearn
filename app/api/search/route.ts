@@ -17,7 +17,7 @@ type CategoryDoc = {
 
 type SearchUser = {
   _id: string;
-  userId: string | null;
+  uniqueId: string | null;
   name: string;
   picture: string;
   bio?: string;
@@ -43,7 +43,7 @@ async function enrichPost(
   if (post.authorId && ObjectId.isValid(post.authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, userId: 1, avatarUpdatedAt: 1, bio: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1, bio: 1 } }
     );
   }
 
@@ -119,15 +119,15 @@ export async function GET(req: NextRequest) {
 
     const rawUsers = await usersColl
       .find(
-        { $or: [{ userId: regex }, { name: regex }] },
-        { projection: { name: 1, userId: 1, avatarUpdatedAt: 1 } }
+        { $or: [{ uniqueId: regex }, { name: regex }] },
+        { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
       )
       .limit(5)
       .toArray();
 
     const users: SearchUser[] = rawUsers.map((u) => ({
       _id: u._id.toString(),
-      userId: u.userId ?? null,
+      uniqueId: u.uniqueId ?? null,
       name: u.name ?? "Unknown",
       bio: u.bio ?? "",
       picture: `${CDN}/avatars/${u._id.toString()}.webp${
