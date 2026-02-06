@@ -101,7 +101,7 @@ export const Tag = Node.create({
               "\uFFFC"
             );
 
-            const match = beforeText.match(/#([\p{L}\p{N}_]+)$/u);
+            const match = beforeText.match(/#(?![_]+$)([\p{L}\p{N}_]+)$/u);
             if (!match) return false;
 
             const value = match[1];
