@@ -51,7 +51,7 @@ export default function AnswerModal({
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-neutral-900 z-10">
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <span className="text-orange-500">A.</span>
-                {t("answerToQuestion") || "Answer to Question"}
+                {t("answerToQuestion")}
               </h2>
               <button
                 onClick={onClose}
@@ -91,7 +91,7 @@ export default function AnswerModal({
                   <PostForm
                     mode={PostTypes.ANSWER}
                     questionId={questionPost._id}
-                    submitLabel={t("postAnswer") || "Post Answer"}
+                    submitLabel={t("postAnswer")}
                     onSubmit={async (data) => {
                       // PostForm からのデータを Answer 用に変換して送信
                       await onSubmit(

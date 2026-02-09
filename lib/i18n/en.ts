@@ -36,7 +36,16 @@ const en = {
     copied: "Copied!",
     copyLink: "Copy Link",
     requestCategory: "Request Category",
+    categoryName: "Category Name",
     search: "Search",
+    categoryReason: "Reason (Optional)",
+    loadingUser: "Loading User",
+    requestSent: "Request sent successfully!",
+    sendRequest: "Send Request",
+    answerToQuestion: "Answer to Question",
+    postAnswer: "Post Answer",
+    answers: "Answers",
+    noAnswersYet: "No answers yet.",
 
     // home page
     home: "Home",
@@ -81,11 +90,8 @@ const en = {
     settings: "Settings",
     notification: "Notification",
     reports: "Reports",
+    categoryRequest: "Category Request",
     loadingDashboard: "Loading dashboard",
-
-    nest: {
-      nested: "nested"
-    }
   },
 } as const;
 

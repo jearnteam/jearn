@@ -29,7 +29,7 @@ export default function CategoryRequestModal({ onClose }: Props) {
       });
 
       if (res.ok) {
-        alert(t("requestSent") || "Request sent successfully!");
+        alert(t("requestSent"));
         onClose();
       } else {
         alert("Failed to send request.");
@@ -62,9 +62,12 @@ export default function CategoryRequestModal({ onClose }: Props) {
             {/* Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-800">
               <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                {t("requestCategory") || "Request Category"}
+                {t("requestCategory")}
               </h2>
-              <button onClick={onClose} className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+              <button
+                onClick={onClose}
+                className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -73,7 +76,7 @@ export default function CategoryRequestModal({ onClose }: Props) {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t("categoryName") || "Category Name"} <span className="text-red-500">*</span>
+                  {t("categoryName")} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -87,7 +90,7 @@ export default function CategoryRequestModal({ onClose }: Props) {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t("reason") || "Reason (Optional)"}
+                  {t("categoryReason")}
                 </label>
                 <textarea
                   value={reason}
@@ -104,14 +107,14 @@ export default function CategoryRequestModal({ onClose }: Props) {
                   onClick={onClose}
                   className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
                 >
-                  {t("cancel") || "Cancel"}
+                  {t("cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || !name.trim()}
                   className="px-4 py-2 rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  {submitting ? "Sending..." : t("sendRequest") || "Send Request"}
+                  {submitting ? "Sending..." : t("sendRequest")}
                 </button>
               </div>
             </form>

@@ -100,7 +100,7 @@ export default function EditPostModal({
             {/* HEADER */}
             <div className="flex justify-between items-center p-4 border-b dark:border-gray-700">
               <h2 className="text-xl font-semibold">
-                {t("editPost") || "Edit Post"}
+                {t("editPost")}
               </h2>
               <button
                 onClick={onClose}
@@ -120,7 +120,7 @@ export default function EditPostModal({
                   post.categories?.map((c) => c.id) ?? []
                 }
                 initialAvailableCategories={allCategories}
-                submitLabel={t("saveChanges") || "Save Changes"}
+                submitLabel={t("saveChanges")}
                 onCancel={onClose}
                 onSubmit={async (data) => {
                   await onSave(

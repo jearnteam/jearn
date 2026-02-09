@@ -164,7 +164,7 @@ export default function PostFooter({
               className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <Share2 size={18} />
-              <span>{t("share") || "Share"}</span>
+              <span>{t("share")}</span>
             </button>
           </div>
 

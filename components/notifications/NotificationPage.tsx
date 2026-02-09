@@ -69,7 +69,7 @@ export default function NotificationPage() {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-500">
         <Bell className="w-10 h-10 mb-3 opacity-50" />
-        <p className="text-sm">{t("no_noti_yet") || "No notifications yet"}</p>
+        <p className="text-sm">{t("no_noti_yet")}</p>
       </div>
     );
   }
@@ -119,22 +119,22 @@ function NotificationItem({
         const count = notification.count ?? 1;
         if (count > 1) {
           return `${notification.lastActorName} and ${count - 1} others ${
-            t("upvote_noti") || "upvoted your post."
+            t("upvote_noti")
           }`;
         }
         return `${notification.lastActorName} ${
-          t("upvote_noti") || "upvoted your post."
+          t("upvote_noti")
         }`;
       }
 
       case "mention":
         return `${notification.lastActorName} ${
-          t("mention_noti") || "mentioned you!"
+          t("mention_noti")
         }`;
 
       case "comment":
         return `${notification.lastActorName} ${
-          t("comment_noti") || "commented on your post."
+          t("comment_noti")
         }`;
 
       case "system":
@@ -155,7 +155,7 @@ function NotificationItem({
       }
 
       default:
-        return t("notifications") || "Notification";
+        return t("notifications");
     }
   }
 

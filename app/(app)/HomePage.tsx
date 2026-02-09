@@ -374,7 +374,7 @@ export default function HomePage() {
             >
               {uploading
                 ? `Uploading ${progress}%`
-                : `+ ${t("createPost") || "Create Post"}`}
+                : `+ ${t("createPost")}`}
             </button>
 
             <nav className="mt-6 relative flex flex-col gap-1">
@@ -401,7 +401,7 @@ export default function HomePage() {
               {/* ITEMS */}
               <div className="relative z-10">
                 <SidebarItem
-                  label={t("home") || "home"}
+                  label={t("home")}
                   active={activeView === "home"}
                   onClick={() => changeView("home")}
                 />
@@ -409,7 +409,7 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
-                  label={t("follow") || "follow"}
+                  label={t("follow")}
                   active={activeView === "users"}
                   onClick={() => changeView("users")}
                 />
@@ -417,7 +417,7 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
-                  label={t("notifications") || "notifications"}
+                  label={t("notifications")}
                   active={activeView === "notify"}
                   onClick={() => changeView("notify")}
                   badge={unreadCount}
@@ -494,7 +494,7 @@ export default function HomePage() {
               >
                 {followingLoading && (
                   <div className="p-4 text-center text-gray-500">
-                    読み込み中…
+                    {t("loading")}…
                   </div>
                 )}
 

@@ -65,7 +65,7 @@ export default function Dashboard() {
   if (!hydrated || !activeTab)
     return (
       <div className="fixed inset-0 flex items-center justify-center text-gray-500 dark:text-gray-400">
-        {t("loadingDashboard") || "Loading dashboard"}...
+        {t("loadingDashboard")}...
       </div>
     );
 
@@ -105,7 +105,7 @@ export default function Dashboard() {
         <div className="mt-16">
           <SidebarItem
             icon={<Home size={18} />}
-            label={t("overview") || "Overview"}
+            label={t("overview")}
             active={activeTab === "overview"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("overview")}
@@ -113,7 +113,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<BarChart3 size={18} />}
-            label={t("analytics") || "Analytics"}
+            label={t("analytics")}
             active={activeTab === "analytics"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("analytics")}
@@ -121,7 +121,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<Database size={18} />}
-            label={t("database") || "Database"}
+            label={t("database")}
             active={activeTab === "database"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("database")}
@@ -129,7 +129,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<Bell size={18} />}
-            label={t("notification") || "Notification"}
+            label={t("notification")}
             active={activeTab === "notification"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("notification")}
@@ -137,7 +137,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<FileBarChart size={18} />}
-            label={t("reports") || "Reports"}
+            label={t("reports")}
             active={activeTab === "reports"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("reports")}
@@ -145,7 +145,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<FolderPlus size={18} />}
-            label={t("categoryRequest") || "categoryRequest"}
+            label={t("categoryRequest")}
             active={activeTab === "categoryRequest"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("categoryRequest")}
@@ -153,7 +153,7 @@ export default function Dashboard() {
 
           <SidebarItem
             icon={<Settings size={18} />}
-            label={t("settings") || "Settings"}
+            label={t("settings")}
             active={activeTab === "settings"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("settings")}

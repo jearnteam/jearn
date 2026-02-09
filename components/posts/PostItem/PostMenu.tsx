@@ -94,7 +94,7 @@ export default function PostMenu({
                              hover:bg-gray-100 dark:hover:bg-neutral-700"
                 >
                   <Pencil className="w-4 h-4 text-blue-500" />
-                  <span>{t("edit") || "Edit"}</span>
+                  <span>{t("edit")}</span>
                 </button>
 
                 <button
@@ -103,7 +103,7 @@ export default function PostMenu({
                              text-red-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
                 >
                   <Trash2 className="w-4 h-4 text-red-500" />
-                  <span>{t("delete") || "Delete"}</span>
+                  <span>{t("delete")}</span>
                 </button>
               </>
             ) : (
@@ -113,7 +113,7 @@ export default function PostMenu({
                            text-yellow-600 hover:bg-gray-100 dark:hover:bg-neutral-700"
               >
                 <Flag className="w-4 h-4 text-yellow-500" />
-                <span>{t("report") || "Report"}</span>
+                <span>{t("report")}</span>
               </button>
             )}
           </motion.div>

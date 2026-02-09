@@ -80,7 +80,7 @@ export default function CommentForm({
       <div className="relative px-2 py-4">
         <PostEditorWrapper
           ref={editorRef}
-          value=""
+          value="" // TODO: 
           placeholder={placeholder}
           compact
         />
@@ -94,7 +94,7 @@ export default function CommentForm({
             disabled={submitting}
             className="text-sm text-gray-600 hover:underline dark:text-gray-300"
           >
-            {t("cancel") || "Cancel"}
+            {t("cancel")}
           </button>
         )}
         <button
@@ -110,7 +110,7 @@ export default function CommentForm({
               : "Posting..."
             : mode === "reply"
             ? "Reply"
-            : (t("postComment") || "Post Comment")}
+            : (t("postComment"))}
         </button>
       </div>
     </form>

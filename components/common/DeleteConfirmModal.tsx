@@ -49,11 +49,11 @@ export default function DeleteConfirmModal({
             >
               <div className="flex items-center gap-3 mb-4 text-red-500 dark:text-red-400">
                 <AlertTriangle size={24} />
-                <h3 className="text-lg font-semibold">{t("deletePost") || "Delete this post?"}</h3>
+                <h3 className="text-lg font-semibold">{t("deletePost")}</h3>
               </div>
 
               <p className="text-gray-700 dark:text-gray-300 mb-6">
-                {t("deletePostDesc") || "This action cannot be undone. Are you sure you want to permanently delete this post?"}
+                {t("deletePostDesc")}
               </p>
 
               <div className="flex justify-end gap-3">
@@ -64,7 +64,7 @@ export default function DeleteConfirmModal({
                              text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-neutral-700
                              disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t("cancel") || "Cancel"}
+                  {t("cancel")}
                 </button>
                 <button
                   onClick={handleConfirm}
@@ -75,7 +75,7 @@ export default function DeleteConfirmModal({
                   {isDeleting && (
                     <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   )}
-                  {isDeleting ? "Deleting..." : (t("delete") || "Delete")}
+                  {isDeleting ? "Deleting..." : (t("delete"))}
                 </button>
               </div>
             </motion.div>

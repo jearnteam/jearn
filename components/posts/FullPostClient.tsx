@@ -209,7 +209,7 @@ export default function FullPostClient({
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4 px-2">
             <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">
-              {answers.length} {t("answers") || "Answers"}
+              {answers.length} {t("answers")}
             </h3>
           </div>
 
@@ -246,7 +246,7 @@ export default function FullPostClient({
             </div>
           ) : (
             <div className="p-8 text-center text-gray-500 bg-gray-50 dark:bg-neutral-900 rounded-lg border border-dashed border-gray-300 dark:border-gray-700">
-              {t("noAnswersYet") || "No answers yet."}
+              {t("noAnswersYet")}
             </div>
           )}
         </div>

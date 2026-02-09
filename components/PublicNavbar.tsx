@@ -98,7 +98,7 @@ export default function PublicNavbar() {
             className="text-4xl font-bold"
             style={{ fontFamily: "var(--font-shadows-into-light)" }}
           >
-            {t("jearn") || "JEARN"}
+            {t("jearn")}
           </h1>
         </div>
 
@@ -117,7 +117,7 @@ export default function PublicNavbar() {
               dark:bg-white dark:text-black dark:hover:bg-neutral-200
             "
           >
-            {t("login") || "Log in"}
+            {t("login")}
           </button>
         </div>
       </div>

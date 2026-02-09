@@ -47,7 +47,7 @@ export default function SharePostModal({
               <div className="flex items-center gap-3 mb-4">
                 <Link2 size={24} className="text-blue-500 dark:text-blue-400" />
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                  {t("shareThisPost") || "Share this post"}
+                  {t("shareThisPost")}
                 </h3>
               </div>
 
@@ -61,7 +61,7 @@ export default function SharePostModal({
                   className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-neutral-800
                              text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-neutral-700"
                 >
-                  {t("cancel") || "Cancel"}
+                  {t("cancel")}
                 </button>
 
                 <button
@@ -71,11 +71,11 @@ export default function SharePostModal({
                 >
                   {copied ? (
                     <>
-                      <Check size={18} /> {t("copied") || "Copied!"}
+                      <Check size={18} /> {t("copied")}
                     </>
                   ) : (
                     <>
-                      <Link2 size={18} /> {t("copyLink") || "Copy Link"}
+                      <Link2 size={18} /> {t("copyLink")}
                     </>
                   )}
                 </button>

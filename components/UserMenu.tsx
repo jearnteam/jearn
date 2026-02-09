@@ -121,7 +121,7 @@ export default function UserMenu({ user }: { user: User }) {
               }}
               className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
             >
-              {t("profile") || "Profile"}
+              {t("profile")}
             </button>
 
             {/* THEME */}
@@ -134,7 +134,7 @@ export default function UserMenu({ user }: { user: User }) {
               ) : (
                 <Moon className="w-5 h-5 text-gray-800" />
               )}
-              {t("toggleTheme") || "Toggle Theme"}
+              {t("toggleTheme")}
             </button>
 
             {/* LANGUAGE */}
@@ -151,7 +151,7 @@ export default function UserMenu({ user }: { user: User }) {
               className="flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
             >
               <FolderPlus size={18} />
-              <span>{t("requestCategory") || "Request Category"}</span>
+              <span>{t("requestCategory")}</span>
             </button>
 
             {/* ADMIN */}
@@ -163,7 +163,7 @@ export default function UserMenu({ user }: { user: User }) {
                 }}
                 className="px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
               >
-                {t("dashboard") || "Dashboard"}
+                {t("dashboard")}
               </button>
             )}
 
@@ -175,7 +175,7 @@ export default function UserMenu({ user }: { user: User }) {
               }}
               className="px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-md text-left"
             >
-              {t("logout") || "Logout"}
+              {t("logout")}
             </button>
           </div>
         </div>

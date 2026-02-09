@@ -43,14 +43,14 @@ export default function CommentClientSection({
     <section id="comments" className="space-y-5">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">
-          {t("comments") || "Comments"}
+          {t("comments")}
         </h3>
 
         <button
           onClick={() => setIsCommentOpen(true)}
           className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
         >
-          + {t("addComment") || "Add Comment"}
+          + {t("addComment")}
         </button>
       </div>
 

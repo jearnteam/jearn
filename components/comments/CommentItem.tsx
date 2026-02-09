@@ -259,7 +259,7 @@ export default function CommentItem({
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-neutral-700"
                     >
-                      ✏️ {t("edit") || "Edit"}
+                      ✏️ {t("edit")}
                     </button>
 
                     <button
@@ -269,7 +269,7 @@ export default function CommentItem({
                 hover:bg-gray-100 dark:hover:bg-neutral-700
               "
                     >
-                      🗑 {t("delete") || "Delete"}
+                      🗑 {t("delete")}
                     </button>
                   </motion.div>
                 )}
@@ -339,7 +339,7 @@ export default function CommentItem({
                  hover:text-blue-600 dark:hover:text-blue-400"
             >
               <Reply size={12} />
-              <span className="text-xs">{t("reply") || "reply"}</span>
+              <span className="text-xs">{t("reply")}</span>
             </button>
           )}
         </div>

@@ -55,12 +55,12 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
             onClick={(e) => e.stopPropagation()} // ✅ Prevent click inside from closing modal
           >
             <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold">{t("editComment") || "Edit Comment"}</h2>
+              <h2 className="text-lg font-semibold">{t("editComment")}</h2>
               <button onClick={onClose} className="text-lg hover:text-gray-600">✕</button>
             </div>
 
             <div className="flex-1 p-4 overflow-y-auto">
-              <PostEditorWrapper ref={editorRef} value={comment.content} />
+              <PostEditorWrapper ref={editorRef} value={comment.content} />{/* TODO: */}
             </div>
 
             <div className="p-4 flex justify-end gap-2 border-t">
@@ -68,7 +68,7 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
                 onClick={onClose}
                 className="px-4 py-2 rounded-md bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600"
               >
-                {t("cancel") || "Cancel"}
+                {t("cancel")}
               </button>
               <button
                 disabled={saving}

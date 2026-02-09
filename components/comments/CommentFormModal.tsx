@@ -56,7 +56,7 @@ export default function CommentFormModal({
         >
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">
-              {t("writeComment") || "Write a Comment"}
+              {t("writeComment")}
             </h2>
             <button
               onClick={onClose}

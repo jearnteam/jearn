@@ -128,7 +128,7 @@ export default function Navbar() {
             className="text-4xl font-bold"
             style={{ fontFamily: "var(--font-shadows-into-light)" }}
           >
-            {t("jearn") || "JEARN"}
+            {t("jearn") }
           </h1>
         </div>
 
@@ -162,7 +162,7 @@ export default function Navbar() {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("search") || "Search"}
+                placeholder={t("search") }
                 onFocus={() => setSearchFocused(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && query.trim().length >= 2) {
