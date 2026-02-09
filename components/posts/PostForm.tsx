@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper, {
@@ -22,6 +29,7 @@ import {
   clearDraft,
   type PostDraftRecord,
 } from "@/lib/postDraft";
+import { Undo, Redo, Eraser} from "lucide-react";
 
 export interface PostFormData {
   postType: PostType;
@@ -37,6 +45,10 @@ export interface PostFormData {
     duration?: number;
     aspectRatio?: number;
   };
+}
+
+export interface PostFormHandle {
+  insertImage: () => void;
 }
 
 export interface Category {
@@ -65,19 +77,21 @@ export interface PostFormProps {
 const EMPTY_CATEGORIES: Category[] = [];
 const EMPTY_STRING_ARRAY: string[] = [];
 
-export default function PostForm({
-  mode,
-  questionId,
-  onSubmit,
-  initialTitle = "",
-  initialContent = "",
-  // ✅ 修正点2: デフォルト値を定数に置き換え
-  initialSelectedCategories = EMPTY_STRING_ARRAY,
-  initialAvailableCategories = EMPTY_CATEGORIES,
-  onSuccess,
-  onCancel,
-  isEdit = false,
-}: PostFormProps) {
+const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
+  {
+    mode,
+    questionId,
+    onSubmit,
+    initialTitle = "",
+    initialContent = "",
+    initialSelectedCategories = EMPTY_STRING_ARRAY,
+    initialAvailableCategories = EMPTY_CATEGORIES,
+    onSuccess,
+    onCancel,
+    isEdit = false,
+  },
+  ref
+) {
   const [title, setTitle] = useState(initialTitle);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);
@@ -553,6 +567,46 @@ export default function PostForm({
       saveDraftSafe("");
     }
   };
+  const insertImage = () => {
+    if (mode === PostTypes.VIDEO) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      const localUrl = URL.createObjectURL(file);
+      const localId = crypto.randomUUID();
+
+      editorRef.current?.editor
+        ?.chain()
+        .focus()
+        .insertImagePlaceholder(localId, localUrl)
+        .run();
+
+      requestAnimationFrame(() => {
+        const editorEl = editorHostRef.current;
+        if (!editorEl) return;
+
+        const img = editorEl.querySelector(
+          `img[data-type="image-placeholder"][data-id="${localId}"]`
+        ) as HTMLImageElement | null;
+
+        if (img) img.setAttribute("data-status", "local");
+      });
+
+      pendingImagesRef.current.set(localId, file);
+      localBlobUrlsRef.current.set(localId, localUrl);
+
+      saveDraftSafe();
+    };
+
+    input.click();
+  };
+
   const handleUndo = () => {
     const area = getFocusArea();
 
@@ -858,6 +912,10 @@ export default function PostForm({
 
     return updatedAt ? `${user.picture}?t=${updatedAt}` : user.picture;
   }, [user?.picture, user?.avatarUpdatedAt]);
+
+  useImperativeHandle(ref, () => ({
+    insertImage,
+  }));
 
   return (
     <motion.form
@@ -1205,7 +1263,7 @@ export default function PostForm({
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
               title="Undo (Ctrl/Cmd + Z)"
             >
-              ↩️
+              <Undo size={16}/>
             </button>
 
             {/* Redo Button */}
@@ -1217,7 +1275,7 @@ export default function PostForm({
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
               title="Redo (Ctrl/Cmd + Shift + Z)"
             >
-              ↪️
+              <Redo size={16}/>
             </button>
 
             {/* Clear Content Button */}
@@ -1228,62 +1286,8 @@ export default function PostForm({
              dark:bg-red-900/30 dark:text-red-400 transition"
               title="Clear title and content"
             >
-              🗑️
+              <Eraser size={16}/>
             </button>
-
-            {/* Image Upload Button */}
-            {mode !== PostTypes.VIDEO && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = "image/*";
-
-                  input.onchange = async () => {
-                    const file = input.files?.[0];
-                    if (!file) return;
-
-                    // 🔹 create local preview
-                    const localUrl = URL.createObjectURL(file);
-                    const localId = crypto.randomUUID();
-
-                    // 🔹 INSERT PREVIEW ONLY (NO UPLOAD)
-                    editorRef.current?.editor
-                      ?.chain()
-                      .focus()
-                      .insertImagePlaceholder(localId, localUrl)
-                      .run();
-
-                    // 🔑 mark image as local AFTER insertion
-                    requestAnimationFrame(() => {
-                      const editorEl = editorHostRef.current;
-                      if (!editorEl) return;
-
-                      const img = editorEl.querySelector(
-                        `img[data-type="image-placeholder"][data-id="${localId}"]`
-                      ) as HTMLImageElement | null;
-
-                      if (img) {
-                        img.setAttribute("data-status", "local");
-                      }
-                    });
-
-                    // 🔹 STORE references for later submit
-                    pendingImagesRef.current.set(localId, file);
-                    localBlobUrlsRef.current.set(localId, localUrl);
-
-                    // 🔥 FORCE save AFTER image map is populated
-                    saveDraftSafe();
-                  };
-
-                  input.click();
-                }}
-                className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-              >
-                🖼️
-              </button>
-            )}
 
             {/* Submit / Check Categories Button */}
             {(categories.length === 0 || contentChanged) &&
@@ -1342,4 +1346,6 @@ export default function PostForm({
       </div>
     </motion.form>
   );
-}
+});
+
+export default PostForm;

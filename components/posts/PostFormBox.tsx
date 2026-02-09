@@ -1,17 +1,66 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm from "./PostForm";
+import type { PostFormHandle } from "./PostForm";
 import { useTranslation } from "react-i18next";
 import { PostType, PostTypes } from "@/types/post";
+import { Pencil, BadgeQuestionMark, Video, ImagePlus } from "lucide-react";
 
-interface PostFormBoxProps {
+const POST_TYPE_OPTIONS = [
+  {
+    type: PostTypes.POST,
+    label: "Post",
+    Icon: Pencil,
+  },
+  {
+    type: PostTypes.QUESTION,
+    label: "Question",
+    Icon: BadgeQuestionMark,
+  },
+  {
+    type: PostTypes.VIDEO,
+    label: "Video",
+    Icon: Video,
+  },
+];
+
+type PostFormMode =
+  | typeof PostTypes.POST
+  | typeof PostTypes.QUESTION
+  | typeof PostTypes.VIDEO
+  | typeof PostTypes.ANSWER;
+
+const POST_TYPE_GLOW: Record<PostFormMode, string> = {
+  [PostTypes.POST]:
+    "border-blue-500/40 shadow-[0_0_0_1px_rgba(59,130,246,0.4),0_0_30px_rgba(59,130,246,0.15)]",
+  [PostTypes.QUESTION]:
+    "border-red-500/40 shadow-[0_0_0_1px_rgba(249,115,22,0.4),0_0_30px_rgba(249,115,22,0.15)]",
+  [PostTypes.VIDEO]:
+    "border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.4),0_0_30px_rgba(168,85,247,0.15)]",
+  [PostTypes.ANSWER]:
+    "border-emerald-500/40 shadow-[0_0_0_1px_rgba(16,185,129,0.4),0_0_30px_rgba(16,185,129,0.15)]",
+};
+
+const POST_TYPE_GLOW_BG: Record<PostFormMode, string> = {
+  [PostTypes.POST]: "bg-blue-500/40",
+  [PostTypes.QUESTION]: "bg-red-500/40",
+  [PostTypes.VIDEO]: "bg-purple-500/40",
+  [PostTypes.ANSWER]: "bg-emerald-500/40",
+};
+
+/* ===================== Component ===================== */
+
+export default function PostFormBox({
+  open,
+  onClose,
+  onSubmit,
+  type = PostTypes.POST,
+}: {
   open: boolean;
   onClose: () => void;
-
-  // ✅ UPDATED: video is now supported
   onSubmit: (
     postType: PostType,
     title: string,
@@ -19,35 +68,21 @@ interface PostFormBoxProps {
     authorId: string | null,
     categories: string[],
     tags: string[],
-    video?: {
-      url: string;
-      thumbnailUrl?: string;
-      duration?: number;
-      aspectRatio?: number;
-    }
+    video?: any
   ) => Promise<void>;
-
-  type?: (typeof PostTypes)[Extract<
-    keyof typeof PostTypes,
-    "POST" | "QUESTION" | "ANSWER" | "VIDEO"
-  >];
-}
-
-export default function PostFormBox({
-  open,
-  onClose,
-  onSubmit,
-  type = PostTypes.POST,
-}: PostFormBoxProps) {
+  type?: PostFormMode;
+}) {
   const { t } = useTranslation();
-  const [mode, setMode] = useState(type);
+  const [mode, setMode] = useState<PostFormMode>(type);
+  const [openTypeMenu, setOpenTypeMenu] = useState(false);
+  const postFormRef = useRef<PostFormHandle>(null);
 
-  /* ⭐ Reset to POST when modal opens (except ANSWER) */
   useEffect(() => {
-    if (open && mode !== PostTypes.ANSWER) {
-      setMode(PostTypes.POST);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (open && mode !== PostTypes.ANSWER) setMode(PostTypes.POST);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setOpenTypeMenu(false);
   }, [open]);
 
   return (
@@ -55,111 +90,163 @@ export default function PostFormBox({
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm flex items-center justify-center"
+            className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm
+                       flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            aria-modal="true"
-            role="dialog"
+            onClick={onClose}
           >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ duration: 0.25 }}
-              className="
-                w-full max-w-4xl max-h-[80vh]
-                bg-white dark:bg-neutral-900
-                shadow-lg rounded-md
-                border border-gray-200 dark:border-gray-700
-                flex flex-col
-              "
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* ---------------- Header ---------------- */}
-              <header className="p-4 bg-white dark:bg-neutral-900 z-10 rounded-full">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-lg font-semibold">
-                    {mode === PostTypes.POST
-                      ? t("createPost") || "Create Post"
-                      : mode === PostTypes.QUESTION
-                      ? "Ask Question"
-                      : mode === PostTypes.VIDEO
-                      ? "Upload Video"
-                      : mode === PostTypes.ANSWER
-                      ? "Answer Question"
-                      : "Create Post"}
-                  </h2>
+            {/* Center wrapper controls glow size */}
+            <div className="relative w-full max-w-4xl px-4">
+              {/* Halo glow (ONLY around modal) */}
+              <div
+                className={`
+                  absolute -inset-10
+                  rounded-xl
+                  blur-[90px]
+                  opacity-60
+                  pointer-events-none
+                  ${POST_TYPE_GLOW_BG[mode]}
+                `}
+              />
 
-                  <button
-                    onClick={onClose}
-                    className="text-xl hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    ✕
-                  </button>
-                </div>
+              {/* Modal box */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.92, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.92, y: 20 }}
+                transition={{ duration: 0.25 }}
+                onClick={(e) => e.stopPropagation()}
+                className={`
+                  relative
+                  bg-white dark:bg-neutral-900
+                  rounded-md
+                  border
+                  flex flex-col
+                  max-h-[80vh]
+                  transition-[border-color,box-shadow] duration-300
+                  ${POST_TYPE_GLOW[mode]}
+                `}
+              >
+                {/* ================= Header ================= */}
+                <header className="relative p-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    {mode !== PostTypes.ANSWER && (
+                      <div className="relative">
+                        <button
+                          onClick={() => setOpenTypeMenu((v) => !v)}
+                          className="flex items-center gap-2 px-3 py-1.5
+                                     text-sm font-medium rounded-md border
+                                     hover:bg-gray-100 dark:hover:bg-neutral-800"
+                        >
+                          {(() => {
+                            const Icon = POST_TYPE_OPTIONS.find(
+                              (o) => o.type === mode
+                            )?.Icon;
+                            return Icon ? <Icon size={16} /> : null;
+                          })()}
+                          <span>
+                            {
+                              POST_TYPE_OPTIONS.find((o) => o.type === mode)
+                                ?.label
+                            }
+                          </span>
+                          <span className="text-xs">▾</span>
+                        </button>
 
-                {/* ---------------- Tabs ---------------- */}
-                {mode !== PostTypes.ANSWER && (
-                  <div className="flex mt-4 border-b dark:border-gray-700">
-                    <button
-                      className={`w-1/3 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 ${
-                        mode === PostTypes.POST
-                          ? "border-b-2 border-blue-500 text-blue-600 font-semibold"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
-                      onClick={() => setMode(PostTypes.POST)}
+                        <AnimatePresence>
+                          {openTypeMenu && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -6 }}
+                              className="absolute left-0 mt-2 w-40
+                                         bg-white dark:bg-neutral-900
+                                         border rounded-md shadow-lg z-50"
+                            >
+                              {POST_TYPE_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.type}
+                                  onClick={() => {
+                                    setMode(opt.type);
+                                    setOpenTypeMenu(false);
+                                  }}
+                                  className="w-full px-3 py-2 text-sm
+                                             flex gap-2 hover:bg-gray-100
+                                             dark:hover:bg-neutral-800"
+                                >
+                                  <opt.Icon size={16} />
+                                  <span>{opt.label}</span>
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+
+                    {mode !== PostTypes.VIDEO && (
+                      <button
+                        type="button"
+                        onClick={() => postFormRef.current?.insertImage()}
+                        className="w-9 h-9 flex items-center justify-center
+               rounded-md border
+               hover:bg-gray-100 dark:hover:bg-neutral-800"
+                        title="Insert image"
+                      >
+                        <ImagePlus size={16} />
+                      </button>
+                    )}
+
+                    {/* Center title */}
+                    <h2
+                      className="absolute left-1/2 top-1/2
+                                   -translate-x-1/2 -translate-y-1/2
+                                   text-lg font-semibold pointer-events-none"
                     >
-                      📝 {t("post") || "Post"}
-                    </button>
+                      {mode === PostTypes.POST
+                        ? t("createPost") || "Create Post"
+                        : mode === PostTypes.QUESTION
+                        ? "Ask Question"
+                        : mode === PostTypes.VIDEO
+                        ? "Upload Video"
+                        : "Answer Question"}
+                    </h2>
 
                     <button
-                      className={`w-1/3 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 ${
-                        mode === PostTypes.QUESTION
-                          ? "border-b-2 border-orange-500 text-orange-600 font-semibold"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
-                      onClick={() => setMode(PostTypes.QUESTION)}
+                      onClick={onClose}
+                      className="ml-auto text-xl hover:text-gray-600"
                     >
-                      ❓ {t("question") || "Question"}
-                    </button>
-
-                    <button
-                      className={`w-1/3 px-4 py-2 text-sm font-medium flex items-center justify-center gap-2 ${
-                        mode === PostTypes.VIDEO
-                          ? "border-b-2 border-purple-500 text-purple-600 font-semibold"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
-                      onClick={() => setMode(PostTypes.VIDEO)}
-                    >
-                      🎥 {t("video") || "Video"}
+                      ✕
                     </button>
                   </div>
-                )}
-              </header>
+                </header>
 
-              {/* ---------------- Content ---------------- */}
-              <section className="flex-1 flex flex-col min-h-0">
-                <PostForm
-                  mode={mode}
-                  onSubmit={async (data) => {
-                    await onSubmit(
-                      data.postType,
-                      data.title,
-                      data.content,
-                      data.authorId,
-                      data.categories,
-                      data.tags,
-                      data.video
-                    );
-                  }}
-                  onSuccess={() => {
-                    onClose(); // ✅ CLOSE MODAL
-                    setMode(type); // ✅ optional: reset tab
-                  }}
-                />
-              </section>
-            </motion.div>
+                {/* ================= Content ================= */}
+                <section className="flex-1 min-h-0 flex flex-col">
+                  <PostForm
+                    ref={postFormRef}
+                    mode={mode}
+                    onSubmit={async (data) => {
+                      await onSubmit(
+                        data.postType,
+                        data.title,
+                        data.content,
+                        data.authorId,
+                        data.categories,
+                        data.tags,
+                        data.video
+                      );
+                    }}
+                    onSuccess={() => {
+                      onClose();
+                      setMode(type);
+                    }}
+                  />
+                </section>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
