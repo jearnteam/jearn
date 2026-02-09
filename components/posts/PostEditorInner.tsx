@@ -128,8 +128,7 @@ export default function PostEditorInner({
 
   const finalPlaceholder =
     placeholder ??
-    t("placeholder") ??
-    "Type in what you wanna share with everyone";
+    t("placeholder");
 
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);

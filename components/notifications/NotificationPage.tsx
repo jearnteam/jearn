@@ -139,7 +139,7 @@ function NotificationItem({
 
       case "system":
         return (
-          notification.postPreview ?? t("system_noti") ?? "System notification"
+          notification.postPreview ?? t("system_noti")
         );
 
       case "follow": {
