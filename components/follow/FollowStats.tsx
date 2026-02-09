@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useFollowCount } from "@/features/follow/hooks/useFollowCount";
 import FollowListModal from "./FollowListModal";
+import { useTranslation } from "react-i18next";
 
 interface FollowStatsProps {
   userId?: string;
@@ -15,10 +16,12 @@ export default function FollowStats({
   direction = "row",
 }: FollowStatsProps) {
   if (!userId) return null;
-
+  
   const { followers, following, loading } = useFollowCount(userId);
   const [open, setOpen] = useState<null | "followers" | "following">(null);
-
+  
+  const { t } = useTranslation();
+  
   if (loading) return null;
 
   const isColumn = direction === "column";
@@ -38,7 +41,7 @@ export default function FollowStats({
           className="hover:underline text-left"
         >
           <span className="font-semibold">{followers}</span>{" "}
-          <span className="text-neutral-500">Followers</span>
+          <span className="text-neutral-500">{t("profilePage.followers")}</span>
         </button>
 
         <button
@@ -46,7 +49,7 @@ export default function FollowStats({
           className="hover:underline text-left"
         >
           <span className="font-semibold">{following}</span>{" "}
-          <span className="text-neutral-500">Following</span>
+          <span className="text-neutral-500">{t("profilePage.following")}</span>
         </button>
       </div>
 

@@ -43,12 +43,13 @@ const ja: TranslationSchema = {
       follow: "フォロー",
       notifications: "通知",
   
-      // notification page
-      no_noti_yet: "通知はありません",
-      upvote_noti: "さんが投稿を高評価しました",
-      mention_noti: "さんがあなたを＠メンションしました",
-      comment_noti: "さんがあなたの投稿にコメントしました",
-      system_noti: "System notification",
+      notiPage: {
+        no_noti_yet: "通知はありません",
+        upvote_noti: "さんが投稿を高評価しました",
+        mention_noti: "さんがあなたを＠メンションしました",
+        comment_noti: "さんがあなたの投稿にコメントしました",
+        system_noti: "System notification",
+      },
   
       // comment
       comments: "コメント",
@@ -58,16 +59,19 @@ const ja: TranslationSchema = {
       postComment: "コメントを投稿",
       reply: "返信",
   
-      // UserMenus
-      profile: "プロフィール",
-      toggleTheme: "ダークモード",
+      userMenu: {
+        profile: "プロフィール",
+        toggleTheme: "ダークモード",
+      },
       dashboard: "ダッシュボード",
   
-      // profile
-      userNotFound: "ユーザーが見つかりませんでした。",
-      postsByBefore: "",
-      postsByAfter: "の投稿",
-      following: "フォロー済み",
+      profilePage: {
+        userNotFound: "ユーザーが見つかりませんでした。",
+        postsByBefore: "",
+        postsByAfter: "の投稿",
+        following: "フォロー済み",
+        yourPosts: "あなたの投稿",
+      },
   
       profileSetting: {
         settings: "プロフィール設定",

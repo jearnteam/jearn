@@ -43,12 +43,13 @@ const my: TranslationSchema = {
       follow: "Follow",
       notifications: "အသိပေးချက်များ",
   
-      // notification page
-      no_noti_yet: "အသိပေးစရာ အကြောင်းအရာ မရှိသေးပါ",
-      upvote_noti: "က ပိုစ့်ကို Upvote လုပ်ထားပါတယ်",
-      mention_noti: "က သင့်ကို ပိုစ့်ထဲမှာ Mention ခေါ်ထားပါတယ်",
-      comment_noti: "က ပိုစ့်အောက်မှာ မှတ်ချက်ပေးထားပါတယ်",
-      system_noti: "Jearnအဖွဲ့အစည်းမှ အသိပေးချက်",
+      notiPage: {
+        no_noti_yet: "အသိပေးစရာ အကြောင်းအရာ မရှိသေးပါ",
+        upvote_noti: "က ပိုစ့်ကို Upvote လုပ်ထားပါတယ်",
+        mention_noti: "က သင့်ကို ပိုစ့်ထဲမှာ Mention ခေါ်ထားပါတယ်",
+        comment_noti: "က ပိုစ့်အောက်မှာ မှတ်ချက်ပေးထားပါတယ်",
+        system_noti: "Jearnအဖွဲ့အစည်းမှ အသိပေးချက်",
+      },
   
       // comment
       comments: "မှတ်ချက်များ",
@@ -58,17 +59,19 @@ const my: TranslationSchema = {
       postComment: "မှတ်ချက်ပေးမည်",
       reply: "စာပြန်မည်",
   
-      // UserMenus
-      profile: "ပရိုဖိုင်",
-      toggleTheme: "Themeပြောင်းမည်",
+      userMenu: {
+        profile: "ပရိုဖိုင်",
+        toggleTheme: "Themeပြောင်းမည်",
+      },
       dashboard: "Dashboard",
   
-      // profile
-      userNotFound: "အကောင့်ရှာမတွေ့ပါ",
-      postsByBefore: "",
-      postsByAfter: "၏ပို့စ်များ",
-      following: "following",
-  
+      profilePage: {
+        userNotFound: "အကောင့်ရှာမတွေ့ပါ",
+        postsByBefore: "",
+        postsByAfter: "၏ပို့စ်များ",
+        following: "following",
+      },
+
       profileSetting: {
         settings: "ပရိုဖိုင် ဆက်တင်များ",
         name: "နာမည်",

@@ -8,6 +8,7 @@ import type { Post } from "@/types/post";
 import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/follow/FollowButton";
 import FollowStats from "@/components/follow/FollowStats";
+import { t } from "i18next";
 
 interface Props {
   userId: string;
@@ -140,7 +141,7 @@ export default function ProfileUserClient({ userId }: Props) {
   if (!user) {
     return (
       <div className="flex items-center justify-center h-[60vh] text-gray-500">
-        User not found
+        {t("profilePage.userNotFound")}
       </div>
     );
   }

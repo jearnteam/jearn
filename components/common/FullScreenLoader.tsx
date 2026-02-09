@@ -5,8 +5,6 @@ import LoadingOwl from "@/components/LoadingOwl";
 import { useTranslation } from "react-i18next";
 
 export default function FullScreenLoader({ text }: { text?: string }) {
-  const { t } = useTranslation();
-
   return (
     <motion.div
       initial={false}
@@ -31,7 +29,7 @@ export default function FullScreenLoader({ text }: { text?: string }) {
         </div>
 
         <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">
-          {text || t("loading")}
+          {text || "Loading"}
           <AnimatedDots />
         </p>
       </div>

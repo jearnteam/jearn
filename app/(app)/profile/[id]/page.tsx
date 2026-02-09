@@ -179,7 +179,7 @@ export default function UserPage() {
   if (!user) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
-        {t("userNotFound")}
+        {t("profilePage.userNotFound")}
       </div>
     );
   }

@@ -35,7 +35,6 @@ const en = {
     shareThisPost: "Share this post",
     copied: "Copied!",
     copyLink: "Copy Link",
-    requestCategory: "Request Category",
     categoryName: "Category Name",
     search: "Search",
     categoryReason: "Reason (Optional)",
@@ -46,19 +45,20 @@ const en = {
     postAnswer: "Post Answer",
     answers: "Answers",
     noAnswersYet: "No answers yet.",
-
+    
     // home page
     home: "Home",
     follow: "Follow",
     notifications: "Notifications",
-
-    // notification page
-    no_noti_yet: "No notifications yet",
-    upvote_noti: "upvoted your post.",
-    mention_noti: "mentioned you!",
-    comment_noti: "commented on your post.",
-    system_noti: "System notification",
-
+    
+    notiPage: {
+      no_noti_yet: "No notifications yet",
+      upvote_noti: "upvoted your post.",
+      mention_noti: "mentioned you!",
+      comment_noti: "commented on your post.",
+      system_noti: "System notification",
+    },
+    
     // comment
     comments: "Comments",
     addComment: "Add Comment",
@@ -66,17 +66,22 @@ const en = {
     editComment: "Edit Comment",
     postComment: "Post Comment",
     reply: "reply",
-
-    // UserMenus
-    profile: "Profile",
-    toggleTheme: "Toggle Theme",
+    
+    userMenu: {
+      profile: "Profile",
+      toggleTheme: "Toggle Theme",
+      requestCategory: "Request Category",
+    },
     dashboard: "Dashboard",
 
-    // profile
-    userNotFound: "User not found.",
-    postsByBefore: "Posts by",
-    postsByAfter: "",
-    following: "following",
+    profilePage: {
+      userNotFound: "User not found.",
+      postsByBefore: "Posts by",
+      postsByAfter: "",
+      following: "following",
+      followers: "Followers",
+      yourPosts: "your Posts",
+    },
     
     profileSetting: {
       settings: "Profile Settings",
@@ -88,7 +93,9 @@ const en = {
       saving: "Saving...",
     },
 
-    // dashboard
+    dashboardPage: {
+
+    },
     overview: "Overview",
     analytics: "Analytics",
     database: "DataBase",

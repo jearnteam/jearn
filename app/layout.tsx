@@ -50,14 +50,12 @@ export default function RootLayout({
         `}
       >
         <Providers>
+          <LanguageInitializer />
           <ClientLayout>
             <UserThemeSync />
             <I18nProvider>
-              <LanguageInitializer />
-
               {/* ⬇️ NOTHING APP-SPECIFIC HERE */}
               {children}
-
             </I18nProvider>
           </ClientLayout>
         </Providers>

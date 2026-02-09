@@ -3,6 +3,7 @@ import type { Post } from "@/types/post";
 import PostList from "@/components/posts/PostList";
 import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import { useTranslation } from "react-i18next";
 
 export default function ProfilePostsSection({
   posts,
@@ -16,9 +17,11 @@ export default function ProfilePostsSection({
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const {t} = useTranslation()
+ 
   return (
     <section>
-      <h2 className="text-xl font-semibold mb-4">Your Posts</h2>
+      <h2 className="text-xl font-semibold mb-4">{t("profilePage.yourPosts")}</h2>
 
       <PostList
         posts={posts}
