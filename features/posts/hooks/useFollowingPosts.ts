@@ -27,7 +27,6 @@ export function useFollowingPosts() {
     setLoading(false);
   }, [cursor, hasMore]);
 
-  // ✅ 追加：PullToRefresh 用
   const refresh = useCallback(async () => {
     setLoading(true);
     setPosts([]);
@@ -49,5 +48,5 @@ export function useFollowingPosts() {
     fetchNext();
   }, []);
 
-  return { posts, hasMore, loading, fetchNext, refresh };
+  return { posts, setPosts, hasMore, loading, fetchNext, refresh };
 }

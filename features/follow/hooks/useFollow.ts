@@ -1,17 +1,23 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 export function useFollow(targetUserId: string) {
-  const [following, setFollowing] = useState(false);
+  const [following, setFollowing] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const initializedRef = useRef(false);
+
   useEffect(() => {
-    // ⭐ ここ重要
     if (!targetUserId) {
-      setLoading(false); // ← 必ず止める
+      setLoading(false);
       return;
     }
 
     let alive = true;
+
+    //初回だけ spinner
+    if (!initializedRef.current) {
+      setLoading(true);
+    }
 
     (async () => {
       try {
@@ -28,8 +34,12 @@ export function useFollow(targetUserId: string) {
         }
       } catch (e) {
         console.error("follow status error", e);
+        if (alive) setFollowing(false);
       } finally {
-        if (alive) setLoading(false); // ← 絶対ここで止まる
+        if (alive) {
+          setLoading(false);
+          initializedRef.current = true;
+        }
       }
     })();
 
@@ -39,7 +49,8 @@ export function useFollow(targetUserId: string) {
   }, [targetUserId]);
 
   const toggleFollow = useCallback(async () => {
-    if (!targetUserId) return;
+    //未確定状態では操作させない
+    if (!targetUserId || following === null) return;
 
     setLoading(true);
     try {
@@ -57,9 +68,9 @@ export function useFollow(targetUserId: string) {
     } catch (e) {
       console.error("toggle follow error", e);
     } finally {
-      setLoading(false); // ← ここも必須
+      setLoading(false);
     }
-  }, [targetUserId]);
+  }, [targetUserId, following]);
 
   return { following, loading, toggleFollow };
 }

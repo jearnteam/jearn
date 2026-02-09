@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import Avatar from "@/components/Avatar";
 import FollowButton from "./FollowButton";
 
@@ -20,6 +21,8 @@ export default function FollowListModal({
   onClose: () => void;
 }) {
   const [users, setUsers] = useState<FollowUser[]>([]);
+  const { data: session } = useSession();
+  const myUserId = session?.user?.uid;
 
   useEffect(() => {
     fetch(`/api/follow/${type}/${userId}`, { cache: "no-store" })
@@ -45,7 +48,9 @@ export default function FollowListModal({
                 <span>{u.name}</span>
               </div>
 
-              <FollowButton targetUserId={u.uid} />
+              {myUserId !== u.uid && (
+                <FollowButton targetUserId={u.uid} />
+              )}
             </div>
           ))}
         </div>
