@@ -22,7 +22,7 @@ export default function CategoryPostListClient({
       onLoadMore={onLoadMore}
       onEdit={() => {}}
       onDelete={async () => {}}
-      onUpvote={async () => ({ ok: true })}
+      onUpvote={async () => {}}
       onAnswer={() => {}}
       scrollContainerRef={scrollContainerRef}
     />
