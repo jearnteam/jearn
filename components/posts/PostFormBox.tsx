@@ -107,7 +107,6 @@ export default function PostFormBox({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose}
           >
             {/* Center wrapper controls glow size */}
             <div className="relative w-full max-w-4xl px-4">
