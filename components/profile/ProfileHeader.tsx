@@ -1,5 +1,6 @@
 import Image from "next/image";
 import FollowStats from "@/components/follow/FollowStats";
+import { useTranslation } from "react-i18next";
 
 export default function ProfileHeader({
   user,
@@ -14,12 +15,13 @@ export default function ProfileHeader({
   saving,
   save,
 }: any) {
+  const { t } = useTranslation();
   return (
     <section className="space-y-10">
       {/* ───────── Title ───────── */}
       <header className="flex justify-center">
         <h1 className="text-2xl font-bold tracking-tight">
-          Profile Settings
+          {t("profileSetting.settings")}
         </h1>
       </header>
 
@@ -61,14 +63,12 @@ export default function ProfileHeader({
               pointer-events-none
             "
           >
-            Change
+            {t("profileSetting.change")}
           </div>
         </div>
 
         {/* Followers / Following (stacked) */}
-        {user?._id && (
-          <FollowStats userId={user._id} direction="column" />
-        )}
+        {user?._id && <FollowStats userId={user._id} direction="column" />}
 
         <input
           id="avatarInput"
@@ -84,7 +84,7 @@ export default function ProfileHeader({
         {/* Name */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Name
+            {t("profileSetting.name")}
           </label>
           <input
             value={name}
@@ -102,25 +102,29 @@ export default function ProfileHeader({
         {/* Unique ID */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Unique ID
+            {t("profileSetting.uniqueId")}
           </label>
-          <input
-            value={uniqueId}
-            onChange={(e) => setUniqueId(e.target.value)}
-            className="
+          <div className="flex gap-2">
+            <div className="text-sm py-2 select-none">@</div>
+            <input
+              value={uniqueId}
+              onChange={(e) => setUniqueId(e.target.value)}
+              className="
               w-full px-3 py-2 rounded-md
               border border-neutral-300 dark:border-neutral-700
               bg-white dark:bg-neutral-900
               text-sm
               focus:outline-none focus:ring-2 focus:ring-blue-500
+              flex-1
             "
-          />
+            />
+          </div>
         </div>
 
         {/* Bio */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Bio
+            {t("profileSetting.bio")}
           </label>
           <textarea
             value={bio}
@@ -151,7 +155,7 @@ export default function ProfileHeader({
               transition
             "
           >
-            {saving ? "Saving..." : "Save changes"}
+            {saving ? t("profileSetting.saving") : t("profileSetting.save")}
           </button>
         </div>
       </div>

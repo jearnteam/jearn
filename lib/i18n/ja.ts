@@ -69,10 +69,15 @@ const ja: TranslationSchema = {
       postsByAfter: "の投稿",
       following: "フォロー済み",
   
-      // profile setting
-      profileSettings: "プロフィール設定",
-      name: "名前",
-      bio: "自己紹介",
+      profileSetting: {
+        settings: "プロフィール設定",
+        name: "名前",
+        bio: "自己紹介",
+        uniqueId: "Unique ID",
+        change: "変更",
+        save: "変更を保存",
+        saving: "保存中...",
+      },
   
       // dashboard
       overview: "概要",

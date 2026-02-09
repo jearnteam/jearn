@@ -77,11 +77,16 @@ const en = {
     postsByBefore: "Posts by",
     postsByAfter: "",
     following: "following",
-
-    // profile setting
-    profileSettings: "Profile Settings",
-    name: "Name",
-    bio: "Bio",
+    
+    profileSetting: {
+      settings: "Profile Settings",
+      name: "Name",
+      bio: "Bio",
+      uniqueId: "Unique ID",
+      change: "Change",
+      save: "Save changes",
+      saving: "Saving...",
+    },
 
     // dashboard
     overview: "Overview",

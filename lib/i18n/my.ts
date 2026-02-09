@@ -69,11 +69,16 @@ const my: TranslationSchema = {
       postsByAfter: "၏ပို့စ်များ",
       following: "following",
   
-      // profile setting
-      profileSettings: "ပရိုဖိုင် ဆက်တင်များ",
-      name: "နာမည်",
-      bio: "မိတ်ဆက်စကား",
-  
+      profileSetting: {
+        settings: "ပရိုဖိုင် ဆက်တင်များ",
+        name: "နာမည်",
+        bio: "မိတ်ဆက်စကား",
+        uniqueId: "Unique ID",
+        change: "Change",
+        save: "Save changes",
+        saving: "Saving...",
+      },
+
       // dashboard
       overview: "ခြုံငုံသုံးသပ်ချက်",
       analytics: "ခွဲခြမ်းစိတ်ဖြာမှု",
