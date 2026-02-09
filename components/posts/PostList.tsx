@@ -6,13 +6,14 @@ import { motion } from "framer-motion";
 import { useEffect, useRef, useMemo } from "react";
 import type { UpvoteResponse } from "@/types/post";
 
+
 interface Props {
   posts: Post[];
   hasMore: boolean;
   onLoadMore: () => void;
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
-
+  onVote?: (postId: string, optionId: string) => void;
   // 🔥 CHANGE THIS
   onUpvote: (id: string) => Promise<void>;
 
@@ -27,6 +28,7 @@ export default function PostList({
   onEdit,
   onDelete,
   onUpvote,
+  onVote,
   onAnswer,
   scrollContainerRef,
 }: Props) {
@@ -95,6 +97,7 @@ export default function PostList({
           onEdit={() => onEdit(post)}
           onDelete={() => onDelete(post._id)}
           onUpvote={(id) => onUpvote(id)}
+          onVote={onVote}
           onAnswer={onAnswer}
           scrollContainerRef={scrollContainerRef}
         />

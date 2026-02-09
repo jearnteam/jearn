@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "react";
 export function usePullToRefresh(
   containerRef: React.RefObject<HTMLElement | null>,
   onRefresh: () => Promise<void>,
-  threshold = 80
+  threshold = 80,
+  enabled = true
 ) {
   const startY = useRef<number | null>(null);
   const isTouchingRef = useRef(false); // ← 追加
@@ -13,6 +14,8 @@ export function usePullToRefresh(
   const hitThresholdRef = useRef(false);
 
   useEffect(() => {
+    if (!enabled) return;
+    
     const el = containerRef.current;
     if (!el) return;
 

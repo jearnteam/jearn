@@ -15,7 +15,7 @@ import PostEditorWrapper, {
 } from "@/components/posts/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n/index";
-import { PostType, PostTypes } from "@/types/post";
+import { PostType, PostTypes, Poll } from "@/types/post";
 import {
   extractTagsFromHTML,
   extractTextWithMath,
@@ -29,7 +29,7 @@ import {
   clearDraft,
   type PostDraftRecord,
 } from "@/lib/postDraft";
-import { Undo, Redo, Eraser} from "lucide-react";
+import { Undo, Redo, Eraser } from "lucide-react";
 
 export interface PostFormData {
   postType: PostType;
@@ -39,6 +39,7 @@ export interface PostFormData {
   authorId: string | null;
   categories: string[];
   tags: string[];
+  poll?: Poll;
   video?: {
     url: string;
     thumbnailUrl?: string;
@@ -102,6 +103,16 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   const clearRedoRef = useRef<ClearSnapshot | null>(null);
   const editorHostRef = useRef<HTMLDivElement>(null);
   const lastFocusedAreaRef = useRef<FocusArea>("none");
+
+  const isPoll = mode === PostTypes.POLL;
+  const [pollOptions, setPollOptions] = useState<
+    { id: string; text: string }[]
+  >([
+    { id: crypto.randomUUID(), text: "" },
+    { id: crypto.randomUUID(), text: "" },
+  ]);
+  const [allowMultiple, setAllowMultiple] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   type GlobalSnapshot = {
     title: string;
@@ -467,13 +478,13 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   }, []);
 
   useEffect(() => {
-    // 🔥 FULL RESET on mode / question change
-    editorReadyRef.current = false;
-    draftReadyRef.current = false;
-
-    pendingDraftRef.current = null;
-    lastLoadedDraftKeyRef.current = null;
-    setDraftLoaded(false);
+    if (mode === PostTypes.ANSWER || mode === PostTypes.VIDEO) {
+      editorReadyRef.current = false;
+      draftReadyRef.current = false;
+      pendingDraftRef.current = null;
+      lastLoadedDraftKeyRef.current = null;
+      setDraftLoaded(false);
+    }
   }, [mode, questionId]);
 
   /* -------------------------------------------------------------------------- */
@@ -494,7 +505,9 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
 
     if (!text && !hasMedia && !title.trim()) return;
 
-    const checkText = `title: ${title}\n${text}`;
+    const pollText = isPoll ? pollOptions.map((o) => o.text).join("\n") : "";
+
+    const checkText = `title: ${title}\n${text}\n${pollText}`;
 
     setContentChanged(false);
     setCategoryReady(false);
@@ -784,7 +797,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   /* -------------------------------------------------------------------------- */
   /* SUBMIT                                   */
   /* -------------------------------------------------------------------------- */
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (mode !== PostTypes.ANSWER && !title.trim()) {
@@ -797,100 +810,134 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
       return;
     }
 
+    if (isPoll) {
+      const validOptions = pollOptions.filter((o) => o.text.trim().length > 0);
+      if (validOptions.length < 2) {
+        alert("Poll must have at least 2 options.");
+        return;
+      }
+    }
+
     if (mode === PostTypes.VIDEO && !videoFileRef.current) {
       alert("Please upload a video.");
       return;
     }
 
-    upload.start();
-    setSubmitting(true);
+    /* ------------------------------------------------------------------ */
+    /* CLOSE UI IMMEDIATELY                                                */
+    /* ------------------------------------------------------------------ */
 
-    onSuccess?.();
+    onSuccess?.(); // ✅ closes PostFormBox instantly
 
-    try {
-      let html = editorRef.current?.getHTML() ?? "";
-      html = removeZWSP(html);
+    /* ------------------------------------------------------------------ */
+    /* FIRE & FORGET BACKGROUND TASK                                       */
+    /* ------------------------------------------------------------------ */
 
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
+    (async () => {
+      try {
+        upload.start();
 
-      const images = Array.from(
-        doc.querySelectorAll(
-          "img[data-type='image-placeholder'][data-status='local']"
-        )
-      );
+        let html = editorRef.current?.getHTML() ?? "";
+        html = removeZWSP(html);
 
-      // 🖼 Image uploads (XHR)
-      for (const img of images) {
-        const localId = img.getAttribute("data-id");
-        if (!localId) continue;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
 
-        const file = pendingImagesRef.current.get(localId);
-        if (!file) continue;
-
-        const form = new FormData();
-        form.append("file", file);
-
-        const uploaded = await xhrUpload("/api/media/upload", form, (p) =>
-          upload.setUploading(p)
+        /* ---------------- IMAGE UPLOAD ---------------- */
+        const images = Array.from(
+          doc.querySelectorAll(
+            "img[data-type='image-placeholder'][data-status='local']"
+          )
         );
 
-        if (!uploaded?.url) throw new Error("Image upload failed");
+        for (const img of images) {
+          const localId = img.getAttribute("data-id");
+          if (!localId) continue;
 
-        img.setAttribute("src", uploaded.url);
-        img.removeAttribute("data-status");
+          const file = pendingImagesRef.current.get(localId);
+          if (!file) continue;
 
-        const blobUrl = localBlobUrlsRef.current.get(localId);
-        if (blobUrl) URL.revokeObjectURL(blobUrl);
-      }
+          const form = new FormData();
+          form.append("file", file);
 
-      html = doc.body.innerHTML;
-      const tags = extractTagsFromHTML(html);
+          const uploaded = await xhrUpload("/api/media/upload", form, (p) =>
+            upload.setUploading(p)
+          );
 
-      let video;
+          if (!uploaded?.url) throw new Error("Image upload failed");
 
-      if (mode === PostTypes.VIDEO && videoFileRef.current) {
-        const form = new FormData();
-        form.append("file", videoFileRef.current);
+          img.setAttribute("src", uploaded.url);
+          img.removeAttribute("data-status");
 
-        if (thumbnailFileRef.current) {
-          form.append("thumbnail", thumbnailFileRef.current);
+          const blobUrl = localBlobUrlsRef.current.get(localId);
+          if (blobUrl) URL.revokeObjectURL(blobUrl);
         }
 
-        video = await xhrUpload("/api/media/upload/video", form, (p) =>
-          upload.setUploading(p)
-        );
+        html = doc.body.innerHTML;
+        const tags = extractTagsFromHTML(html);
 
-        if (!video?.url) throw new Error("Video upload failed");
-      }
+        /* ---------------- VIDEO UPLOAD ---------------- */
+        let video;
+        if (mode === PostTypes.VIDEO && videoFileRef.current) {
+          const form = new FormData();
+          form.append("file", videoFileRef.current);
 
-      upload.setProcessing();
+          if (thumbnailFileRef.current) {
+            form.append("thumbnail", thumbnailFileRef.current);
+          }
 
-      await onSubmit({
-        postType: mode,
-        title,
-        content: html,
-        authorId,
-        categories: selected,
-        tags,
-        video,
-      });
+          video = await xhrUpload("/api/media/upload/video", form, (p) =>
+            upload.setUploading(p)
+          );
 
-      // CLEAR DRAFT
-      if (authorId) {
-        clearDraft(
+          if (!video?.url) throw new Error("Video upload failed");
+        }
+
+        upload.setProcessing();
+
+        /* ---------------- FINAL SUBMIT ---------------- */
+        await onSubmit({
+          postType: mode,
+          title,
+          content: isPoll ? "" : html,
           authorId,
-          mode,
-          mode === PostTypes.ANSWER ? questionId : undefined
-        );
+          categories: [...selected],
+          tags,
+          poll:
+            mode === PostTypes.POLL
+              ? {
+                  options: pollOptions
+                    .filter((o) => o.text.trim())
+                    .map((o) => ({
+                      id: o.id,
+                      text: o.text,
+                      voteCount: 0,
+                    })),
+                  totalVotes: 0,
+                  allowMultiple,
+                  expiresAt: expiresAt
+                    ? new Date(expiresAt).toISOString()
+                    : null,
+                }
+              : undefined,
+          video,
+        });
+
+        /* ---------------- CLEAR DRAFT ---------------- */
+        if (authorId) {
+          clearDraft(
+            authorId,
+            mode,
+            mode === PostTypes.ANSWER ? questionId : undefined
+          );
+        }
+
+        upload.finish();
+      } catch (err) {
+        console.error("❌ Background submit failed:", err);
+        upload.finish();
       }
-      upload.finish();
-    } catch (err) {
-      console.error("❌ Error posting:", err);
-      upload.finish();
-    } finally {
-      setSubmitting(false);
-    }
+    })();
   };
 
   /* -------------------------------------------------------------------------- */
@@ -916,6 +963,12 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   useImperativeHandle(ref, () => ({
     insertImage,
   }));
+
+  const nowLocal = useMemo(() => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16); // yyyy-MM-ddTHH:mm
+  }, []);
 
   return (
     <motion.form
@@ -947,8 +1000,8 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                 mode === PostTypes.VIDEO
                   ? "Add a description"
                   : mode === PostTypes.QUESTION
-                  ? t("questionEnter") || "Question"
-                  : t("title") || "Title"
+                  ? t("questionEnter")
+                  : t("title")
               }
               value={title}
               maxLength={200}
@@ -1058,6 +1111,118 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
           )}
         </div>
 
+        {isPoll && (
+          <div className="space-y-4 rounded-lg border p-4 bg-gray-50/50 dark:bg-neutral-900/50">
+            <p className="text-sm text-gray-500">Create a poll (2–5 options)</p>
+
+            {pollOptions.map((opt, idx) => (
+              <div key={opt.id} className="flex gap-2">
+                <input
+                  type="text"
+                  value={opt.text}
+                  placeholder={`Option ${idx + 1}`}
+                  maxLength={80}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setPollOptions((prev) =>
+                      prev.map((o) =>
+                        o.id === opt.id ? { ...o, text: value } : o
+                      )
+                    );
+                  }}
+                  className="flex-1 px-3 py-2 rounded-md border bg-transparent"
+                />
+
+                {pollOptions.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPollOptions((prev) =>
+                        prev.filter((o) => o.id !== opt.id)
+                      )
+                    }
+                    className="text-red-500"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {pollOptions.length < 5 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setPollOptions((prev) => [
+                    ...prev,
+                    { id: crypto.randomUUID(), text: "" },
+                  ])
+                }
+                className="
+    inline-flex items-center gap-1
+    px-3 py-1.5 rounded-md
+    text-sm font-medium
+    border border-blue-500/30
+    text-blue-600
+    hover:bg-blue-50 dark:hover:bg-blue-500/10
+    transition
+  "
+              >
+                <span className="text-lg leading-none">+</span>
+                Add option
+              </button>
+            )}
+            {/* ───────── Poll Settings ───────── */}
+            <div className="pt-3 space-y-3 border-t">
+              {/* Multiple choice */}
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowMultiple}
+                  onChange={(e) => setAllowMultiple(e.target.checked)}
+                  className="accent-blue-600"
+                />
+                Allow multiple choices
+              </label>
+
+              {/* Expiration */}
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-gray-500">
+                  Poll expiration (optional)
+                </span>
+                <input
+                  type="datetime-local"
+                  value={expiresAt ?? ""}
+                  min={nowLocal} // ✅ prevent past time
+                  onChange={(e) =>
+                    setExpiresAt(e.target.value ? e.target.value : null)
+                  }
+                  className="px-3 py-2 rounded-md border bg-transparent"
+                />
+              </label>
+
+              {expiresAt && (
+                <button
+                  type="button"
+                  onClick={() => setExpiresAt(null)}
+                  className="
+    inline-flex items-center gap-1
+    px-2.5 py-1.5 rounded-md
+    text-xs font-medium
+    border border-red-500/30
+    text-red-600
+    hover:bg-red-50 dark:hover:bg-red-500/10
+    transition
+    w-fit
+  "
+                >
+                  ✕ Remove expiration
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ------------------------------ Categories ------------------------------ */}
         <AnimatePresence>
           {(!contentChanged || initialAvailableCategories.length > 0) &&
@@ -1130,7 +1295,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                         onClick={() => setVisibleCount((v) => v + 5)}
                         className="text-blue-500 hover:underline"
                       >
-                        {t("showMore") || "Show more"}
+                        {t("showMore")}
                       </button>
                     )}
                     {visibleCount > 5 && (
@@ -1139,7 +1304,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                         onClick={() => setVisibleCount(5)}
                         className="text-blue-500 hover:underline"
                       >
-                        {t("showLess") || "Show less"}
+                        {t("showLess")}
                       </button>
                     )}
                   </motion.div>
@@ -1243,13 +1408,13 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
               <div className="w-8 h-8 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-full" />
             )}
             <span>
-              {t("postingAsBefore") ?? "Posting as"}{" "}
+              {t("postingAsBefore")}{" "}
               {user ? (
                 <strong>{user.name}</strong>
               ) : (
                 <span className="inline-block w-24 h-5 bg-gray-300 dark:bg-neutral-700 animate-pulse rounded-md"></span>
               )}{" "}
-              {t("postingAsAfter") ?? ""}
+              {t("postingAsAfter")}
             </span>
           </div>
 
@@ -1263,7 +1428,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
               title="Undo (Ctrl/Cmd + Z)"
             >
-              <Undo size={16}/>
+              <Undo size={16} />
             </button>
 
             {/* Redo Button */}
@@ -1275,7 +1440,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
              dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 transition"
               title="Redo (Ctrl/Cmd + Shift + Z)"
             >
-              <Redo size={16}/>
+              <Redo size={16} />
             </button>
 
             {/* Clear Content Button */}
@@ -1286,7 +1451,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
              dark:bg-red-900/30 dark:text-red-400 transition"
               title="Clear title and content"
             >
-              <Eraser size={16}/>
+              <Eraser size={16} />
             </button>
 
             {/* Submit / Check Categories Button */}
@@ -1300,9 +1465,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                 onClick={handleCheckCategories}
                 className="px-6 py-2 rounded-lg bg-yellow-500 text-white disabled:bg-gray-400 transition"
               >
-                {checking
-                  ? "Checking..."
-                  : t("checkCategories") || "Check Categories"}
+                {checking ? "Checking..." : t("checkCategories")}
               </motion.button>
             ) : (
               <motion.button
@@ -1327,7 +1490,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                 {mode === PostTypes.POST
                   ? submitting
                     ? "Submitting..."
-                    : t("submit") || "Submit"
+                    : t("submit")
                   : mode === PostTypes.QUESTION
                   ? submitting
                     ? "Submitting Question..."

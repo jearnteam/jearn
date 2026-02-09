@@ -5,7 +5,7 @@ import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
-import { PostType, PostTypes, RawPost } from "@/types/post";
+import { Poll, PostType, PostTypes, RawPost } from "@/types/post";
 import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
@@ -112,6 +112,8 @@ async function enrichCategories(
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const session = await getServerSession(authConfig);
+    const viewerId = session?.user?.uid ?? null;
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
     const categoryId = searchParams.get("categoryId");
@@ -176,7 +178,8 @@ export async function GET(req: Request) {
       ...new Set(
         answerDocs
           .map((d) => {
-            if (d.parentId != undefined && ObjectId.isValid(d.parentId)) return new ObjectId(d.parentId);
+            if (d.parentId != undefined && ObjectId.isValid(d.parentId))
+              return new ObjectId(d.parentId);
             return null;
           })
           .filter((id): id is ObjectId => id !== null)
@@ -231,8 +234,23 @@ export async function GET(req: Request) {
 
         const post = await enrichPost(p, users);
 
+        const poll = p.poll
+          ? {
+              ...p.poll,
+
+              votedOptionIds: viewerId
+                ? Array.isArray(p.poll.votes?.[viewerId])
+                  ? p.poll.votes[viewerId]
+                  : typeof p.poll.votes?.[viewerId] === "string"
+                  ? [p.poll.votes[viewerId]]
+                  : []
+                : [],
+            }
+          : undefined;
+
         return {
           ...post,
+          poll, // 👈 THIS IS THE IMPORTANT LINE
           categories,
           tags: p.tags ?? [],
           mediaRefs: p.mediaRefs ?? [],
@@ -280,7 +298,8 @@ export async function POST(req: Request) {
       txId = null,
       categories = [],
       tags = [],
-      video, // ✅ VIDEO
+      poll,
+      video,
     } = await req.json();
 
     if (!authorId) {
@@ -299,7 +318,11 @@ export async function POST(req: Request) {
     const safeContent = postType === PostTypes.VIDEO ? "" : content;
     const mediaRefs =
       postType === PostTypes.VIDEO ? [] : extractPostImageKeys(safeContent);
-    if (postType !== PostTypes.VIDEO && !content?.trim()) {
+    if (
+      postType !== PostTypes.VIDEO &&
+      postType !== PostTypes.POLL &&
+      !content?.trim()
+    ) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
     }
 
@@ -307,8 +330,9 @@ export async function POST(req: Request) {
       [
         PostTypes.POST,
         PostTypes.QUESTION,
-        PostTypes.ANSWER,
+        PostTypes.POLL,
         PostTypes.VIDEO,
+        PostTypes.ANSWER,
       ].includes(postType) &&
       !title?.trim()
     ) {
@@ -328,6 +352,24 @@ export async function POST(req: Request) {
         { error: "At least one category required" },
         { status: 400 }
       );
+    }
+
+    if (postType === PostTypes.POLL) {
+      if (!poll || !Array.isArray(poll.options) || poll.options.length < 2) {
+        return NextResponse.json(
+          { error: "Poll requires at least 2 options" },
+          { status: 400 }
+        );
+      }
+
+      for (const opt of poll.options) {
+        if (!opt.text || opt.text.trim().length === 0) {
+          return NextResponse.json(
+            { error: "Poll option text required" },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     if (postType === PostTypes.VIDEO) {
@@ -382,7 +424,13 @@ export async function POST(req: Request) {
       safeParentId = target.parentId || target._id.toString();
     }
 
-    if (postType === PostTypes.ANSWER && (await posts.countDocuments({ _id: safeParentId, authorId: { $exists: true } })) === 0) {
+    if (
+      postType === PostTypes.ANSWER &&
+      (await posts.countDocuments({
+        _id: ObjectId.createFromHexString(safeParentId),
+        authorId: { $exists: true },
+      })) === 0
+    ) {
       return NextResponse.json(
         { error: "Target question is closed" },
         { status: 403 }
@@ -407,6 +455,7 @@ export async function POST(req: Request) {
       tags: string[];
       isAdmin?: boolean;
       mediaRefs?: string[];
+      poll?: Poll;
       video?: {
         url: string;
         thumbnailUrl?: string;
@@ -430,6 +479,25 @@ export async function POST(req: Request) {
       isAdmin: session.user.role === "admin",
       mediaRefs,
     };
+
+    // ✅ POLL metadata (ADD THIS)
+    if (postType === PostTypes.POLL && poll) {
+      doc.poll = {
+        options: poll.options.map((o: any) => ({
+          id: o.id,
+          text: o.text,
+          voteCount: 0,
+        })),
+        totalVotes: 0,
+
+        // ✅ IMPORTANT
+        votes: {},
+
+        // ✅ NEW (persist settings)
+        allowMultiple: !!poll.allowMultiple,
+        expiresAt: poll.expiresAt ?? null,
+      };
+    }
 
     // ✅ VIDEO metadata
     if (postType === PostTypes.VIDEO && video) {
@@ -754,7 +822,10 @@ export async function DELETE(req: Request) {
       // Answerが存在するものは削除しない
       posts.updateOne(
         { _id: existing._id },
-        { $set: { authorName: "Anonymous", isAdmin: false }, $unset: { authorId: 1 } }
+        {
+          $set: { authorName: "Anonymous", isAdmin: false },
+          $unset: { authorId: 1 },
+        }
       );
       /* ---------------- SSE ---------------- */
       broadcastSSE({

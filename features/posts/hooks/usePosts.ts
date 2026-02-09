@@ -79,6 +79,38 @@ export function usePosts() {
       setLoading(false);
     }
   }, []);
+
+  /* -------------------------------------------------------------------------- */
+  /*                               VOTE POLL                                     */
+  /* -------------------------------------------------------------------------- */
+  const votePoll = async (postId: string, optionId: string) => {
+    const res = await fetch("/api/posts/polls/vote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId, optionId }),
+    });
+
+    if (!res.ok) return;
+
+    const { poll, votedOptionIds } = await res.json();
+
+    setPosts((prev) =>
+      prev.map((p) =>
+        p._id === postId
+          ? {
+              ...p,
+              poll: {
+                ...poll,
+                votedOptionIds: Array.isArray(votedOptionIds)
+                  ? votedOptionIds
+                  : [],
+              },
+            }
+          : p
+      )
+    );
+  };
+
   /* -------------------------------------------------------------------------- */
   /*                               INITIAL LOAD                                  */
   /* -------------------------------------------------------------------------- */
@@ -137,6 +169,26 @@ export function usePosts() {
                   : p
               );
 
+            case "poll-vote":
+              if (isRecentTx(data.txId)) return prev;
+
+              return prev.map((p) =>
+                p._id === data.postId && p.poll
+                  ? {
+                      ...p,
+                      poll: {
+                        ...p.poll,
+                        totalVotes: p.poll.totalVotes + 1,
+                        options: p.poll.options.map((o) =>
+                          o.id === data.optionId
+                            ? { ...o, voteCount: o.voteCount + 1 }
+                            : o
+                        ),
+                      },
+                    }
+                  : p
+              );
+
             default:
               return prev;
           }
@@ -167,6 +219,16 @@ export function usePosts() {
       authorId: string | null,
       categories: string[],
       tags: string[],
+      poll?: {
+        options: {
+          id: string;
+          text: string;
+          voteCount: number;
+        }[];
+        totalVotes: number;
+        allowMultiple?: boolean;
+        expiresAt?: string | null;
+      },
       video?: {
         url: string;
         thumbnailUrl?: string;
@@ -186,6 +248,7 @@ export function usePosts() {
           authorId,
           categories,
           tags,
+          poll,
           video, // ✅ THIS WAS MISSING
         }),
       }).catch((e) => console.error("🔥 addPost error:", e));
@@ -255,11 +318,8 @@ export function usePosts() {
       // 🧮 compute removed images
       const oldImages = extractCdnImages(originalContent);
       const newImages = extractCdnImages(content);
-      
-      const removedImages = [...oldImages].filter(
-        (url) => !newImages.has(url)
-      );
-      
+
+      const removedImages = [...oldImages].filter((url) => !newImages.has(url));
 
       // ⚡ optimistic update
       setPosts((prev) =>
@@ -318,6 +378,7 @@ export function usePosts() {
   /* -------------------------------------------------------------------------- */
   return {
     posts,
+    setPosts,
     loading,
     hasMore,
     fetchNext,
@@ -326,5 +387,6 @@ export function usePosts() {
     addAnswer,
     editPost,
     deletePost,
+    votePoll,
   };
 }

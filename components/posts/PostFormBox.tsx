@@ -7,7 +7,13 @@ import PostForm from "./PostForm";
 import type { PostFormHandle } from "./PostForm";
 import { useTranslation } from "react-i18next";
 import { PostType, PostTypes } from "@/types/post";
-import { Pencil, BadgeQuestionMark, Video, ImagePlus } from "lucide-react";
+import {
+  Pencil,
+  BadgeQuestionMark,
+  Video,
+  ImagePlus,
+  BarChart3,
+} from "lucide-react";
 
 const POST_TYPE_OPTIONS = [
   {
@@ -20,6 +26,7 @@ const POST_TYPE_OPTIONS = [
     label: "Question",
     Icon: BadgeQuestionMark,
   },
+  { type: PostTypes.POLL, label: "Poll", Icon: BarChart3 },
   {
     type: PostTypes.VIDEO,
     label: "Video",
@@ -30,6 +37,7 @@ const POST_TYPE_OPTIONS = [
 type PostFormMode =
   | typeof PostTypes.POST
   | typeof PostTypes.QUESTION
+  | typeof PostTypes.POLL
   | typeof PostTypes.VIDEO
   | typeof PostTypes.ANSWER;
 
@@ -38,17 +46,20 @@ const POST_TYPE_GLOW: Record<PostFormMode, string> = {
     "border-blue-500/40 shadow-[0_0_0_1px_rgba(59,130,246,0.4),0_0_30px_rgba(59,130,246,0.15)]",
   [PostTypes.QUESTION]:
     "border-red-500/40 shadow-[0_0_0_1px_rgba(249,115,22,0.4),0_0_30px_rgba(249,115,22,0.15)]",
+  [PostTypes.POLL]:
+    "border-emerald-500/40 shadow-[0_0_0_1px_rgba(64,255,22,0.4),0_0_30px_rgba(249,115,22,0.15)]",
   [PostTypes.VIDEO]:
     "border-purple-500/40 shadow-[0_0_0_1px_rgba(168,85,247,0.4),0_0_30px_rgba(168,85,247,0.15)]",
   [PostTypes.ANSWER]:
-    "border-emerald-500/40 shadow-[0_0_0_1px_rgba(16,185,129,0.4),0_0_30px_rgba(16,185,129,0.15)]",
+    "border-yellow-500/40 shadow-[0_0_0_1px_rgba(200,200,22,0.4),0_0_30px_rgba(16,185,129,0.15)]",
 };
 
 const POST_TYPE_GLOW_BG: Record<PostFormMode, string> = {
   [PostTypes.POST]: "bg-blue-500/40",
   [PostTypes.QUESTION]: "bg-red-500/40",
+  [PostTypes.POLL]: "bg-emerald-500/40",
   [PostTypes.VIDEO]: "bg-purple-500/40",
-  [PostTypes.ANSWER]: "bg-emerald-500/40",
+  [PostTypes.ANSWER]: "bg-yellow-500/40",
 };
 
 /* ===================== Component ===================== */
@@ -68,6 +79,7 @@ export default function PostFormBox({
     authorId: string | null,
     categories: string[],
     tags: string[],
+    poll?: any,
     video?: any
   ) => Promise<void>;
   type?: PostFormMode;
@@ -78,8 +90,8 @@ export default function PostFormBox({
   const postFormRef = useRef<PostFormHandle>(null);
 
   useEffect(() => {
-    if (open && mode !== PostTypes.ANSWER) setMode(PostTypes.POST);
-  }, [open]);
+    if (open) setMode(type);
+  }, [open, type]);
 
   useEffect(() => {
     if (!open) setOpenTypeMenu(false);
@@ -186,7 +198,7 @@ export default function PostFormBox({
                       </div>
                     )}
 
-                    {mode !== PostTypes.VIDEO && (
+                    {!(mode === PostTypes.VIDEO || mode === PostTypes.POLL) && (
                       <button
                         type="button"
                         onClick={() => postFormRef.current?.insertImage()}
@@ -206,7 +218,7 @@ export default function PostFormBox({
                                    text-lg font-semibold pointer-events-none"
                     >
                       {mode === PostTypes.POST
-                        ? t("createPost") || "Create Post"
+                        ? t("createPost")
                         : mode === PostTypes.QUESTION
                         ? "Ask Question"
                         : mode === PostTypes.VIDEO
@@ -236,6 +248,7 @@ export default function PostFormBox({
                         data.authorId,
                         data.categories,
                         data.tags,
+                        data.poll,
                         data.video
                       );
                     }}

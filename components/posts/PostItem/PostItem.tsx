@@ -8,6 +8,7 @@ import PostContent from "./PostContent";
 import PostFooter from "./PostFooter";
 import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
+import PollView from "./PollView";
 
 /**
  * @param isSingle 全画面表示か
@@ -20,6 +21,7 @@ export default function PostItem({
   onUpvote,
   onAnswer,
   onShare,
+  onVote,
   isSingle = false,
   scrollContainerRef,
 }: {
@@ -31,6 +33,7 @@ export default function PostItem({
   onDelete?: () => Promise<void> | void;
 
   onUpvote?: (id: string) => Promise<void>;
+  onVote?: (postId: string, optionId: string) => void;
 
   onAnswer?: (post: Post) => void;
   onShare?: () => void;
@@ -162,6 +165,11 @@ export default function PostItem({
             scrollContainerRef={scrollContainerRef}
             wrapperRef={wrapperRef}
           />
+
+          {/* 🗳️ POLL */}
+          {post.postType === PostTypes.POLL && post.poll && onVote && (
+            <PollView post={post} onVote={onVote} />
+          )}
 
           <PostFooter
             post={post}

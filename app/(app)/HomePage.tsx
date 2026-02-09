@@ -52,7 +52,7 @@ export default function HomePage() {
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  //make sure not to occur conflicting uploads 
+  //make sure not to occur conflicting uploads
   const { uploading, progress } = useUpload();
   //storing latest chatroomId
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
@@ -63,6 +63,7 @@ export default function HomePage() {
   //main feed
   const {
     posts,
+    setPosts,
     hasMore,
     fetchNext,
     refresh,
@@ -101,9 +102,9 @@ export default function HomePage() {
 
   /**
    * always checking for mobile navbar should be shown or not, whenever user scroll
-   *  
-   * @param e 
-   * @returns 
+   *
+   * @param e
+   * @returns
    */
   function onScroll(e: React.UIEvent<HTMLDivElement>) {
     const cur = e.currentTarget.scrollTop;
@@ -140,8 +141,8 @@ export default function HomePage() {
 
   /**
    * handle the page navigation
-   * @param next 
-   * @returns 
+   * @param next
+   * @returns
    */
   function changeView(next: HomeView) {
     const el = scrollRef.current;
@@ -195,22 +196,27 @@ export default function HomePage() {
   /* ---------------------------------------------
    * PULL TO REFRESH
    * ------------------------------------------- */
-  const { pullY, refreshing } = usePullToRefresh(scrollRef, async () => {
-    if (activeView === "home") {
-      await refresh();
-    }
+  const { pullY, refreshing } = usePullToRefresh(
+    scrollRef,
+    async () => {
+      if (activeView === "home") {
+        await refresh();
+      }
 
-    if (activeView === "users") {
-      await refreshFollowing();
-    }
-  });
+      if (activeView === "users") {
+        await refreshFollowing();
+      }
+    },
+    80,
+    activeView !== "chat"
+  );
 
   /* ---------------------------------------------
    * DELETE
    * ------------------------------------------- */
   /**
    * store target post id and opens the delete modal
-   * @param id 
+   * @param id
    */
   function requestDelete(id: string) {
     setDeletePostId(id);
@@ -218,7 +224,7 @@ export default function HomePage() {
   }
   /**
    * delete the targeted post
-   * @returns 
+   * @returns
    */
   async function confirmDelete() {
     if (!deletePostId) return;
@@ -302,6 +308,33 @@ export default function HomePage() {
       }).catch(() => {});
     }
   }
+  async function votePoll(postId: string, optionId: string) {
+    const res = await apiFetch("/api/posts/polls/vote", {
+      method: "POST",
+      body: JSON.stringify({ postId, optionId }),
+    });
+
+    if (!res.ok) return;
+
+    const { poll, votedOptionIds } = await res.json();
+
+    setPosts((prev: Post[]) =>
+      prev.map((p) =>
+        p._id === postId
+          ? {
+              ...p,
+              poll: {
+                ...poll,
+                // ✅ KEEP EXACT SHAPE
+                votedOptionIds: Array.isArray(votedOptionIds)
+                  ? votedOptionIds
+                  : [],
+              },
+            }
+          : p
+      )
+    );
+  }
 
   /* ---------------------------------------------
    * RENDER
@@ -372,9 +405,7 @@ export default function HomePage() {
               disabled={uploading}
               className="w-full bg-blue-600 text-white py-3 rounded-lg disabled:opacity-60"
             >
-              {uploading
-                ? `Uploading ${progress}%`
-                : `+ ${t("createPost")}`}
+              {uploading ? `Uploading ${progress}%` : `+ ${t("createPost")}`}
             </button>
 
             <nav className="mt-6 relative flex flex-col gap-1">
@@ -478,6 +509,7 @@ export default function HomePage() {
                   onEdit={setEditingPost}
                   onDelete={async (id) => requestDelete(id)}
                   onUpvote={upvotePost}
+                  onVote={votePoll} // ✅ ADD THIS
                   onAnswer={setAnsweringPost}
                   scrollContainerRef={scrollRef}
                 />
@@ -509,10 +541,11 @@ export default function HomePage() {
                   hasMore={followingHasMore}
                   onLoadMore={fetchFollowingNext}
                   /* ▼ PostList が要求する Props をすべて満たす */
-                  onEdit={async (_post) => {}}
-                  onDelete={async (_id: string) => {}}
-                  onUpvote={async (_id: string) => {}}
-                  onAnswer={(_post) => {}}
+                  onEdit={setEditingPost}
+                  onDelete={async (id) => requestDelete(id)}
+                  onUpvote={upvotePost}
+                  onVote={votePoll}
+                  onAnswer={setAnsweringPost}
                   scrollContainerRef={scrollRef}
                 />
               </div>
@@ -572,8 +605,8 @@ export default function HomePage() {
 }
 /**
  * returns the positions of left sidebar tags of current view page
- * @param view 
- * @returns 
+ * @param view
+ * @returns
  */
 function getSidebarIndicatorTop(view: HomeView) {
   switch (view) {

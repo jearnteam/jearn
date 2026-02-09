@@ -3,33 +3,58 @@
 import { ObjectId } from "mongodb";
 
 export interface CategoryObject {
-  id: string;          // ObjectId as string
-  name: string;        // English ("programming")
-  jname: string;       // Japanese ("プログラミング")
+  id: string;
+  name: string;
+  jname: string;
   myname?: string;
 }
 
-/** 投稿種別 Object */
+/* -------------------------------------------------------------------------- */
+/* POST TYPES                                                                  */
+/* -------------------------------------------------------------------------- */
+
 export const PostTypes = {
   POST: "Post",
   QUESTION: "Question",
   ANSWER: "Answer",
+  POLL: "POLL",
   COMMENT: "Comment",
   VIDEO: "VIDEO",
 } as const;
 
-/** 投稿種別 Union */
-export type PostType = typeof PostTypes[keyof typeof PostTypes];
+export type PostType = (typeof PostTypes)[keyof typeof PostTypes];
 
-export type UpvoteResponse = {
-  ok: boolean;
-  action?: "added" | "removed";
-  error?: string;
-};
+/* -------------------------------------------------------------------------- */
+/* POLL                                                                        */
+/* -------------------------------------------------------------------------- */
 
-/**
- * 投稿
- */
+export interface PollOption {
+  id: string;
+  text: string;
+  voteCount: number;
+}
+
+export interface Poll {
+  options: PollOption[];
+  totalVotes: number;
+
+  /**
+   * server-owned: { [userId]: optionId }
+   * This is what enables "change vote"
+   */
+  votes?: Record<string, string>;
+
+  allowMultiple?: boolean;
+  expiresAt?: string | null;
+
+  // client-only (optional)
+  votedOptionIds?: string[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* POST                                                                        */
+/* -------------------------------------------------------------------------- */
+
 export interface Post {
   txId: any;
   _id: string;
@@ -39,6 +64,9 @@ export interface Post {
   title?: string;
   content?: string;
   mediaRefs?: string[];
+
+  poll?: Poll;
+
   video?: {
     url: string;
     thumbnailUrl?: string | null;
@@ -55,10 +83,7 @@ export interface Post {
   authorName?: string;
   authorUniqueId?: string;
 
-  // 🔥 EXISTING FIELD (avatar URL)
   authorAvatar: string | null;
-
-  // 🔥 NEW FIELD (critical for cache busting)
   authorAvatarUpdatedAt?: string | null;
 
   parentId: string | null;
@@ -70,12 +95,19 @@ export interface Post {
 
   commentCount?: number;
 
+  /** logged-in viewer (client only, injected) */
+  viewerId?: string;
+
   _optimisticTx?: string;
   isAdmin?: boolean;
 
   edited?: boolean;
   editedAt?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/* RAW DB POST                                                                 */
+/* -------------------------------------------------------------------------- */
 
 export type RawPost = {
   _id: ObjectId | string;
@@ -90,10 +122,21 @@ export type RawPost = {
   categories?: unknown[];
   tags?: string[];
   mediaRefs?: string[];
+  poll?: Poll;
   video?: {
     url: string;
     thumbnailUrl?: string;
     duration?: number;
     aspectRatio?: number;
   };
+};
+
+/* -------------------------------------------------------------------------- */
+/* UPVOTE                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type UpvoteResponse = {
+  ok: boolean;
+  action?: "added" | "removed";
+  error?: string;
 };

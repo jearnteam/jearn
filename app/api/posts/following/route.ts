@@ -117,6 +117,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ items: [], nextCursor: null });
     }
 
+    const userId = session.user.uid;
+
     const { searchParams } = new URL(req.url);
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
@@ -147,12 +149,7 @@ export async function GET(req: Request) {
      * ------------------------------------------------- */
     const query: any = {
       authorId: { $in: followingIds },
-      postType: { $nin: ["COMMENT", "Comment", "comment"] }, // ← 修正
-      $or: [
-        { parentId: null },
-        { parentId: { $exists: false } },
-        { postType: { $in: ["ANSWER", "Answer", "answer"] } },
-      ],
+      postType: { $in: ["Question", "Answer", "Post", "POLL"] },
     };
 
     if (cursor) {
