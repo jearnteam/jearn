@@ -13,10 +13,10 @@ export default function ClientLayout({
 }) {
   useEffect(() => {
     const observer = new MutationObserver(() => {
-      console.log(
-        "🧠 <html> class changed:",
-        document.documentElement.className
-      );
+      // console.log(
+      //   "🧠 <html> class changed:",
+      //   document.documentElement.className
+      // );
     });
 
     observer.observe(document.documentElement, {

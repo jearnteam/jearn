@@ -123,6 +123,9 @@ export async function GET(req: Request) {
     const users = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
+    // コメントを表示しない
+    // でなければ、parentIdがある投稿を表示しない
+    // しかし、回答は表示する
     const query: Record<string, unknown> = {
       $and: [
         { postType: { $ne: PostTypes.COMMENT } },

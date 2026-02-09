@@ -113,11 +113,11 @@ export default function Navbar() {
                 onClick={() => router.back()}
                 aria-label="Go back"
                 className="
-        flex items-center justify-center
-        w-10 h-10 rounded-full
-        hover:bg-gray-100 dark:hover:bg-neutral-800
-        transition-colors
-      "
+                  flex items-center justify-center
+                  w-10 h-10 rounded-full
+                  hover:bg-gray-100 dark:hover:bg-neutral-800
+                  transition-colors
+                "
               >
                 <ArrowLeft className="w-6 h-6" strokeWidth={2.5} />
               </button>

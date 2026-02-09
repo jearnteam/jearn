@@ -1,4 +1,6 @@
-const my = {
+import { TranslationSchema } from "./en";
+
+const my: TranslationSchema = {
     translation: {
       loading: "ခဏစောင့်ပါ",
       loadingPosts: "ပြဖို့ပို့စ်တွေကိုရှာနေပါတယ်",

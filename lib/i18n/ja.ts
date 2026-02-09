@@ -1,4 +1,6 @@
-const ja = {
+import { TranslationSchema } from "./en";
+
+const ja: TranslationSchema = {
     translation: {
       loading: "読み込み中",
       loadingPosts: "投稿を読み込み中",
@@ -58,7 +60,7 @@ const ja = {
   
       // UserMenus
       profile: "プロフィール",
-      toggleTheme: "ダークモード切替",
+      toggleTheme: "ダークモード",
       dashboard: "ダッシュボード",
   
       // profile

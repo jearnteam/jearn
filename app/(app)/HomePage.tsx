@@ -307,7 +307,7 @@ export default function HomePage() {
    * RENDER
    * ------------------------------------------- */
   if (loading) {
-    return <FullScreenLoader text={t("loadingUser")} />;
+    return <FullScreenLoader />;
   }
 
   return (
