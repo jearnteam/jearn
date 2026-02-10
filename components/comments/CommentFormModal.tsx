@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import CommentForm from "@/components/comments/CommentForm";
 import Portal from "@/components/common/Portal";
-import type { PostEditorWrapperRef } from "@/components/posts/PostEditorWrapper";
+import type { PostEditorWrapperRef } from "@/components/posts/PostForm/PostEditorWrapper";
 import { useTranslation } from "react-i18next";
 
 export default function CommentFormModal({

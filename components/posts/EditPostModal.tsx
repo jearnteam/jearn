@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
-import PostForm, { Category } from "@/components/posts/PostForm";
+import PostForm, { Category } from "@/components/posts/PostForm/PostForm";
 import { useTranslation } from "react-i18next";
 import type { Post } from "@/types/post";
 import { PostTypes, PostType } from "@/types/post";

@@ -4,7 +4,9 @@
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal"; // ✅ Use the same working portal
-import PostEditorWrapper, { PostEditorWrapperRef } from "@/components/posts/PostEditorWrapper";
+import PostEditorWrapper, {
+  PostEditorWrapperRef,
+} from "@/components/posts/PostForm/PostEditorWrapper";
 import { useTranslation } from "react-i18next";
 
 interface EditCommentModalProps {
@@ -13,9 +15,13 @@ interface EditCommentModalProps {
   onSave: (content: string) => Promise<void>;
 }
 
-export default function EditCommentModal({ comment, onClose, onSave }: EditCommentModalProps) {
-  const {t} = useTranslation();
-  
+export default function EditCommentModal({
+  comment,
+  onClose,
+  onSave,
+}: EditCommentModalProps) {
+  const { t } = useTranslation();
+
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const [saving, setSaving] = useState(false);
 
@@ -56,11 +62,16 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
           >
             <div className="flex items-center justify-between p-4 border-b">
               <h2 className="text-lg font-semibold">{t("editComment")}</h2>
-              <button onClick={onClose} className="text-lg hover:text-gray-600">✕</button>
+              <button onClick={onClose} className="text-lg hover:text-gray-600">
+                ✕
+              </button>
             </div>
 
             <div className="flex-1 p-4 overflow-y-auto">
-              <PostEditorWrapper ref={editorRef} value={comment.content} />{/* TODO: */}
+              <PostEditorWrapper
+                ref={editorRef}
+                initialValue={comment.content}
+              />
             </div>
 
             <div className="p-4 flex justify-end gap-2 border-t">
@@ -74,7 +85,9 @@ export default function EditCommentModal({ comment, onClose, onSave }: EditComme
                 disabled={saving}
                 onClick={handleSave}
                 className={`px-4 py-2 rounded-md text-white ${
-                  saving ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  saving
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
                 {saving ? "Saving..." : "Save"}

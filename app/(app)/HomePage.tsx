@@ -10,7 +10,7 @@ import MobileNavbar from "@/components/MobileNavbar";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import NotificationPage from "@/components/notifications/NotificationPage";
 import VideosPage from "@/components/videos/VideosPage";
-import PostFormBox from "@/components/posts/PostFormBox";
+import PostFormBox from "@/components/posts/PostForm/PostFormBox";
 import EditPostModal from "@/components/posts/EditPostModal";
 import AnswerModal from "@/components/posts/AnswerModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
@@ -308,13 +308,21 @@ export default function HomePage() {
       }).catch(() => {});
     }
   }
-  async function votePoll(postId: string, optionId: string) {
+  type VotePollResult = {
+    poll: Post["poll"];
+    votedOptionIds: string[];
+  };
+
+  async function votePoll(
+    postId: string,
+    optionId: string
+  ): Promise<VotePollResult | null> {
     const res = await apiFetch("/api/posts/polls/vote", {
       method: "POST",
       body: JSON.stringify({ postId, optionId }),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) return null;
 
     const { poll, votedOptionIds } = await res.json();
 
@@ -325,7 +333,6 @@ export default function HomePage() {
               ...p,
               poll: {
                 ...poll,
-                // ✅ KEEP EXACT SHAPE
                 votedOptionIds: Array.isArray(votedOptionIds)
                   ? votedOptionIds
                   : [],
@@ -334,6 +341,12 @@ export default function HomePage() {
           : p
       )
     );
+
+    // 🔥 RETURN SERVER TRUTH
+    return {
+      poll,
+      votedOptionIds: Array.isArray(votedOptionIds) ? votedOptionIds : [],
+    };
   }
 
   /* ---------------------------------------------
@@ -503,13 +516,14 @@ export default function HomePage() {
                 }
               >
                 <PostList
+                  viewId="home"
                   posts={posts}
                   hasMore={hasMore}
                   onLoadMore={fetchNext}
                   onEdit={setEditingPost}
                   onDelete={async (id) => requestDelete(id)}
                   onUpvote={upvotePost}
-                  onVote={votePoll} // ✅ ADD THIS
+                  onVote={votePoll}
                   onAnswer={setAnsweringPost}
                   scrollContainerRef={scrollRef}
                 />
@@ -537,10 +551,10 @@ export default function HomePage() {
                 )}
 
                 <PostList
+                  viewId="users"
                   posts={followingPosts}
                   hasMore={followingHasMore}
                   onLoadMore={fetchFollowingNext}
-                  /* ▼ PostList が要求する Props をすべて満たす */
                   onEdit={setEditingPost}
                   onDelete={async (id) => requestDelete(id)}
                   onUpvote={upvotePost}

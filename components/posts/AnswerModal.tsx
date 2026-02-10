@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
-import PostForm from "@/components/posts/PostForm";
+import PostForm from "@/components/posts/PostForm/PostForm";
 import { MathRenderer } from "@/components/math/MathRenderer"; // 質問内容の表示用
 import { useTranslation } from "react-i18next";
 import type { Post, PostType } from "@/types/post";

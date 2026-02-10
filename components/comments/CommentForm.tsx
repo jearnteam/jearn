@@ -5,7 +5,7 @@ import { useRef, useState, useMemo, useEffect } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import PostEditorWrapper, {
   PostEditorWrapperRef,
-} from "@/components/posts/PostEditorWrapper";
+} from "@/components/posts/PostForm/PostEditorWrapper";
 import { useTranslation } from "react-i18next";
 
 interface Props {
@@ -61,7 +61,7 @@ export default function CommentForm({
     setSubmitting(true);
     try {
       await onSubmitted?.(html); // ✅ passing content properly
-      editorRef.current?.clearEditor?.();
+      editorRef.current?.clearWithHistory?.();
     } catch (err) {
       console.error("❌ add comment/reply failed:", err);
     } finally {
@@ -80,7 +80,7 @@ export default function CommentForm({
       <div className="relative px-2 py-4">
         <PostEditorWrapper
           ref={editorRef}
-          value="" // TODO: 
+          initialValue=""
           placeholder={placeholder}
           compact
         />
@@ -110,7 +110,7 @@ export default function CommentForm({
               : "Posting..."
             : mode === "reply"
             ? "Reply"
-            : (t("postComment"))}
+            : t("postComment")}
         </button>
       </div>
     </form>
