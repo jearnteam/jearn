@@ -2,6 +2,7 @@
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId, WithId, Document } from "mongodb";
+import { requireAdmin } from "@/lib/admin";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ type ReportDoc = {
  * GET — Fetch ALL reports
  * ------------------------------------------------------- */
 export async function GET() {
-  // TODO: add auth (admin)
+  await requireAdmin();
   try {
     const client = await clientPromise;
     const db = client.db("jearn");

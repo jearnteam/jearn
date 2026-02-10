@@ -2,6 +2,7 @@
 import clientPromise from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
+import { requireAdmin } from "@/lib/admin";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // TODO: add auth
+  await requireAdmin();
   try {
     const { id } = await params; // ✅ FIXED
 

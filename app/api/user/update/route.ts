@@ -85,6 +85,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      if (uniqueId.match(/^\w+$/)) {
+        return NextResponse.json(
+          { ok: false, error: "UniqueId has invalid characters" },
+          { status: 400 }
+        );
+      }
+
       const exists = await db.collection("users").findOne({
         uniqueId,
         _id: { $ne: new ObjectId(user_id) },
