@@ -7,7 +7,7 @@ import UserMenu from "@/components/UserMenu";
 import { useState, useEffect, useRef, memo } from "react";
 import { Search } from "lucide-react";
 import { useSearch } from "@/features/search/useSearch";
-import SearchResults from "@/features/search/SearchResults";
+import SearchResults from "@/components/search/SearchResults";
 import { useRouter } from "next/navigation";
 import { useNotificationContext } from "@/features/notifications/NotificationProvider";
 import { usePathname } from "next/navigation";
@@ -25,7 +25,7 @@ export default function Navbar() {
   const isHome = pathname === "/";
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
-  const { unreadCount } = useNotificationContext();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   /* ---------------------------------------------
    * STATE
@@ -128,7 +128,7 @@ export default function Navbar() {
             className="text-4xl font-bold"
             style={{ fontFamily: "var(--font-shadows-into-light)" }}
           >
-            {t("jearn") }
+            {t("jearn")}
           </h1>
         </div>
 
@@ -156,13 +156,39 @@ export default function Navbar() {
                 rounded-full shadow-sm
               "
             >
-              <Search className="w-5 h-5 text-gray-400 mr-3" strokeWidth={3} />
+              <button
+                type="button"
+                aria-label="Search"
+                onClick={() => {
+                  // If not focused → focus input
+                  if (document.activeElement !== inputRef.current) {
+                    inputRef.current?.focus();
+                    setSearchFocused(true);
+                    return;
+                  }
+
+                  // If focused & valid query → go to search page
+                  if (query.trim().length >= 2) {
+                    router.push(`/search?q=${encodeURIComponent(query)}`);
+                    setSearchFocused(false);
+                  }
+                }}
+                className="
+                  flex items-center justify-center
+                  mr-3
+                  text-gray-400
+                  hover:text-gray-600 dark:hover:text-gray-300
+                "
+              >
+                <Search className="w-5 h-5" strokeWidth={3} />
+              </button>
 
               <input
+                ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("search") }
+                placeholder={t("search")}
                 onFocus={() => setSearchFocused(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && query.trim().length >= 2) {

@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
 import PostEditorWrapper, {
   PostEditorWrapperRef,
-} from "@/components/posts/PostEditorWrapper";
+} from "@/components/posts/PostForm/PostEditorWrapper";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import i18n from "@/lib/i18n/index";
 import { PostType, PostTypes, Poll } from "@/types/post";

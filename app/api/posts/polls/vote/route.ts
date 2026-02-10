@@ -37,9 +37,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Poll expired" }, { status: 403 });
   }
 
+  /* ─────────────────────────────────────────────
+   * NORMALIZE PREVIOUS VOTES
+   * ───────────────────────────────────────────── */
   const prevVotes: string[] = Array.isArray(votes[userId])
     ? votes[userId]
-    : votes[userId]
+    : typeof votes[userId] === "string"
     ? [votes[userId]]
     : [];
 
@@ -50,21 +53,24 @@ export async function POST(req: Request) {
    * ───────────────────────────────────────────── */
   if (allowMultiple) {
     if (hasVotedThis) {
-      const isLastVote = prevVotes.length === 1;
+      // prevent double-unvote corruption
+      if (prevVotes.length > 0) {
+        const isLastVote = prevVotes.length === 1;
 
-      await posts.updateOne(
-        { _id: postObjectId },
-        {
-          $inc: {
-            "poll.options.$[opt].voteCount": -1,
-            ...(isLastVote ? { "poll.totalVotes": -1 } : {}),
+        await posts.updateOne(
+          { _id: postObjectId },
+          {
+            $inc: {
+              "poll.options.$[opt].voteCount": -1,
+              ...(isLastVote ? { "poll.totalVotes": -1 } : {}),
+            },
+            $pull: {
+              [`poll.votes.${userId}`]: optionId,
+            },
           },
-          $pull: {
-            [`poll.votes.${userId}`]: optionId,
-          },
-        },
-        { arrayFilters: [{ "opt.id": optionId }] }
-      );
+          { arrayFilters: [{ "opt.id": optionId }] }
+        );
+      }
     } else {
       const isFirstVote = prevVotes.length === 0;
 
@@ -85,13 +91,13 @@ export async function POST(req: Request) {
   }
 
   /* ─────────────────────────────────────────────
-   * SINGLE CHOICE (RESTORED)
+   * SINGLE CHOICE
    * ───────────────────────────────────────────── */
   else {
     const prev = prevVotes[0];
 
+    // unvote
     if (prev === optionId) {
-      // unvote
       await posts.updateOne(
         { _id: postObjectId },
         {
@@ -105,7 +111,10 @@ export async function POST(req: Request) {
         },
         { arrayFilters: [{ "opt.id": optionId }] }
       );
-    } else {
+    }
+
+    // vote or switch
+    else {
       const ops: any = {
         $inc: {
           "poll.options.$[new].voteCount": 1,
@@ -134,6 +143,9 @@ export async function POST(req: Request) {
     }
   }
 
+  /* ─────────────────────────────────────────────
+   * ALWAYS RETURN FRESH STATE
+   * ───────────────────────────────────────────── */
   const fresh = await posts.findOne(
     { _id: postObjectId },
     { projection: { poll: 1 } }

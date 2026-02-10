@@ -10,6 +10,11 @@ import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
 import PollView from "./PollView";
 
+export type VotePollResult = {
+  poll: Post["poll"];
+  votedOptionIds: string[];
+};
+
 /**
  * @param isSingle 全画面表示か
  */
@@ -33,7 +38,7 @@ export default function PostItem({
   onDelete?: () => Promise<void> | void;
 
   onUpvote?: (id: string) => Promise<void>;
-  onVote?: (postId: string, optionId: string) => void;
+  onVote?: (postId: string, optionId: string) => Promise<VotePollResult | null>;
 
   onAnswer?: (post: Post) => void;
   onShare?: () => void;

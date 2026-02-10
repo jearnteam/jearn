@@ -4,8 +4,11 @@ import type { Post } from "@/types/post";
 import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
 import { useEffect, useRef, useMemo } from "react";
-import type { UpvoteResponse } from "@/types/post";
 
+export type VotePollResult = {
+  poll: Post["poll"];
+  votedOptionIds: string[];
+};
 
 interface Props {
   posts: Post[];
@@ -13,12 +16,20 @@ interface Props {
   onLoadMore: () => void;
   onEdit: (post: Post) => void;
   onDelete: (id: string) => Promise<void>;
-  onVote?: (postId: string, optionId: string) => void;
-  // 🔥 CHANGE THIS
-  onUpvote: (id: string) => Promise<void>;
+  onVote?: (
+    postId: string,
+    optionId: string
+  ) => Promise<{
+    poll: Post["poll"];
+    votedOptionIds: string[];
+  } | null>;
 
+  onUpvote: (id: string) => Promise<void>;
   onAnswer: (post: Post) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+
+  /** 🔑 OPTIONAL view namespace */
+  viewId?: string;
 }
 
 export default function PostList({
@@ -31,8 +42,9 @@ export default function PostList({
   onVote,
   onAnswer,
   scrollContainerRef,
+  viewId,
 }: Props) {
-  // 🔧 FIX: stable reference for hooks
+  /* 🔧 SAFETY */
   const safePosts = useMemo(() => (Array.isArray(posts) ? posts : []), [posts]);
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -90,18 +102,22 @@ export default function PostList({
       transition={{ duration: 0.4 }}
       className="space-y-[2px] overflow-hidden"
     >
-      {safePosts.map((post) => (
-        <PostItem
-          key={post._id}
-          post={post}
-          onEdit={() => onEdit(post)}
-          onDelete={() => onDelete(post._id)}
-          onUpvote={(id) => onUpvote(id)}
-          onVote={onVote}
-          onAnswer={onAnswer}
-          scrollContainerRef={scrollContainerRef}
-        />
-      ))}
+      {safePosts.map((post) => {
+        const key = viewId ? `${viewId}:${post._id}` : post._id;
+
+        return (
+          <PostItem
+            key={key}
+            post={post}
+            onEdit={() => onEdit(post)}
+            onDelete={() => onDelete(post._id)}
+            onUpvote={(id) => onUpvote(id)}
+            onVote={onVote}
+            onAnswer={onAnswer}
+            scrollContainerRef={scrollContainerRef}
+          />
+        );
+      })}
 
       {hasMore && (
         <div

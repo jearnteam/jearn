@@ -71,8 +71,13 @@ function hasMeaningfulContent(html: string): boolean {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
 
+  // media is meaningful
   if (tmp.querySelector("img, video")) return true;
 
+  // 🔑 math is meaningful
+  if (tmp.querySelector("span[data-type='math']")) return true;
+
+  // text is meaningful
   const text = tmp.textContent?.replace(/\s+/g, "").trim() ?? "";
   return text.length > 0;
 }
@@ -109,35 +114,6 @@ export default function PostContent({
   }, [post.postType, post.video?.url]);
 
   /* =========================================================
-   * 🎥 VIDEO POST → VIDEO ONLY
-   * ========================================================= */
-  if (post.postType === PostTypes.VIDEO && post.video?.url) {
-    return (
-      <div className="mt-2">
-        <div
-          className="
-            relative w-full overflow-hidden rounded-xl bg-black
-            aspect-video max-h-[480px]
-          "
-        >
-          <video
-            src={post.video.url}
-            poster={poster}
-            controls
-            preload="metadata"
-            playsInline
-            className="
-              absolute inset-0
-              w-full h-full
-              object-contain
-            "
-          />
-        </div>
-      </div>
-    );
-  }
-
-  /* =========================================================
    * 📝 NON-VIDEO POSTS
    * ========================================================= */
   const { firstMediaHTML, restHTML } = useMemo(
@@ -159,6 +135,35 @@ export default function PostContent({
     initialized,
     shouldTruncate,
   } = usePostCollapse(restHTML);
+
+  /* =========================================================
+   * 🎥 VIDEO POST → VIDEO ONLY
+   * ========================================================= */
+  if (post.postType === PostTypes.VIDEO && post.video?.url) {
+    return (
+      <div className="mt-2">
+        <div
+          className="
+              relative w-full overflow-hidden rounded-xl bg-black
+              aspect-video max-h-[480px]
+            "
+        >
+          <video
+            src={post.video.url}
+            poster={poster}
+            controls
+            preload="metadata"
+            playsInline
+            className="
+                absolute inset-0
+                w-full h-full
+                object-contain
+              "
+          />
+        </div>
+      </div>
+    );
+  }
 
   const collapsed = firstMediaHTML ? 0 : collapsedHeight ?? fullHeight;
 
@@ -216,9 +221,7 @@ export default function PostContent({
               <motion.div
                 initial={false}
                 animate={{
-                  maxHeight: expanded
-                    ? fullHeight + SAFE_PADDING
-                    : collapsed,
+                  maxHeight: expanded ? fullHeight + SAFE_PADDING : collapsed,
                 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
                 className="relative overflow-hidden mt-2"
@@ -235,9 +238,7 @@ export default function PostContent({
                       if (expanded) {
                         setExpanded(false);
                         requestAnimationFrame(() => {
-                          requestAnimationFrame(
-                            jumpBeforeCollapseIfNeeded
-                          );
+                          requestAnimationFrame(jumpBeforeCollapseIfNeeded);
                         });
                       } else {
                         setExpanded(true);

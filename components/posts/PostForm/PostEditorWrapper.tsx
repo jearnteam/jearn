@@ -10,33 +10,6 @@ import clsx from "clsx";
 import type { Editor } from "@tiptap/react";
 
 /* -------------------------------------------------------------------------- */
-/* Utilities                                                                  */
-/* -------------------------------------------------------------------------- */
-
-function ensureSafeEnding(html: string): string {
-  if (!html) return "<p></p>";
-
-  let clean = html.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
-
-  if (
-    clean.endsWith("</span>") ||
-    clean.endsWith("/>") ||
-    clean.endsWith("</code>") ||
-    clean.endsWith("</strong>") ||
-    clean.endsWith("</em>") ||
-    clean.endsWith("</mark>")
-  ) {
-    clean += "<p></p>";
-  }
-
-  if (!clean.match(/<p[^>]*>.*<\/p>\s*$/)) {
-    clean += "<p></p>";
-  }
-
-  return clean;
-}
-
-/* -------------------------------------------------------------------------- */
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
