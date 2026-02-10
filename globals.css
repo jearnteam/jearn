@@ -77,10 +77,16 @@ html.dark {
   color: #0a0a0a;
   user-select: none;
   cursor: pointer;
-  display: inline-block;
+
+  /* 🔑 FIX */
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+
   white-space: nowrap;
   vertical-align: middle;
 }
+
 .math-node:hover {
   background-color: #f0fdfa;
 }

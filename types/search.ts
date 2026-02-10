@@ -6,8 +6,12 @@ import type { Post } from "@/types/post";
 export type SearchMode =
   | "all"
   | "posts"
-  | "users"
-  | "categories";
+  | "questions"
+  | "answers"
+  | "polls"
+  | "videos"
+  | "tags"
+  | "users";
 
 /* ---------------------------------------------
  * SEARCH ENTITIES

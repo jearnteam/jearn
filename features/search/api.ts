@@ -1,6 +1,6 @@
-import { SearchPost } from "./types";
+import { SearchItem } from "@/types/search";
 
-export async function searchPosts(query: string): Promise<SearchPost[]> {
+export async function searchPosts(query: string): Promise<SearchItem[]> {
   const res = await fetch(
     `/api/search?q=${encodeURIComponent(query)}`,
     { cache: "no-store" }

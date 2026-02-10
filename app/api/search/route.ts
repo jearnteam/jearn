@@ -1,49 +1,36 @@
 // app/api/search/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
-import { ObjectId, Collection, WithId, Document } from "mongodb";
+import { ObjectId, Collection } from "mongodb";
 import { PostTypes, RawPost } from "@/types/post";
 
 export const runtime = "nodejs";
 
-/* ========================== TYPES ========================== */
-
 type CategoryDoc = {
   _id: ObjectId;
-  name?: string;
-  jname?: string;
-  myname?: string;
-};
-
-type SearchUser = {
-  _id: string;
-  uniqueId: string | null;
-  name: string;
-  picture: string;
-  bio?: string;
-};
-
-type SearchCategory = {
-  id: string;
-  name: string;
-  jname: string;
-  myname: string;
+  name?: string | null;
+  jname?: string | null;
+  myname?: string | null;
 };
 
 /* ====================== ENRICH POST ======================= */
 
 async function enrichPost(
   post: RawPost,
-  users: Collection,
+  usersColl: Collection,
   categoriesColl: Collection<CategoryDoc>
 ) {
   const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
 
-  let user = null;
-  if (post.authorId && ObjectId.isValid(post.authorId)) {
-    user = await users.findOne(
+  let user: any = null;
+  if (
+    post.authorId &&
+    typeof post.authorId === "string" &&
+    ObjectId.isValid(post.authorId)
+  ) {
+    user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1, bio: 1 } }
+      { projection: { name: 1, avatarUpdatedAt: 1, uniqueId: 1 } }
     );
   }
 
@@ -51,7 +38,14 @@ async function enrichPost(
     ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
     : "";
 
-  const catIds = Array.isArray(post.categories)
+  const authorName = post.authorName ?? user?.name ?? "Anonymous";
+  const authorUniqueId = user?.uniqueId;
+
+  const authorAvatar = user
+    ? `${CDN}/avatars/${post.authorId}.webp${avatarTs}`
+    : `${CDN}/avatars/default.webp`;
+
+  const categoryIds = Array.isArray(post.categories)
     ? post.categories
         .map((c) =>
           typeof c === "string" && ObjectId.isValid(c)
@@ -63,10 +57,10 @@ async function enrichPost(
         .filter((c): c is ObjectId => c !== null)
     : [];
 
-  const cats =
-    catIds.length > 0
+  const categories =
+    categoryIds.length > 0
       ? await categoriesColl
-          .find({ _id: { $in: catIds } })
+          .find({ _id: { $in: categoryIds } })
           .project({ name: 1, jname: 1, myname: 1 })
           .toArray()
       : [];
@@ -74,11 +68,11 @@ async function enrichPost(
   return {
     ...post,
     _id: post._id.toString(),
-    authorName: user?.name ?? "Anonymous",
-    authorAvatar: user
-      ? `${CDN}/avatars/${user._id.toString()}.webp${avatarTs}`
-      : `${CDN}/avatars/default.webp`,
-    categories: cats.map((c) => ({
+    createdAt: post.createdAt, // ✅ keep for client + debug
+    authorName,
+    authorUniqueId,
+    authorAvatar,
+    categories: categories.map((c) => ({
       id: c._id.toString(),
       name: c.name ?? "",
       jname: c.jname ?? "",
@@ -89,93 +83,211 @@ async function enrichPost(
     commentCount: 0,
   };
 }
-
-/* ==========================================================
-   GET /api/search?q=xxx
-   ========================================================== */
+function dbg(label: string, data?: any) {
+  console.log(`🧪 [SEARCH] ${label}`, data ?? "");
+}
 
 export async function GET(req: NextRequest) {
+  dbg("REQUEST START");
+
   try {
     const { searchParams } = new URL(req.url);
-    const q = searchParams.get("q")?.trim();
+    const q = searchParams.get("q")?.trim() ?? "";
+    const cursor = searchParams.get("cursor");
 
-    if (!q || q.length < 2) {
-      return NextResponse.json({ users: [], categories: [], posts: [] });
+    dbg("PARAMS", { q, cursor });
+
+    if (q.length < 2) {
+      dbg("QUERY TOO SHORT");
+      return NextResponse.json({
+        users: [],
+        categories: [],
+        posts: [],
+        nextCursor: null,
+      });
     }
 
+    dbg("CONNECT MONGO");
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const postsColl = db.collection("posts");
+    const postsColl = db.collection<RawPost>("posts");
     const usersColl = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
+    dbg("BUILD REGEX");
     const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(safe, "i");
 
-    const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
-
     /* ================= USERS ================= */
+    let users: any[] = [];
+    let categories: any[] = [];
 
-    const rawUsers = await usersColl
-      .find(
-        { $or: [{ uniqueId: regex }, { name: regex }] },
-        { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
-      )
-      .limit(5)
-      .toArray();
+    if (!cursor) {
+      dbg("FETCH USERS");
 
-    const users: SearchUser[] = rawUsers.map((u) => ({
-      _id: u._id.toString(),
-      uniqueId: u.uniqueId ?? null,
-      name: u.name ?? "Unknown",
-      bio: u.bio ?? "",
-      picture: `${CDN}/avatars/${u._id.toString()}.webp${
-        u.avatarUpdatedAt ? `?t=${new Date(u.avatarUpdatedAt).getTime()}` : ""
-      }`,
-    }));
+      const rawUsers = await usersColl
+        .find(
+          { $or: [{ uniqueId: regex }, { name: regex }] },
+          { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1, bio: 1 } }
+        )
+        .limit(5)
+        .toArray();
 
-    /* ================= CATEGORIES ================= */
+      dbg("USERS FOUND", rawUsers.length);
 
-    const rawCategories = await categoriesColl
-      .find(
-        { $or: [{ name: regex }, { jname: regex }, { myname: regex }] },
-        { projection: { name: 1, jname: 1, myname: 1 } }
-      )
-      .limit(5)
-      .toArray();
+      const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
 
-    const categories: SearchCategory[] = rawCategories.map((c) => ({
-      id: c._id.toString(),
-      name: c.name ?? "",
-      jname: c.jname ?? "",
-      myname: c.myname ?? "",
-    }));
+      users = rawUsers.map((u: any) => ({
+        _id: u._id.toString(),
+        uniqueId: u.uniqueId ?? null,
+        name: u.name ?? "Unknown",
+        bio: u.bio ?? "",
+        picture: `${CDN}/avatars/${u._id}.webp${
+          u.avatarUpdatedAt ? `?t=${new Date(u.avatarUpdatedAt).getTime()}` : ""
+        }`,
+      }));
+
+      dbg("FETCH CATEGORIES");
+
+      const startsRegex = new RegExp("^" + safe, "i");
+
+      const rawCategories = await categoriesColl
+        .aggregate([
+          {
+            $match: {
+              $or: [{ name: regex }, { jname: regex }, { myname: regex }],
+            },
+          },
+          {
+            $addFields: {
+              _priority: {
+                $switch: {
+                  branches: [
+                    {
+                      case: {
+                        $regexMatch: {
+                          input: { $toString: { $ifNull: ["$name", ""] } },
+                          regex: startsRegex,
+                        },
+                      },
+                      then: 0,
+                    },
+                    {
+                      case: {
+                        $regexMatch: {
+                          input: { $toString: { $ifNull: ["$jname", ""] } },
+                          regex: startsRegex,
+                        },
+                      },
+                      then: 1,
+                    },
+                    {
+                      case: {
+                        $regexMatch: {
+                          input: { $toString: { $ifNull: ["$myname", ""] } },
+                          regex: startsRegex,
+                        },
+                      },
+                      then: 1,
+                    },
+                    {
+                      case: {
+                        $regexMatch: {
+                          input: { $toString: { $ifNull: ["$name", ""] } },
+                          regex,
+                        },
+                      },
+                      then: 2,
+                    },
+                  ],
+                  default: 3,
+                },
+              },
+            },
+          },
+          { $sort: { _priority: 1, name: 1 } },
+          { $limit: 5 },
+          {
+            $project: {
+              name: 1,
+              jname: 1,
+              myname: 1,
+            },
+          },
+        ])
+        .toArray();
+
+      dbg("CATEGORIES FOUND", rawCategories.length);
+
+      categories = rawCategories.map((c: any) => ({
+        id: c._id.toString(),
+        name: c.name ?? "",
+        jname: c.jname ?? "",
+        myname: c.myname ?? "",
+      }));
+    }
 
     /* ================= POSTS ================= */
+    dbg("BUILD POST QUERY");
 
-    const rawPosts = (await postsColl
-      .find({
-        $and: [
-          { postType: { $ne: PostTypes.COMMENT } },
-          {
-            $or: [{ title: regex }, { content: regex }],
-          },
-        ],
-      })
+    const query: any = {
+      postType: { $ne: PostTypes.COMMENT },
+      $or: [
+        { title: regex },
+        { content: regex },
+        { tags: { $elemMatch: { $regex: regex } } },
+      ],
+    };
+
+    if (cursor) {
+      query.createdAt = { $lt: new Date(cursor) };
+    }
+
+    if (cursor) {
+      dbg("APPLY CURSOR");
+      query.createdAt.$lt = new Date(cursor);
+    }
+
+    dbg("FETCH POSTS", query);
+
+    const rawPosts = await postsColl
+      .find(query)
       .sort({ createdAt: -1 })
       .limit(10)
-      .toArray()) as RawPost[];
+      .toArray();
+
+    dbg("POSTS FOUND", rawPosts.length);
 
     const posts = await Promise.all(
-      rawPosts.map((p) => enrichPost(p, usersColl, categoriesColl))
+      rawPosts.map(async (p, i) => {
+        dbg(`ENRICH POST ${i}`, p._id.toString());
+        return enrichPost(p, usersColl, categoriesColl);
+      })
     );
 
-    return NextResponse.json({ users, categories, posts });
-  } catch (err) {
-    console.error("❌ GET /api/search error:", err);
+    dbg("SUCCESS");
+
+    return NextResponse.json({
+      users,
+      categories,
+      posts,
+      nextCursor:
+        rawPosts.length > 0
+          ? rawPosts[rawPosts.length - 1].createdAt!.toISOString()
+          : null,
+    });
+  } catch (err: any) {
+    console.error("🔥 SEARCH HARD FAIL", {
+      message: err?.message,
+      stack: err?.stack,
+    });
+
     return NextResponse.json(
-      { users: [], categories: [], posts: [] },
+      {
+        error: "search_failed",
+        message: err?.message ?? "unknown",
+      },
       { status: 500 }
     );
   }

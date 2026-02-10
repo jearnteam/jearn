@@ -12,7 +12,7 @@ export default function AppLayout({
   overlay,
 }: {
   children: React.ReactNode;
-  overlay?: React.ReactNode;
+  overlay: React.ReactNode;
 }) {
   return (
     <NotificationProvider>

@@ -1,8 +1,8 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import PostOverlayShell from "@/app/(app)/posts/[id]/PostOverlayShell";
-import SearchPageClientWrapper from "@/features/search/SearchPageClientWrapper";
+import SearchOverlayShell from "@/components/search/SearchOverlayShell";
+import SearchPageClientWrapper from "@/components/search/SearchPageClientWrapper";
 
 export default function SearchOverlayPage() {
   const params = useSearchParams();
@@ -11,10 +11,10 @@ export default function SearchOverlayPage() {
   if (!query) return null;
 
   return (
-    <PostOverlayShell onClose={() => history.back()}>
+    <SearchOverlayShell onClose={() => history.back()}>
       {(scrollRef) => (
         <SearchPageClientWrapper scrollContainerRef={scrollRef} />
       )}
-    </PostOverlayShell>
+    </SearchOverlayShell>
   );
 }

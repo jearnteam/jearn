@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { SearchItem } from "@/features/search/types";
+import { SearchItem } from "@/types/search";
 
 /**
  * Unified search hook
