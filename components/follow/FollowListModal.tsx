@@ -42,7 +42,7 @@ export default function FollowListModal({
 
         <div className="space-y-3 max-h-[60vh] overflow-y-auto">
           {users.map((u) => (
-            <div key={u.uid} className="flex items-center justify-between">
+            <div key={u.uid} className="flex items-center justify-between overflow-hidden">
               <div className="flex items-center gap-3">
                 <Avatar id={u.uid} size={36} />
                 <span>{u.name}</span>

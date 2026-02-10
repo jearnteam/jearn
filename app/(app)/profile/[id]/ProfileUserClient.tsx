@@ -157,7 +157,7 @@ export default function ProfileUserClient({ userId }: Props) {
             <h1 className="text-xl font-bold">{user.name}</h1>
             <p className="text-sm text-gray-500">@{user.uniqueId}</p>
 
-            <FollowStats userId={user._id} />
+            <FollowStats userId={userId} />
             {user.bio && (
               <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                 {user.bio}
@@ -165,11 +165,7 @@ export default function ProfileUserClient({ userId }: Props) {
             )}
           </div>
 
-          {currentUser?._id !== user._id && (
-            <div className="absolute top-0 right-0">
-              <FollowButton targetUserId={user._id} />
-            </div>
-          )}
+          <FollowButton targetUserId={userId} />
         </div>
 
         {/* POSTS — NO WRAPPER */}

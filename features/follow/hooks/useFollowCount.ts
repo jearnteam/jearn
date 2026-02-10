@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export function useFollowCount(userId: string) {
+export function useFollowCount(userId?: string) {
   const [followers, setFollowers] = useState(0);
   const [following, setFollowing] = useState(0);
   const [loading, setLoading] = useState(true);

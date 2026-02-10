@@ -27,27 +27,44 @@ type CategoryDoc = {
 /*                         ENRICH POST WITH USER DATA                          */
 /* -------------------------------------------------------------------------- */
 
-async function enrichPost(post: RawPost, usersColl: Collection) {
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date;
+};
+
+async function enrichPost(
+  post: RawPost,
+  usersColl: Collection<UserDoc>
+) {
   const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
   const DEFAULT_AVATAR = "/default-avatar.png";
 
-  // 🔒 System posts
+  // System post
   if (post.authorId === "system") {
     return {
       ...post,
       _id: post._id.toString(),
       authorId: "system",
       authorName: "System",
+      authorUniqueId: null,
       authorAvatar: `${CDN}/avatars/system.webp`,
     };
   }
 
-  let user = null;
+  let user: UserDoc | null = null;
 
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
       { _id: new ObjectId(post.authorId) },
-      { projection: { name: 1, avatarUpdatedAt: 1 } }
+      {
+        projection: {
+          name: 1,
+          uniqueId: 1,
+          avatarUpdatedAt: 1,
+        },
+      }
     );
   }
 
@@ -67,9 +84,11 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     _id: post._id.toString(),
     authorId: post.authorId,
     authorName,
+    authorUniqueId: user?.uniqueId ?? null,
     authorAvatar: cdnAvatar,
   };
 }
+
 
 /* -------------------------------------------------------------------------- */
 /*                        ENRICH CATEGORY OBJECTS                              */
@@ -127,7 +146,7 @@ export async function GET(req: Request) {
     const db = client.db("jearn");
 
     const postsColl = db.collection<RawPost>("posts");
-    const usersColl = db.collection("users");
+    const usersColl = db.collection<UserDoc>("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     /* -------------------------------------------------
@@ -192,7 +211,7 @@ export async function GET(req: Request) {
     });
 
     /* -------------------------------------------------
-     * ⑤ enrich (🔥 this fixes avatar + name)
+     * ⑤ enrich (this fixes avatar + name)
      * ------------------------------------------------- */
     const enriched = await Promise.all(
       docs.map(async (p: RawPost) => {
@@ -201,7 +220,7 @@ export async function GET(req: Request) {
         let parentPost = null;
         let categories: any[] = [];
 
-        // ★ Answer の場合：親 Question を取得
+        // Answer の場合：親 Question を取得
         if (p.postType === PostTypes.ANSWER && p.parentId) {
           const q = await postsColl.findOne(
             { _id: new ObjectId(p.parentId) },
@@ -214,14 +233,14 @@ export async function GET(req: Request) {
               title: q.title,
             };
 
-            // ★ Question の categories を使う
+            //Question の categories を使う
             categories = await enrichCategories(
               Array.isArray(q.categories) ? q.categories : [],
               categoriesColl
             );
           }
         } else {
-          // ★ Question / 通常 Post
+          //Question / 通常 Post
           categories = await enrichCategories(
             Array.isArray(p.categories) ? p.categories : [],
             categoriesColl
@@ -236,8 +255,8 @@ export async function GET(req: Request) {
           postType: p.postType,
           parentId: p.parentId ?? null,
 
-          parentPost, // Q のタイトル
-          categories, // ★ ここが直る
+          parentPost,
+          categories,
 
           tags: p.tags ?? [],
           commentCount: countMap[p._id.toString()] ?? 0,

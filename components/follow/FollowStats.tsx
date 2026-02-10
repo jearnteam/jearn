@@ -15,13 +15,12 @@ export default function FollowStats({
   userId,
   direction = "row",
 }: FollowStatsProps) {
-  if (!userId) return null;
-  
   const { followers, following, loading } = useFollowCount(userId);
   const [open, setOpen] = useState<null | "followers" | "following">(null);
   
   const { t } = useTranslation();
   
+  if (!userId) return null;
   if (loading) return null;
 
   const isColumn = direction === "column";

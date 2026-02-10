@@ -1,23 +1,14 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export function useFollow(targetUserId: string) {
   const [following, setFollowing] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const initializedRef = useRef(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!targetUserId) {
-      setLoading(false);
-      return;
-    }
+    if (!targetUserId) return;
 
     let alive = true;
-
-    //初回だけ spinner
-    if (!initializedRef.current) {
-      setLoading(true);
-    }
+    setLoading(true);
 
     (async () => {
       try {
@@ -26,20 +17,12 @@ export function useFollow(targetUserId: string) {
           credentials: "include",
         });
 
-        if (!res.ok) throw new Error("status fetch failed");
-
         const data = await res.json();
-        if (alive) {
-          setFollowing(!!data.following);
-        }
-      } catch (e) {
-        console.error("follow status error", e);
+        if (alive) setFollowing(!!data.following);
+      } catch {
         if (alive) setFollowing(false);
       } finally {
-        if (alive) {
-          setLoading(false);
-          initializedRef.current = true;
-        }
+        if (alive) setLoading(false);
       }
     })();
 
@@ -49,7 +32,6 @@ export function useFollow(targetUserId: string) {
   }, [targetUserId]);
 
   const toggleFollow = useCallback(async () => {
-    //未確定状態では操作させない
     if (!targetUserId || following === null) return;
 
     setLoading(true);
@@ -65,8 +47,6 @@ export function useFollow(targetUserId: string) {
 
       if (data.action === "followed") setFollowing(true);
       if (data.action === "unfollowed") setFollowing(false);
-    } catch (e) {
-      console.error("toggle follow error", e);
     } finally {
       setLoading(false);
     }

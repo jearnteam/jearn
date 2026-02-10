@@ -12,13 +12,18 @@ interface FollowButtonProps {
 export default function FollowButton({ targetUserId }: FollowButtonProps) {
   const { following, loading, toggleFollow } = useFollow(targetUserId);
 
-  // ✅ 未確定 or 通信中は必ず spinner
-  if (loading || following === null) {
+  // 通信中は spinner
+  if (loading) {
     return (
       <div className="px-4 h-9 rounded-full border border-gray-300 flex items-center justify-center">
         <Spinner />
       </div>
     );
+  }
+
+  // 未取得状態（初回など）は何も描画しない
+  if (following === null) {
+    return null;
   }
 
   return (
