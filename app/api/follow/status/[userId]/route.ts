@@ -6,8 +6,10 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId } = await params;
+
   const session = await getServerSession(authConfig);
   if (!session?.user?.uid) {
     return NextResponse.json({ following: false });
@@ -19,8 +21,8 @@ export async function GET(
   const follows = db.collection("follow");
 
   const existing = await follows.findOne({
-    followerId: session.user.uid,   // ✅ string
-    followingId: params.userId,     // ✅ string
+    followerId: session.user.uid, // ✅ string
+    followingId: userId, // ✅ string
   });
 
   return NextResponse.json({ following: !!existing });

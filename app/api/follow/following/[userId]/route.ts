@@ -6,8 +6,9 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId } = await params;
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
@@ -15,9 +16,7 @@ export async function GET(
   const users = db.collection("users");
 
   // 自分がフォローしている userId 一覧
-  const followingLinks = await follows
-    .find({ followerId: params.userId })
-    .toArray();
+  const followingLinks = await follows.find({ followerId: userId }).toArray();
 
   if (followingLinks.length === 0) {
     return NextResponse.json([]);

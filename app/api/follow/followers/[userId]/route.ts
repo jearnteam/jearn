@@ -5,8 +5,9 @@ import { ObjectId } from "mongodb";
 
 export async function GET(
   _req: Request,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
+  const { userId } = await params;
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
@@ -15,7 +16,7 @@ export async function GET(
 
   // フォロワーの userId 一覧
   const followerLinks = await follows
-    .find({ followingId: params.userId })
+    .find({ followingId: userId })
     .toArray();
 
   const followerIds = followerLinks.map((f) => new ObjectId(f.followerId));
