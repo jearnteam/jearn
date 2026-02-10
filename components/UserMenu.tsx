@@ -155,7 +155,7 @@ export default function UserMenu({ user }: { user: User }) {
             </button>
 
             {/* ADMIN */}
-            {(user.isAdmin || useSession().data?.user.role === "admin") && (
+            {(useSession().data?.user.role === "admin" || user.isAdmin) && (
               <button
                 onClick={() => {
                   setOpen(false);

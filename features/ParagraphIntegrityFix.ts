@@ -10,7 +10,7 @@ export const ParagraphIntegrityFix = Extension.create({
         key: new PluginKey("paragraph-integrity"),
 
         appendTransaction(transactions, oldState, newState) {
-          let tr = newState.tr;
+          const tr = newState.tr;
           let modified = false;
 
           newState.doc.descendants((node, pos) => {

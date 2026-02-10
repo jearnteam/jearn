@@ -261,7 +261,7 @@ export default function VideosItem({ post }: { post: Post }) {
       className="snap-start w-full h-full flex justify-center items-center"
     >
       <div
-        className="relative w-full h-full max-w-[600px] bg-black overflow-hidden"
+        className="relative w-full h-full max-w-[500px] bg-black overflow-hidden"
         onClick={handleTap}
       >
         <video
@@ -400,7 +400,7 @@ export default function VideosItem({ post }: { post: Post }) {
           <div className="flex items-center gap-3 mb-2">
             <img
               src={resolveAvatar(post)}
-              alt={post.authorName}
+              alt={post.authorName ?? "Anonymous"}
               className="w-10 h-10 rounded-full object-cover bg-neutral-700"
             />
             <div className="text-sm truncate max-w-[70%]">

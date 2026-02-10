@@ -27,9 +27,9 @@ export const RestorePrismBlockOnDelete = Extension.create({
           if (tr.getMeta(HARD_DELETE_KEY)) {
             return true;
           }
-        
+
           const sel = state.selection;
-        
+
           // 1️⃣ NodeSelection delete → revert
           if (
             sel instanceof NodeSelection &&
@@ -41,34 +41,32 @@ export const RestorePrismBlockOnDelete = Extension.create({
             });
             return true;
           }
-        
+
           // 2️⃣ Backspace at start of paragraph AFTER prismBlock
           if (sel instanceof TextSelection && sel.empty) {
             const $from = sel.$from;
-        
+
             if ($from.parentOffset !== 0) return true;
             if ($from.depth < 1) return true;
-        
+
             const parent = $from.node($from.depth - 1);
             const index = $from.index($from.depth - 1);
             if (index === 0) return true;
-        
+
             const prevNode = parent.child(index - 1);
             if (prevNode.type.name !== "prismBlock") return true;
-        
+
             const pos = $from.before($from.depth) - prevNode.nodeSize;
             if (pos < 0) return true;
-        
+
             tr.setMeta(META_KEY, {
               pos,
               attrs: prevNode.attrs,
             });
           }
-        
-          return true;
-        }
-        ,
 
+          return true;
+        },
         /* ---------------------------------------------
          * RESTORE BLOCK AS PARAGRAPHS
          * ------------------------------------------- */
@@ -102,13 +100,12 @@ export const RestorePrismBlockOnDelete = Extension.create({
           const code = normalizeCode(attrs.code ?? "");
           if (!code) return null;
 
-          let lines: string[];
           const lang =
             typeof attrs.language === "string" && attrs.language !== "text"
               ? attrs.language
               : "";
 
-          lines = [`\`\`\`${lang}`, ...code.split("\n"), "```"];
+          const lines = [`\`\`\`${lang}`, ...code.split("\n"), "```"];
 
           const paragraphs = lines.map((line: string) =>
             schema.nodes.paragraph.create(null, line ? schema.text(line) : null)

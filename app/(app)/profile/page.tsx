@@ -13,12 +13,11 @@ import { useProfileForm } from "@/hooks/profile/useProfileForm";
 import { useUserPosts } from "@/hooks/profile/useUserPosts";
 
 interface ProfilePageProps {
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function ProfilePage({ scrollContainerRef }: ProfilePageProps) {
   const { t } = useTranslation();
-  const mainRef = scrollContainerRef ?? useRef<HTMLDivElement | null>(null);
 
   const { loading: authLoading } = useProfileAuth();
   const profile = useProfileForm();
@@ -29,7 +28,7 @@ export default function ProfilePage({ scrollContainerRef }: ProfilePageProps) {
   }
 
   return (
-    <ProfileLayout scrollRef={mainRef}>
+    <ProfileLayout scrollRef={scrollContainerRef}>
       <div className="feed-container mt-10 space-y-16">
         <ProfileHeader {...profile} />
         <ProfilePostsSection
