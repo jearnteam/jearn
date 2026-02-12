@@ -30,6 +30,7 @@ export const FloatingMenuIndexedShortcuts = Extension.create({
       "Mod-Alt-8": () => runIndex(7),
       "Mod-Alt-9": () => runIndex(8),
       "Mod-Alt-0": () => runIndex(9),
+      "Mod-m": () => runIndex(10),
     };
   },
 });
