@@ -75,8 +75,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uniqueIdUpdate: Record<string, unknown> = {};
-
     if (uniqueId) {
       if (uniqueId.length < 3 || uniqueId.length > 32) {
         return NextResponse.json(
@@ -85,7 +83,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      if (uniqueId.match(/^\w+$/)) {
+      if (!uniqueId.match(/^\w+$/)) {
         return NextResponse.json(
           { ok: false, error: "UniqueId has invalid characters" },
           { status: 400 }
@@ -103,8 +101,6 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-
-      uniqueIdUpdate.uniqueId = uniqueId;
     }
 
     /* -------------------------------------------------
@@ -152,18 +148,15 @@ export async function POST(req: NextRequest) {
      * ------------------------------------------------ */
     const updateData = {
       name,
+      uniqueId,
       bio,
       updatedAt: new Date(),
-      ...uniqueIdUpdate,
       ...pictureUpdate,
     };
 
     await db
       .collection("users")
-      .updateOne(
-        { _id: new ObjectId(user_id) },
-        { $set: updateData }
-      );
+      .updateOne({ _id: new ObjectId(user_id) }, { $set: updateData });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

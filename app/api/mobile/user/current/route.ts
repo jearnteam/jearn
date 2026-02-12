@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
       _id: user._id.toString(),
       name: user.name ?? "",
       email: user.email ?? "",
+      uniqueId: user.uniqueId ?? "",
       bio: user.bio ?? "",
       avatarUrl:
         user.avatarUrl ??
