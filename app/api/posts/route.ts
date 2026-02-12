@@ -9,6 +9,8 @@ import { Poll, PostType, PostTypes, RawPost } from "@/types/post";
 import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
+import { notify } from "@/lib/notificationHub";
+import { emitGroupedNotification } from "@/lib/emitNotification";
 
 export const runtime = "nodejs";
 
@@ -529,6 +531,75 @@ export async function POST(req: Request) {
       console.log("🧠 Stored AI feedback (filtered)");
     } catch (e) {
       console.log("⚠ AI logging skipped:", e);
+    }
+    /* ------------------------------------------------------------------ */
+    /* NOTIFICATIONS                                                      */
+    /* ------------------------------------------------------------------ */
+
+    try {
+      // コメント or 回答
+      if (safeParentId) {
+        const parentPost = await posts.findOne({
+          _id: new ObjectId(safeParentId),
+        });
+
+        if (parentPost?.authorId && parentPost.authorId !== session.user.uid) {
+          await emitGroupedNotification({
+            userId: parentPost.authorId,
+            type: postType === PostTypes.ANSWER ? "answer" : "comment",
+            postId: safeParentId,
+            actorId: session.user.uid,
+          });
+        }
+      }
+
+      // 特定コメントへの返信
+      if (replyTo) {
+        const replyTarget = await posts.findOne({
+          _id: new ObjectId(replyTo),
+        });
+
+        if (
+          replyTarget?.authorId &&
+          replyTarget.authorId !== session.user.uid
+        ) {
+          await emitGroupedNotification({
+            userId: replyTarget.authorId,
+            type: "comment",
+            postId: safeParentId,
+            actorId: session.user.uid,
+          });
+        }
+      }
+    } catch (e) {
+      console.error("⚠ Notification failed:", e);
+    }
+    /* ------------------ MENTION ------------------ */
+
+    const mentionMatches = content?.match(/@([a-zA-Z0-9_]+)/g);
+
+    if (mentionMatches?.length) {
+      const uniqueNames = [
+        ...new Set(mentionMatches.map((m: string) => m.replace("@", ""))),
+      ];
+
+      const mentionedUsers = await users
+        .find({ uniqueId: { $in: uniqueNames } })
+        .project({ _id: 1 })
+        .toArray();
+
+      for (const user of mentionedUsers) {
+        const mentionedUserId = user._id.toString();
+
+        if (mentionedUserId !== session.user.uid) {
+          await emitGroupedNotification({
+            userId: mentionedUserId,
+            type: "mention",
+            postId: result.insertedId.toString(),
+            actorId: session.user.uid,
+          });
+        }
+      }
     }
 
     /* ------------------------------------------------------------------ */

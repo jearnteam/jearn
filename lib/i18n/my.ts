@@ -48,6 +48,8 @@ const my: TranslationSchema = {
         upvote_noti: "က ပိုစ့်ကို Upvote လုပ်ထားပါတယ်",
         mention_noti: "က သင့်ကို ပိုစ့်ထဲမှာ Mention ခေါ်ထားပါတယ်",
         comment_noti: "က ပိုစ့်အောက်မှာ မှတ်ချက်ပေးထားပါတယ်",
+        answer_noti: "မင်းရဲ့မေးခွန်းကို ငါဖြေတယ်။",
+        follow_noti: "မင်းနောက်ကိုလိုက်ခဲ့တယ်။",
         system_noti: "Jearnအဖွဲ့အစည်းမှ အသိပေးချက်",
       },
   

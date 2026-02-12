@@ -1,6 +1,7 @@
 // lib/emitNotification.ts
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { notify } from "@/lib/notificationHub";
 
 export async function emitGroupedNotification({
   userId,
@@ -9,7 +10,7 @@ export async function emitGroupedNotification({
   actorId,
 }: {
   userId: string;
-  type: "post_like" | "comment" | "mention";
+  type: "post_like" | "comment" | "mention" | "answer";
   postId: string;
   actorId: string;
 }) {
@@ -25,24 +26,24 @@ export async function emitGroupedNotification({
       userId: receiverId,
       type,
       postId: postObjId,
-      read: false, // 🔥 GROUP ONLY UNREAD
     },
     {
       $setOnInsert: {
         createdAt: new Date(),
       },
+      $set: {
+        updatedAt: new Date(),
+        read: false,
+      },
       $addToSet: {
-        actorIds: actorObjId, // dedupe automatically
+        actorIds: actorObjId,
       },
       $inc: {
         count: 1,
       },
-      $set: {
-        updatedAt: new Date(),
-      },
     },
-    {
-      upsert: true, // 🔥 create if not exists
-    }
+    { upsert: true }
   );
+
+  notify(userId);
 }

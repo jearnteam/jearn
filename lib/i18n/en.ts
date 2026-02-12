@@ -56,6 +56,8 @@ const en = {
       upvote_noti: "upvoted your post.",
       mention_noti: "mentioned you!",
       comment_noti: "commented on your post.",
+      answer_noti: "answered your question.",
+      follow_noti: "followed you.",
       system_noti: "System notification",
     },
     

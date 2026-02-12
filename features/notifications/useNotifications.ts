@@ -6,7 +6,7 @@ export function useNotifications() {
   const [items, setItems] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // 🔒 Prevent overlapping fetches
+  // 🔒 Prevent overlapping fetche
   const fetchingRef = useRef(false);
 
   /* ---------------------------------------------
@@ -39,16 +39,9 @@ export function useNotifications() {
   useEffect(() => {
     const es = new EventSource("/api/notifications/stream");
 
-    // 🔔 Server sends: event: notification
     es.addEventListener("notification", () => {
       fetchNotifications();
     });
-
-    // Optional: log / debug errors
-    es.onerror = () => {
-      // Browser will auto-reconnect using `retry`
-      // Do NOT spam fetch here
-    };
 
     return () => {
       es.close();
@@ -64,9 +57,7 @@ export function useNotifications() {
     });
 
     setUnreadCount(0);
-    setItems((prev) =>
-      prev.map((n) => ({ ...n, read: true }))
-    );
+    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
 
   return {

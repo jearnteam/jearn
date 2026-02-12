@@ -144,7 +144,7 @@ export default function HomePage() {
    * @param next
    * @returns
    */
-  function changeView(next: HomeView) {
+  async function changeView(next: HomeView) {
     const el = scrollRef.current;
     if (!el) return;
     // save the states of video page, if the current activeView is Video Page.
@@ -158,9 +158,15 @@ export default function HomePage() {
     }
     // clear unread when opening notifications
     if (next === "notify") {
-      fetchNotifications(); // Fetch the notifications list
-      clearUnread(); // MARK AS READ
+      clearUnread(); // 先にUIを消す
+
+      await fetch("/api/notifications/mark-read", {
+        method: "POST",
+      });
+
+      await fetchNotifications(); // サーバーと同期
     }
+
     // TAP HOME ICON AGAIN → SCROLL TO TOP
     if (next === "home" && activeView === "home") {
       restoringScrollRef.current = true;

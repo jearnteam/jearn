@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
  * ------------------------------------------- */
 export type Notification = {
   _id: string;
-  type: "post_like" | "comment" | "mention" | "system" | "follow";
+  type: "post_like" | "comment" | "mention" | "system" | "follow" | "answer";
   postId?: string;
 
   lastActorName: string;
@@ -35,13 +35,6 @@ export default function NotificationPage() {
   const router = useRouter();
 
   const { items, fetchNotifications } = useNotificationContext();
-
-  /* ---------------------------------------------
-   * FETCH ON OPEN
-   * ------------------------------------------- */
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
 
   /* ---------------------------------------------
    * OVERLAY NAVIGATION (🔑 KEY FIX)
@@ -118,29 +111,23 @@ function NotificationItem({
       case "post_like": {
         const count = notification.count ?? 1;
         if (count > 1) {
-          return `${notification.lastActorName} and ${count - 1} others ${
-            t("notiPage.upvote_noti")
-          }`;
+          return `${notification.lastActorName} and ${count - 1} others ${t(
+            "notiPage.upvote_noti"
+          )}`;
         }
-        return `${notification.lastActorName} ${
-          t("notiPage.upvote_noti")
-        }`;
+        return `${notification.lastActorName} ${t("notiPage.upvote_noti")}`;
       }
 
       case "mention":
-        return `${notification.lastActorName} ${
-          t("notiPage.mention_noti")
-        }`;
+        return `${notification.lastActorName} ${t("notiPage.mention_noti")}`;
 
       case "comment":
-        return `${notification.lastActorName} ${
-          t("notiPage.comment_noti")
-        }`;
+        return `${notification.lastActorName} ${t("notiPage.comment_noti")}`;
+      case "answer":
+        return `${notification.lastActorName} ${t("notiPage.answer_noti")}`;
 
       case "system":
-        return (
-          notification.postPreview ?? t("notiPage.system_noti")
-        );
+        return notification.postPreview ?? t("notiPage.system_noti");
 
       case "follow": {
         const count = notification.count ?? 1;
@@ -151,7 +138,7 @@ function NotificationItem({
           } others followed you`;
         }
 
-        return `${notification.lastActorName} followed you`;
+        return `${notification.lastActorName} ${t("notiPage.follow_noti")}`;
       }
 
       default:

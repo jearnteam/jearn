@@ -25,29 +25,45 @@ export async function POST(req: Request) {
   }
 
   const client = await clientPromise;
-  const db = client.db(process.env.MONGODB_DB || "jearn");
-  const follows = db.collection("follow");
+  const db = client.db("jearn");
 
-  const followerId = session.user.uid;   // ✅ string
-  const followingId = targetUserId;      // ✅ string
+  const follows = db.collection("follow");
+  const notifications = db.collection("notifications");
+
+  const followerId = session.user.uid;
+  const followingId = targetUserId;
 
   const existing = await follows.findOne({
     followerId,
     followingId,
   });
 
+  // unfollow
   if (existing) {
     await follows.deleteOne({ _id: existing._id });
     return NextResponse.json({ ok: true, action: "unfollowed" });
   }
 
+  // follow
   await follows.insertOne({
     followerId,
     followingId,
     createdAt: new Date(),
   });
 
-  notify(targetUserId);
+  // 🔔 通知を作成（← これが今まで無かった）
+  await notifications.insertOne({
+    userId: new ObjectId(followingId),   // 通知を受け取る人
+    type: "follow",
+    actorIds: [new ObjectId(followerId)],
+    count: 1,
+    read: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  // 🔔 SSE 通知
+  notify(followingId);
 
   return NextResponse.json({ ok: true, action: "followed" });
 }

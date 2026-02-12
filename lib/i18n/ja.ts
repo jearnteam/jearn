@@ -45,9 +45,11 @@ const ja: TranslationSchema = {
   
       notiPage: {
         no_noti_yet: "通知はありません",
-        upvote_noti: "さんが投稿を高評価しました",
+        upvote_noti: "さんがあなたの投稿を高評価しました",
         mention_noti: "さんがあなたを＠メンションしました",
         comment_noti: "さんがあなたの投稿にコメントしました",
+        answer_noti: "さんがあなたの質問に回答しました",
+        follow_noti: "さんがあなたをフォローしました",
         system_noti: "System notification",
       },
   

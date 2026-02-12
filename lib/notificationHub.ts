@@ -1,7 +1,4 @@
-const clients = new Map<
-  string,
-  Set<WritableStreamDefaultWriter<Uint8Array>>
->();
+const clients = new Map<string, Set<WritableStreamDefaultWriter<Uint8Array>>>();
 
 const encoder = new TextEncoder();
 
@@ -52,7 +49,7 @@ const NOTIFY_DEBOUNCE_MS = 300;
 /**
  * Call this AFTER DB update
  */
-export function notify(userId: string) {
+export function notify(userId: string, payload?: any) {
   // 🔕 Already scheduled → skip
   if (pending.has(userId)) return;
 
@@ -64,20 +61,16 @@ export function notify(userId: string) {
     const set = clients.get(userId);
     if (!set) return;
 
+    const data = JSON.stringify(payload ?? {});
+
     for (const writer of Array.from(set)) {
       writer
-        .write(
-          encoder.encode(
-            "event: notification\ndata: {}\n\n"
-          )
-        )
+        .write(encoder.encode(`event: notification\ndata: ${data}\n\n`))
         .catch(() => {
-          // 🧹 Writer is dead → remove it
           set.delete(writer);
         });
     }
 
-    // 🧹 Cleanup empty sets
     if (set.size === 0) {
       clients.delete(userId);
     }
