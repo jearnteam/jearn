@@ -1,4 +1,3 @@
-// app/api/posts/[id]/comments/route.ts
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
@@ -14,9 +13,10 @@ async function resolveAuthor(
 ): Promise<{
   name: string;
   uniqueId: string | null;
+  avatarUpdatedAt: Date | null; // ✅ 追加
 }> {
   if (!authorId) {
-    return { name: "Anonymous", uniqueId: null };
+    return { name: "Anonymous", uniqueId: null, avatarUpdatedAt: null };
   }
 
   let user: WithId<Document> | null = null;
@@ -25,7 +25,7 @@ async function resolveAuthor(
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
       { _id: new ObjectId(authorId) },
-      { projection: { name: 1, uniqueId: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } } // ✅ avatarUpdatedAtを取得
     );
   }
 
@@ -33,13 +33,14 @@ async function resolveAuthor(
   if (!user) {
     user = await users.findOne(
       { provider_id: authorId },
-      { projection: { name: 1, uniqueId: 1 } }
+      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
     );
   }
 
   return {
     name: (user?.name as string | undefined) ?? "Anonymous",
     uniqueId: (user?.uniqueId as string | undefined) ?? null,
+    avatarUpdatedAt: (user?.avatarUpdatedAt as Date | undefined) ?? null, // ✅ 追加
   };
 }
 
@@ -74,8 +75,13 @@ export async function GET(
         return {
           ...c,
           _id: c._id.toString(),
+          // ✅ IDを明示的に文字列化 (ObjectIdのままだとクライアントのツリー構築で照合に失敗する)
+          parentId: c.parentId?.toString(),
+          replyTo: c.replyTo?.toString() ?? null,
+
           authorName: author.name,
           authorUniqueId: author.uniqueId,
+          authorAvatarUpdatedAt: author.avatarUpdatedAt, // ✅ アバター更新日時を含める
         };
       })
     );

@@ -25,7 +25,6 @@ export default function CommentClientSection({
     await addComment(content);
     setIsCommentOpen(false);
 
-    // Smooth scroll
     requestAnimationFrame(() => {
       const el = scrollContainerRef?.current;
       if (!el) return;
@@ -55,7 +54,11 @@ export default function CommentClientSection({
         </button>
       </div>
 
-      <CommentList initialComments={comments} postId={postId} />
+      <CommentList
+        initialComments={comments}
+        postId={postId}
+        scrollContainerRef={scrollContainerRef} // ✅ Pass ref
+      />
 
       {isCommentOpen && (
         <CommentFormModal

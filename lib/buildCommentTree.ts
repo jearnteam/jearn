@@ -5,7 +5,7 @@ export interface CommentNode extends Post {
 }
 
 export function buildCommentTree(comments: Post[]): CommentNode[] {
-  // ✅ 修正: comments が undefined / null / 配列以外 の場合は空配列を返してクラッシュを防ぐ
+  // ガード節
   if (!Array.isArray(comments)) {
     return [];
   }
@@ -13,19 +13,27 @@ export function buildCommentTree(comments: Post[]): CommentNode[] {
   const map: Record<string, CommentNode> = {};
   const roots: CommentNode[] = [];
 
-  // 1. Create nodes
-  comments.forEach((c) => {
-    map[c._id] = { ...c, children: [] };
-  });
+  // 1. 全ノードをマップに登録 (IDを文字列化して正規化)
+  for (const c of comments) {
+    const id = String(c._id);
+    map[id] = { ...c, _id: id, children: [] };
+  }
 
-  // 2. Link
-  comments.forEach((c) => {
-    if (c.replyTo && map[c.replyTo]) {
-      map[c.replyTo].children.push(map[c._id]);
+  // 2. 親子関係を構築
+  for (const c of comments) {
+    const id = String(c._id);
+    const node = map[id];
+    
+    // replyTo を文字列化して正規化 (null/undefined/空文字 は null扱い)
+    const replyToId = c.replyTo ? String(c.replyTo) : null;
+
+    // 親が存在し、かつ自分自身でない場合
+    if (replyToId && map[replyToId] && replyToId !== id) {
+      map[replyToId].children.push(node);
     } else {
-      roots.push(map[c._id]);
+      roots.push(node);
     }
-  });
+  }
 
   return roots;
 }
