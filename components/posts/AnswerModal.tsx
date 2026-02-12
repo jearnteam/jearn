@@ -9,6 +9,7 @@ import type { Post, PostType } from "@/types/post";
 import { PostTypes } from "@/types/post";
 import Link from "next/link";
 import dayjs from "@/lib/dayjs";
+import { hasMeaningfulContent } from "@/lib/processText";
 
 interface AnswerModalProps {
   questionPost: Post;
@@ -79,9 +80,12 @@ export default function AnswerModal({
                     </div>
                   </div>
 
-                  <div className="prose dark:prose-invert prose-sm max-w-none break-words p-4 rounded-lg bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-sm">
-                    <MathRenderer html={questionPost.content ?? ""} />
-                  </div>
+                  {questionPost.content &&
+                    hasMeaningfulContent(questionPost.content) && (
+                      <div className="prose dark:prose-invert prose-sm max-w-none break-words p-4 rounded-lg bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-sm">
+                        <MathRenderer html={questionPost.content} />
+                      </div>
+                    )}
                 </div>
               </div>
 

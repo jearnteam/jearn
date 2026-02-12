@@ -1,6 +1,6 @@
-/* -------------------------------------------------------------------------- */
-/*                       REMOVE ZERO-WIDTH-SPACE (ZWSP)                       */
-/* -------------------------------------------------------------------------- */
+/**
+ * Remove zero-width-space
+ */
 export function removeZWSP(html: string): string {
   return html.replace(/\u200B/g, "");
 }
@@ -48,4 +48,24 @@ export function extractTagsFromHTML(html: string): string[] {
     .filter(Boolean);
 
   return Array.from(new Set(tags)); // unique tags
+}
+
+/**
+ * media is meaningful
+ * math is meaningful
+ * text is meaningful
+ */
+export function hasMeaningfulContent(html: string): boolean {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+
+  // media is meaningful
+  if (tmp.querySelector("img, video")) return true;
+
+  // 🔑 math is meaningful
+  if (tmp.querySelector("span[data-type='math']")) return true;
+
+  // text is meaningful
+  const text = tmp.textContent?.replace(/\s+/g, "").trim() ?? "";
+  return text.length > 0;
 }
