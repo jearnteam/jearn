@@ -1,36 +1,24 @@
-// components/comments/CommentFormModal.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import CommentForm from "@/components/comments/CommentForm";
 import Portal from "@/components/common/Portal";
-import type { PostEditorWrapperRef } from "@/components/posts/PostForm/PostEditorWrapper";
 import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function CommentFormModal({
   parentId,
   onClose,
-  onSubmitted, // ✅ Add here
+  onSubmitted,
 }: {
   parentId: string;
   onClose: () => void;
-  onSubmitted: (content: string) => void; // ✅ Add type
+  onSubmitted: (content: string) => void;
 }) {
   const { t } = useTranslation();
+  const [openCount] = useState(() => Date.now());
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<PostEditorWrapperRef | null>(null);
-  const [openCount] = useState(() => Date.now()); // stable key per open
-
-  // Focus after first paint so ProseMirror can measure correctly
-  useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      editorRef.current?.focus?.(); // Now valid ✅
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  // Close on Escape only (safe; doesn't block editor events)
+  // Close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -41,42 +29,57 @@ export default function CommentFormModal({
 
   return (
     <Portal>
-      <div
-        className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center"
-        role="dialog"
-        aria-modal="true"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
-      >
-        <div
-          ref={dialogRef}
-          className="bg-white dark:bg-neutral-900 rounded-lg w-full max-w-lg p-4 shadow-xl relative"
-          onMouseDown={(e) => e.stopPropagation()}
+      <AnimatePresence>
+        <motion.div
+          className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         >
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold">
-              {t("writeComment")}
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-xl text-gray-600 hover:text-gray-800 dark:hover:text-gray-300"
-              aria-label="Close"
-            >
-              ✕
-            </button>
-          </div>
+          {/* Center Wrapper */}
+          <div className="relative w-full max-w-2xl">
+            
+            {/* Glow Effect (Blue for Comment) */}
+            <div className="absolute -inset-10 rounded-xl blur-[80px] opacity-40 bg-blue-500/30 pointer-events-none" />
 
-          {/* Key forces a fresh Tiptap instance each open */}
-          <CommentForm
-            key={openCount}
-            parentId={parentId}
-            onSubmitted={onSubmitted}
-            editorRefFromParent={editorRef}
-            autoFocus
-          />
-        </div>
-      </div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="relative bg-white dark:bg-neutral-900 rounded-xl border border-blue-500/30 shadow-2xl flex flex-col overflow-hidden"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 dark:border-neutral-800">
+                <h2 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+                  {t("writeComment")}
+                </h2>
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5">
+                <CommentForm
+                  key={openCount}
+                  parentId={parentId}
+                  onSubmitted={onSubmitted}
+                  onCancel={onClose}
+                  autoFocus
+                />
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
     </Portal>
   );
 }
