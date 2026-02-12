@@ -193,14 +193,6 @@ export default function FullPostClient({
         onUpvote={async (id) => {
           await handleUpvote(id);
         }}
-        onShare={() => {
-          if (typeof navigator !== "undefined") {
-            navigator.clipboard.writeText(
-              `${window.location.origin}/posts/${post._id}`
-            );
-            alert("Link copied!");
-          }
-        }}
         scrollContainerRef={scrollContainerRef}
       />
 

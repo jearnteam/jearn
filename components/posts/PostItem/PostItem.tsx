@@ -25,7 +25,6 @@ export default function PostItem({
   onDelete,
   onUpvote,
   onAnswer,
-  onShare,
   onVote,
   isSingle = false,
   scrollContainerRef,
@@ -41,7 +40,6 @@ export default function PostItem({
   onVote?: (postId: string, optionId: string) => Promise<VotePollResult | null>;
 
   onAnswer?: (post: Post) => void;
-  onShare?: () => void;
 
   isSingle?: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -184,7 +182,6 @@ export default function PostItem({
             }}
             isSingle={isSingle}
             onShare={() => {
-              if (onShare) onShare(); // ✅ external hook
               setShareOpen(true); // ✅ internal modal
             }}
             onAnswer={() => onAnswer?.(post)}

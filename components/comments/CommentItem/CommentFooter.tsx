@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 import { rememberTx } from "@/lib/recentTx";
 import type { Post } from "@/types/post";
+import dayjs from "dayjs";
+import i18n from "@/lib/i18n/index";
 
 export default function CommentFooter({
   comment,
@@ -57,31 +59,45 @@ export default function CommentFooter({
   };
 
   return (
-    <div className="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-      {/* Upvote */}
-      <button
-        onClick={handleUpvote}
-        disabled={!userId || pending}
-        className={clsx(
-          "flex items-center gap-1 transition-colors px-1.5 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800",
-          localUpvoted
-            ? "text-blue-600 dark:text-blue-400 font-medium"
-            : "hover:text-blue-600 dark:hover:text-blue-400"
-        )}
+    <div className="mt-2 flex items-center justify-between">
+      <div
+        className="
+        flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400
+      "
       >
-        <ArrowBigUp size={18} className={localUpvoted ? "fill-current" : ""} />
-        <span>{localCount}</span>
-      </button>
-
-      {/* Reply */}
-      {onReply && (
+        {/* Upvote */}
         <button
-          onClick={onReply}
-          className="flex items-center gap-1.5 transition-colors px-1.5 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-blue-600 dark:hover:text-blue-400"
+          onClick={handleUpvote}
+          disabled={!userId || pending}
+          className={clsx(
+            "flex items-center gap-1 transition-colors px-1.5 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800",
+            localUpvoted
+              ? "text-blue-600 dark:text-blue-400 font-medium"
+              : "hover:text-blue-600 dark:hover:text-blue-400"
+          )}
         >
-          <Reply size={16} />
-          <span>{t("reply")}</span>
+          <ArrowBigUp
+            size={18}
+            className={localUpvoted ? "fill-current" : ""}
+          />
+          <span>{localCount}</span>
         </button>
+
+        {/* Reply */}
+        {onReply && (
+          <button
+            onClick={onReply}
+            className="flex items-center gap-1.5 transition-colors px-1.5 py-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 hover:text-blue-600 dark:hover:text-blue-400"
+          >
+            <Reply size={16} />
+            <span>{t("reply")}</span>
+          </button>
+        )}
+      </div>
+      {comment.edited && comment.editedAt && (
+        <span className="text-xs text-gray-500 dark:text-gray-500">
+          (edited {dayjs(comment.editedAt).locale(i18n.language).fromNow()})
+        </span>
       )}
     </div>
   );

@@ -56,7 +56,7 @@ export default function CommentItem({
           />
 
           {/* 📝 Reuse PostContent logic (images, math, collapse) */}
-          <div className="pl-11">
+          <div className="">
             <PostContent
               post={comment}
               wrapperRef={wrapperRef}
