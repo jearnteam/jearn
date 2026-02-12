@@ -107,9 +107,15 @@ const en = {
   },
 } as const;
 
+/**
+ * Convert const object to normal object recursively
+ */
 type ToTranslationType<T> = {
   [K in keyof T]: T[K] extends object ? ToTranslationType<T[K]> : string;
 };
+/**
+ * Recursive Partial
+ */
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };

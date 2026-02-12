@@ -23,6 +23,7 @@ const eslintConfig = [
   {
     rules: {
       "@next/next/no-img-element": 0,
+      "@typescript-eslint/no-explicit-any": 1,
     },
   },
 ];

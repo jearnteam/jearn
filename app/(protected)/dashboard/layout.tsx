@@ -7,17 +7,14 @@ import React from "react";
 
 export default function DashboardLayout({
   children,
-  overlay,
 }: {
   children: React.ReactNode;
-  overlay?: React.ReactNode;
 }) {
   return (
     <NotificationProvider>
       <Navbar />
       <AppNavigationBridge />
       {children}
-      {overlay}
     </NotificationProvider>
   );
 }

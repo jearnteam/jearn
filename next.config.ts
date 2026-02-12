@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     scrollRestoration: true,
 
     // ✅ FIX: allow large multipart uploads (FormData)
-    middlewareClientMaxBodySize: "50mb", // or "100mb"
+    middlewareClientMaxBodySize: "100mb",
   },
 
   outputFileTracingRoot: path.join(__dirname),
