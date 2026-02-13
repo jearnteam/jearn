@@ -46,7 +46,7 @@ export default function UserPage() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   /** objectId */
-  const id = params.id;  
+  const id = params.id;
 
   const { user: currentUser } = useCurrentUser();
 
@@ -132,7 +132,10 @@ export default function UserPage() {
     if (!deletePostId) return;
     try {
       setIsDeleting(true);
-      await fetch(`/api/posts/${deletePostId}`, { method: "DELETE" });
+      await fetch(`/api/posts/`, {
+        body: JSON.stringify({ id: deletePostId }),
+        method: "DELETE",
+      });
       await loadAll();
     } finally {
       setIsDeleting(false);
@@ -208,6 +211,7 @@ export default function UserPage() {
         />
       )}
 
+      {/* This is probably not going to be displayed */}
       <DeleteConfirmModal
         open={confirmDeleteOpen}
         onCancel={() => {
@@ -223,10 +227,10 @@ export default function UserPage() {
         <main
           ref={mainRef}
           className="
-      absolute top-[4.3rem] left-0 right-0 bottom-0
-      overflow-y-auto no-scrollbar
-      pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
-    "
+            absolute top-[4.3rem] left-0 right-0 bottom-0
+            overflow-y-auto no-scrollbar
+            pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
+          "
         >
           <div className="feed-container mt-10">
             {/* PROFILE HEADER */}
@@ -237,8 +241,7 @@ export default function UserPage() {
                 <h1 className="text-2xl font-bold">{safeUser.name}</h1>
                 <p className="text-gray-500">@{safeUser.uniqueId}</p>
 
-                {/* TODO: 適切な位置にスタイリング */}
-                <FollowStats userId={id}/>
+                <FollowStats userId={id} />
 
                 {safeUser.bio && (
                   <p className="text-gray-500">{safeUser.bio}</p>

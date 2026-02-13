@@ -127,10 +127,10 @@ export function useComments(initialComments: Post[], postId: string) {
   );
 
   const editComment = useCallback(async (id: string, content: string) => {
-    await fetch("/api/posts", {
+    await fetch(`/api/posts/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, content }),
+      body: JSON.stringify({ content }),
     });
   }, []);
 

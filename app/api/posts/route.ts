@@ -300,6 +300,7 @@ export async function POST(req: Request) {
       tags = [],
       poll,
       video,
+      commentDisabled = false,
     } = await req.json();
 
     if (!authorId) {
@@ -506,6 +507,7 @@ export async function POST(req: Request) {
       categories: ObjectId[];
       tags: string[];
       isAdmin?: boolean;
+      commentDisabled?: boolean;
       mediaRefs?: string[];
       poll?: Poll;
       video?: {
@@ -529,6 +531,7 @@ export async function POST(req: Request) {
       categories: categories.map((id: string) => new ObjectId(id)),
       tags,
       isAdmin: session.user.role === "admin",
+      commentDisabled,
       mediaRefs,
     };
 
@@ -636,124 +639,13 @@ const r2 = new S3Client({
 /* -------------------------------------------------------------------------- */
 /*                                EDIT POST                                   */
 /* -------------------------------------------------------------------------- */
-
+/**
+ * @deprecated use api/[id]/ instead
+ * @param req 
+ * @returns 
+ */
 export async function PUT(req: Request) {
-  try {
-    /* ------------------------------ AUTH ------------------------------ */
-    const session = await getServerSession(authConfig);
-    if (!session?.user?.uid) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
-    /* ------------------------------ BODY ------------------------------ */
-    const {
-      id,
-      title,
-      content,
-      categories,
-      tags,
-      txId = null,
-    } = await req.json();
-
-    if (!id) {
-      return new Response("Missing post id", { status: 400 });
-    }
-
-    /* ------------------------------ DB ------------------------------- */
-    const client = await clientPromise;
-    const db = client.db("jearn");
-
-    const posts = db.collection("posts");
-    const users = db.collection("users");
-    const categoriesColl = db.collection<CategoryDoc>("categories");
-
-    const existing = await posts.findOne({ _id: new ObjectId(id) });
-    if (!existing) {
-      return new Response("Post not found", { status: 404 });
-    }
-    const oldRefs: string[] = Array.isArray(existing.mediaRefs)
-      ? existing.mediaRefs
-      : [];
-
-    if (existing.authorId !== session.user.uid) {
-      return new Response("Forbidden", { status: 403 });
-    }
-
-    /* ------------------------- BUILD UPDATE --------------------------- */
-    const updateFields: Record<string, unknown> = {};
-
-    if (title !== undefined) updateFields.title = title;
-    if (content !== undefined) {
-      updateFields.content = content;
-
-      const newRefs = extractPostImageKeys(content);
-      updateFields.mediaRefs = newRefs;
-
-      const removedRefs = oldRefs.filter((k) => !newRefs.includes(k));
-
-      for (const key of removedRefs) {
-        try {
-          if (!key.startsWith("posts/")) continue;
-
-          await r2.send(
-            new DeleteObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME!,
-              Key: key,
-            })
-          );
-        } catch (err) {
-          console.error("❌ Failed to delete image:", key, err);
-        }
-      }
-    }
-
-    if (Array.isArray(categories)) {
-      updateFields.categories = categories.map((c: string) => new ObjectId(c));
-    }
-
-    if (Array.isArray(tags)) {
-      updateFields.tags = tags;
-    }
-
-    updateFields.edited = true;
-    updateFields.editedAt = new Date();
-
-    /* ---------------------------- UPDATE ------------------------------ */
-    await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
-
-    /* ------------------------- FETCH UPDATED -------------------------- */
-    const updated = await posts.findOne({ _id: new ObjectId(id) });
-    if (!updated) {
-      return new Response("Post not found after update", { status: 404 });
-    }
-
-    const enrichedPost = await enrichPost(updated as RawPost, users);
-    const enrichedCategories = await enrichCategories(
-      updated.categories ?? [],
-      categoriesColl
-    );
-
-    const final = {
-      ...enrichedPost,
-      categories: enrichedCategories,
-      tags: updated.tags ?? [],
-      commentCount: updated.commentCount ?? 0,
-    };
-
-    /* ----------------------------- SSE ------------------------------- */
-    broadcastSSE({
-      type: existing.parentId ? "update-comment" : "update-post",
-      txId,
-      postId: final._id,
-      post: final,
-    });
-
-    /* --------------------------- RESPONSE ----------------------------- */
-    return NextResponse.json({ ok: true, post: final });
-  } catch (err) {
-    console.error("🔥 PUT /api/posts failed:", err);
-    return new Response("Internal Server Error", { status: 500 });
-  }
+  return NextResponse.json({ error: "Use api/[id]/ instead" }, {status: 405});
 }
 
 async function deleteR2ByUrl(url?: string) {

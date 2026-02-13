@@ -116,6 +116,7 @@ export type RawPost = {
   title?: string;
   content?: string;
   parentId?: string;
+  replyTo?: string;
   authorId?: string;
   authorName?: string;
   authorAvatar?: string;
