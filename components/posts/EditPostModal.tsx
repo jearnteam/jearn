@@ -7,6 +7,7 @@ import PostForm, { Category } from "@/components/posts/PostForm/PostForm";
 import { useTranslation } from "react-i18next";
 import type { Post } from "@/types/post";
 import { PostTypes, PostType } from "@/types/post";
+import { MessageCircle, MessageCircleOff } from "lucide-react";
 
 interface EditPostModalProps {
   post: Post;
@@ -15,7 +16,8 @@ interface EditPostModalProps {
     title: string,
     content: string,
     categories: string[],
-    tags: string[]
+    tags: string[],
+    commentDisabled?: boolean
   ) => Promise<void>;
 }
 
@@ -26,6 +28,9 @@ export default function EditPostModal({
 }: EditPostModalProps) {
   const { t } = useTranslation();
   const [allCategories, setAllCategories] = useState<Category[]>([]);
+  const [commentDisabled, setCommentDisabled] = useState(
+    post.commentDisabled ?? false
+  );
 
   /* -------------------------------------------------
    * Resolve safe post type
@@ -99,9 +104,29 @@ export default function EditPostModal({
           >
             {/* HEADER */}
             <div className="flex justify-between items-center p-4 border-b dark:border-gray-700">
-              <h2 className="text-xl font-semibold">
-                {t("editPost")}
-              </h2>
+              {mode !== PostTypes.QUESTION && (
+                <button
+                  type="button"
+                  onClick={() => setCommentDisabled((prev) => !prev)}
+                  className={`w-9 h-9 flex items-center justify-center
+                               rounded-md border transition-colors
+                               ${
+                                 commentDisabled
+                                   ? "border-red-500/50 text-red-500 bg-red-50 dark:bg-red-500/10"
+                                   : "hover:bg-gray-100 dark:hover:bg-neutral-800 border-gray-200 dark:border-neutral-700"
+                               }`}
+                  title={
+                    commentDisabled ? "Enable comments" : "Disable comments"
+                  }
+                >
+                  {commentDisabled ? (
+                    <MessageCircleOff size={16} />
+                  ) : (
+                    <MessageCircle size={16} />
+                  )}
+                </button>
+              )}
+              <h2 className="text-xl font-semibold">{t("editPost")}</h2>
               <button
                 onClick={onClose}
                 className="text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
@@ -123,11 +148,13 @@ export default function EditPostModal({
                 submitLabel={t("saveChanges")}
                 onCancel={onClose}
                 onSubmit={async (data) => {
+                  console.log(commentDisabled);
                   await onSave(
                     data.title,
                     data.content,
                     data.categories,
-                    data.tags
+                    data.tags,
+                    commentDisabled
                   );
 
                   onClose();

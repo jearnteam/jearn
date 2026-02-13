@@ -93,6 +93,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   },
   ref
 ) {
+  console.log(arguments);
   const [title, setTitle] = useState(initialTitle);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);
@@ -377,7 +378,9 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
 
     const init = async () => {
       const { userId, postType, questionId } = getDraftScope();
-      const rawDraft = await loadDraft(userId, postType, questionId);
+      const rawDraft = await loadDraft(userId, postType, questionId).catch(
+        _ => null
+      );
 
       if (cancelled) return;
 
@@ -1159,14 +1162,14 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                   ])
                 }
                 className="
-    inline-flex items-center gap-1
-    px-3 py-1.5 rounded-md
-    text-sm font-medium
-    border border-blue-500/30
-    text-blue-600
-    hover:bg-blue-50 dark:hover:bg-blue-500/10
-    transition
-  "
+                  inline-flex items-center gap-1
+                  px-3 py-1.5 rounded-md
+                  text-sm font-medium
+                  border border-blue-500/30
+                  text-blue-600
+                  hover:bg-blue-50 dark:hover:bg-blue-500/10
+                  transition
+                "
               >
                 <span className="text-lg leading-none">+</span>
                 Add option
@@ -1206,15 +1209,15 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                   type="button"
                   onClick={() => setExpiresAt(null)}
                   className="
-    inline-flex items-center gap-1
-    px-2.5 py-1.5 rounded-md
-    text-xs font-medium
-    border border-red-500/30
-    text-red-600
-    hover:bg-red-50 dark:hover:bg-red-500/10
-    transition
-    w-fit
-  "
+                    inline-flex items-center gap-1
+                    px-2.5 py-1.5 rounded-md
+                    text-xs font-medium
+                    border border-red-500/30
+                    text-red-600
+                    hover:bg-red-50 dark:hover:bg-red-500/10
+                    transition
+                    w-fit
+                  "
                 >
                   ✕ Remove expiration
                 </button>

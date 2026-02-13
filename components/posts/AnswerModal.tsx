@@ -10,6 +10,8 @@ import { PostTypes } from "@/types/post";
 import Link from "next/link";
 import dayjs from "@/lib/dayjs";
 import { hasMeaningfulContent } from "@/lib/processText";
+import { useState } from "react";
+import { MessageCircle, MessageCircleOff } from "lucide-react";
 
 interface AnswerModalProps {
   questionPost: Post;
@@ -20,7 +22,8 @@ interface AnswerModalProps {
     content: string,
     authorId: string | null,
     tags: string[],
-    parentId: string
+    parentId: string,
+    commentDisabled?: boolean
   ) => Promise<void>;
 }
 
@@ -30,6 +33,7 @@ export default function AnswerModal({
   onSubmit,
 }: AnswerModalProps) {
   const { t } = useTranslation();
+  const [commentDisabled, setCommentDisabled] = useState(false);
 
   return (
     <Portal>
@@ -50,6 +54,24 @@ export default function AnswerModal({
           >
             {/* HEADER */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-neutral-900 z-10">
+              <button
+                type="button"
+                onClick={() => setCommentDisabled((prev) => !prev)}
+                className={`w-9 h-9 flex items-center justify-center
+                                   rounded-md border transition-colors
+                                   ${
+                                     commentDisabled
+                                       ? "border-red-500/50 text-red-500 bg-red-50 dark:bg-red-500/10"
+                                       : "hover:bg-gray-100 dark:hover:bg-neutral-800 border-gray-200 dark:border-neutral-700"
+                                   }`}
+                title={commentDisabled ? "Enable comments" : "Disable comments"}
+              >
+                {commentDisabled ? (
+                  <MessageCircleOff size={16} />
+                ) : (
+                  <MessageCircle size={16} />
+                )}
+              </button>
               <h2 className="text-xl font-bold flex items-center gap-2">
                 <span className="text-orange-500">A.</span>
                 {t("answerToQuestion")}
@@ -104,7 +126,8 @@ export default function AnswerModal({
                         data.content,
                         data.authorId,
                         data.tags,
-                        questionPost._id // parentId として質問IDを渡す
+                        questionPost._id, // parentId として質問IDを渡す
+                        commentDisabled
                       );
                       onClose();
                     }}

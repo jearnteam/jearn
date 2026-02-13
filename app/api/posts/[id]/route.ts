@@ -203,7 +203,6 @@ export async function GET(
 /* ===============================================================
    PUT — update post (title, content, categories, tags, SSE)
    =============================================================== */
-// PUT メソッドは変更なし（前回提供したコードが動作している前提）
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -227,6 +226,7 @@ export async function PUT(
       tags,
       removedImages = [],
       txId = null,
+      commentDisabled,
     } = await req.json();
 
     const client = await clientPromise;
@@ -248,10 +248,11 @@ export async function PUT(
     /* ---------------- UPDATE ---------------- */
     const updateFields: Record<string, unknown> = {};
 
-    if (title !== undefined && existing.postType !== PostTypes.QUESTION) {
+    if (title != undefined && existing.postType !== PostTypes.QUESTION) {
       updateFields.title = title;
     }
-    if (content !== undefined) updateFields.content = content;
+    if (content != undefined) updateFields.content = content;
+    if (commentDisabled != undefined) updateFields.commentDisabled = commentDisabled; 
 
     if (Array.isArray(categories)) {
       updateFields.categories = categories

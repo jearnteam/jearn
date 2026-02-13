@@ -82,7 +82,7 @@ export default function HomePage() {
     refresh: refreshFollowing,
   } = useFollowingPosts();
   //Global notification state
-  const { unreadCount, clearUnread, fetchNotifications } =
+  const { unreadCount, clearUnread,} =
     useNotificationContext();
 
   /* ---------------------------------------------
@@ -160,11 +160,9 @@ export default function HomePage() {
     if (next === "notify") {
       clearUnread(); // 先にUIを消す
 
-      await fetch("/api/notifications/mark-read", {
+      await fetch("/api/notifications/read", {
         method: "POST",
       });
-
-      await fetchNotifications(); // サーバーと同期
     }
 
     // TAP HOME ICON AGAIN → SCROLL TO TOP
@@ -375,12 +373,15 @@ export default function HomePage() {
         <EditPostModal
           post={editingPost}
           onClose={() => setEditingPost(null)}
-          onSave={async (title, content) => {
+          onSave={async (title, content, categories, tags, commentDisabled) => {
             await editPost(
               editingPost._id,
               editingPost.content ?? "",
               title,
-              content
+              content,
+              categories,
+              tags,
+              commentDisabled
             );
             setEditingPost(null);
           }}

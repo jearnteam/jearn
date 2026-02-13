@@ -234,7 +234,8 @@ export function usePosts() {
         thumbnailUrl?: string;
         duration?: number;
         aspectRatio?: number;
-      }
+      },
+      commentDisabled?: boolean
     ) => {
       if (!authorId) return;
 
@@ -249,7 +250,8 @@ export function usePosts() {
           categories,
           tags,
           poll,
-          video, // ✅ THIS WAS MISSING
+          video,
+          commentDisabled,
         }),
       }).catch((e) => console.error("🔥 addPost error:", e));
     },
@@ -266,7 +268,8 @@ export function usePosts() {
       content: string,
       authorId: string | null,
       tags: string[],
-      parentId: string
+      parentId: string,
+      commentDisabled?: boolean
     ) => {
       if (!authorId) return;
 
@@ -280,6 +283,7 @@ export function usePosts() {
           authorId,
           tags,
           parentId,
+          commentDisabled,
         }),
       }).catch((e) => console.error("🔥 addAnswer error:", e));
     },
@@ -313,7 +317,8 @@ export function usePosts() {
       title: string,
       content: string,
       categories?: string[],
-      tags?: string[]
+      tags?: string[],
+      commentDisabled?: boolean
     ) => {
       // 🧮 compute removed images
       const oldImages = extractCdnImages(originalContent);
@@ -336,6 +341,9 @@ export function usePosts() {
         )
       );
 
+      console.log(commentDisabled);
+      
+
       // 🌐 API request
       const res = await fetch(`/api/posts/${id}`, {
         method: "PUT",
@@ -346,6 +354,7 @@ export function usePosts() {
           categories,
           tags,
           removedImages,
+          commentDisabled,
         }),
       });
 

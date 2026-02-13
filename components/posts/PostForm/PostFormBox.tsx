@@ -13,6 +13,8 @@ import {
   Video,
   ImagePlus,
   BarChart3,
+  MessageCircleOff,
+  MessageCircle,
 } from "lucide-react";
 
 const POST_TYPE_OPTIONS = [
@@ -80,13 +82,15 @@ export default function PostFormBox({
     categories: string[],
     tags: string[],
     poll?: any,
-    video?: any
+    video?: any,
+    commentDisabled?: boolean
   ) => Promise<void>;
   type?: PostFormMode;
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<PostFormMode>(type);
   const [openTypeMenu, setOpenTypeMenu] = useState(false);
+  const [commentDisabled, setCommentDisabled] = useState(false);
   const postFormRef = useRef<PostFormHandle>(null);
 
   useEffect(() => {
@@ -202,11 +206,36 @@ export default function PostFormBox({
                         type="button"
                         onClick={() => postFormRef.current?.insertImage()}
                         className="w-9 h-9 flex items-center justify-center
-               rounded-md border
-               hover:bg-gray-100 dark:hover:bg-neutral-800"
+                          rounded-md border
+                          hover:bg-gray-100 dark:hover:bg-neutral-800"
                         title="Insert image"
                       >
                         <ImagePlus size={16} />
+                      </button>
+                    )}
+
+                    {mode !== PostTypes.QUESTION && (
+                      <button
+                        type="button"
+                        onClick={() => setCommentDisabled((prev) => !prev)}
+                        className={`w-9 h-9 flex items-center justify-center
+                                   rounded-md border transition-colors
+                                   ${
+                                     commentDisabled
+                                       ? "border-red-500/50 text-red-500 bg-red-50 dark:bg-red-500/10"
+                                       : "hover:bg-gray-100 dark:hover:bg-neutral-800 border-gray-200 dark:border-neutral-700"
+                                   }`}
+                        title={
+                          commentDisabled
+                            ? "Enable comments"
+                            : "Disable comments"
+                        }
+                      >
+                        {commentDisabled ? (
+                          <MessageCircleOff size={16} />
+                        ) : (
+                          <MessageCircle size={16} />
+                        )}
                       </button>
                     )}
 
@@ -248,7 +277,8 @@ export default function PostFormBox({
                         data.categories,
                         data.tags,
                         data.poll,
-                        data.video
+                        data.video,
+                        commentDisabled
                       );
                     }}
                     onSuccess={() => {
