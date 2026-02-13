@@ -143,6 +143,25 @@ export async function GET(
     const post = await posts.findOne({ _id: new ObjectId(id) });
     if (!post) return NextResponse.json(null, { status: 404 });
 
+    // 🔥 Inject votedOptionIds for current user
+    const session = await getServerSession(authConfig);
+    const userId = session?.user?.uid;
+
+    if (post.poll && userId) {
+      const rawVote = post.poll.votes?.[userId];
+
+      const votedOptionIds = Array.isArray(rawVote)
+        ? rawVote
+        : typeof rawVote === "string"
+        ? [rawVote]
+        : [];
+
+      post.poll = {
+        ...post.poll,
+        votedOptionIds,
+      };
+    }
+
     // ✅ メイン投稿のエンリッチ
     const enrichedPost = await enrichSinglePost(
       post as RawPost,

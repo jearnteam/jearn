@@ -3,47 +3,49 @@ import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 type RequestBody = {
-  categoryIds?: unknown;
-};
-
-type UsageResult = {
-  _id: ObjectId;
-  count: number;
+  categories?: unknown;
 };
 
 export async function POST(req: Request) {
   try {
-    const body: unknown = await req.json();
+    const body = (await req.json()) as RequestBody;
 
-    if (
-      !body ||
-      typeof body !== "object" ||
-      !Array.isArray((body as RequestBody).categoryIds)
-    ) {
+    if (!Array.isArray(body.categories)) {
       return NextResponse.json({ usage: {} });
     }
 
-    const categoryIds = (body as RequestBody).categoryIds as unknown[];
+    const categoryNames: string[] = body.categories.filter(
+      (c): c is string => typeof c === "string"
+    );
 
-    // 🔒 Narrow + validate ObjectIds
-    const ids = categoryIds
-      .filter(
-        (id): id is string =>
-          typeof id === "string" && ObjectId.isValid(id)
-      )
-      .map((id) => new ObjectId(id));
-
-    if (ids.length === 0) {
+    if (categoryNames.length === 0) {
       return NextResponse.json({ usage: {} });
     }
 
     const client = await clientPromise;
     const db = client.db("jearn");
 
-    const results = (await db
+    // 🔎 Step 1: Convert names → ObjectIds
+    const categoryDocs = await db
+      .collection("categories")
+      .find({ name: { $in: categoryNames } })
+      .toArray();
+
+    if (categoryDocs.length === 0) {
+      return NextResponse.json({ usage: {} });
+    }
+
+    const idMap = new Map<string, ObjectId>();
+    categoryDocs.forEach((cat) => {
+      idMap.set(cat.name, cat._id);
+    });
+
+    const ids = categoryDocs.map((cat) => cat._id);
+
+    // 🔎 Step 2: Count posts referencing those category IDs
+    const results = await db
       .collection("posts")
-      .aggregate([
-        { $match: { categories: { $in: ids } } },
+      .aggregate<{ _id: ObjectId; count: number }>([
         { $unwind: "$categories" },
         { $match: { categories: { $in: ids } } },
         {
@@ -53,17 +55,27 @@ export async function POST(req: Request) {
           },
         },
       ])
-      .toArray()) as UsageResult[];
+      .toArray();
 
-    // Build usage object EXACTLY as page expects
+    // 🔄 Step 3: Convert ObjectId results back to category name keys
     const usage: Record<string, number> = {};
+
     results.forEach((r) => {
-      usage[r._id.toString()] = r.count;
+      const categoryName = categoryDocs.find((c) =>
+        c._id.equals(r._id)
+      )?.name;
+
+      if (categoryName) {
+        usage[categoryName] = r.count;
+      }
     });
 
     return NextResponse.json({ usage });
   } catch (err) {
     console.error("❌ category usage error:", err);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    );
   }
 }

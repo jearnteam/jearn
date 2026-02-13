@@ -73,15 +73,20 @@ export async function GET(
         const author = await resolveAuthor(users, c.authorId as string | null);
 
         return {
-          ...c,
           _id: c._id.toString(),
-          // ✅ IDを明示的に文字列化 (ObjectIdのままだとクライアントのツリー構築で照合に失敗する)
           parentId: c.parentId?.toString(),
           replyTo: c.replyTo?.toString() ?? null,
 
+          postType: c.postType ?? "Comment", // 👈 important
+          title: typeof c.title === "string" ? c.title : null, // 👈 add this
+          content: c.content ?? "",
+
+          upvoteCount: c.upvoteCount ?? 0,
+          createdAt: c.createdAt ?? null,
+
           authorName: author.name,
           authorUniqueId: author.uniqueId,
-          authorAvatarUpdatedAt: author.avatarUpdatedAt, // ✅ アバター更新日時を含める
+          authorAvatarUpdatedAt: author.avatarUpdatedAt,
         };
       })
     );

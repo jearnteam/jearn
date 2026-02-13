@@ -1,7 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
 import FullScreenPortal from "@/features/FullScreenPortal";
-import GraphView from "@/components/graphview/GraphView";
+import GraphView from "@/components/graph/GraphView";
 import type { Post } from "@/types/post";
 import { PostTypes } from "@/types/post";
 
@@ -17,27 +18,29 @@ export default function PostGraphModal({
   if (!open) return null;
 
   /**
-   * 🔧 NORMALIZE Post → GraphPost
-   * GraphView requires a strict GraphPost shape.
+   * 🔧 Normalize Post → GraphPost
+   * Memoized to prevent unnecessary rebuilds.
    */
-  const graphPost = {
-    _id: post._id,
+  const graphPost = useMemo(() => {
+    return {
+      _id: post._id,
 
-    // title must ALWAYS exist for graph
-    title:
-      post.title ??
-      (post.postType === PostTypes.ANSWER ? "Answer" : "Untitled Post"),
+      title:
+        post.title ??
+        (post.postType === PostTypes.ANSWER ? "Answer" : "Untitled Post"),
 
-    // ✅ align with real Post type
-    authorId: post.authorId,
-    authorName: post.authorName ?? "Unknown",
+      // ✅ FIX: guarantee string
+      authorId: post.authorId ?? "unknown",
 
-    // GraphView REQUIRES arrays
-    tags: post.tags ?? [],
-    categories: (post.categories ?? []).map((c) => ({
-      name: c.name || c.jname || c.myname || "Category",
-    })),
-  };
+      authorName: post.authorName ?? "Unknown",
+
+      tags: post.tags ?? [],
+
+      categories: (post.categories ?? []).map((c) => ({
+        name: c.name || c.jname || c.myname || "Category",
+      })),
+    };
+  }, [post]);
 
   return (
     <FullScreenPortal>
@@ -46,17 +49,19 @@ export default function PostGraphModal({
         onClick={onClose}
       >
         <div
-          className="relative max-w-4xl w-full h-[80vh] rounded-lg shadow-2xl overflow-hidden"
+          className="relative max-w-5xl w-full h-[85vh] rounded-xl shadow-2xl overflow-hidden bg-[#0f0f0f]"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-3 right-3 z-[50] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl hover:bg-black/90"
+            className="absolute top-4 right-4 z-[50] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl hover:bg-black/90 transition"
           >
             ×
           </button>
 
-          <div className="w-full h-full border border-blue-500 overflow-auto">
+          {/* IMPORTANT: Remove overflow-auto */}
+          <div className="w-full h-full">
             <GraphView post={graphPost} />
           </div>
         </div>
