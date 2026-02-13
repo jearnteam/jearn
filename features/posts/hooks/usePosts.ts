@@ -341,9 +341,6 @@ export function usePosts() {
         )
       );
 
-      console.log(commentDisabled);
-      
-
       // 🌐 API request
       const res = await fetch(`/api/posts/${id}`, {
         method: "PUT",

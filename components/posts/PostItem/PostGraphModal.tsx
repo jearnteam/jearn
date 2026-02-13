@@ -15,8 +15,6 @@ export default function PostGraphModal({
   post: Post;
   onClose: () => void;
 }) {
-  if (!open) return null;
-
   /**
    * 🔧 Normalize Post → GraphPost
    * Memoized to prevent unnecessary rebuilds.
@@ -41,6 +39,8 @@ export default function PostGraphModal({
       })),
     };
   }, [post]);
+
+  if (!open) return null;
 
   return (
     <FullScreenPortal>

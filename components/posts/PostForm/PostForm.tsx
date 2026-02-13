@@ -93,7 +93,6 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   },
   ref
 ) {
-  console.log(arguments);
   const [title, setTitle] = useState(initialTitle);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);

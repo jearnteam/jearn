@@ -13,7 +13,7 @@ async function resolveAuthor(
 ): Promise<{
   name: string;
   uniqueId: string | null;
-  avatarUpdatedAt: Date | null; // ✅ 追加
+  avatarUpdatedAt: Date | null;
 }> {
   if (!authorId) {
     return { name: "Anonymous", uniqueId: null, avatarUpdatedAt: null };

@@ -41,7 +41,6 @@ export const MentionSuggestion = Extension.create({
          * e.g. "@o" -> query = "o"
          */
         items: async ({ query }) => {
-          console.log("[mention items] query =", query);
           const raw = (query ?? "").trim();
 
           // Only "@" typed (no text) -> nothing fetched, but dropdown can stay

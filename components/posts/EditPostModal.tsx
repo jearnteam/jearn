@@ -148,7 +148,6 @@ export default function EditPostModal({
                 submitLabel={t("saveChanges")}
                 onCancel={onClose}
                 onSubmit={async (data) => {
-                  console.log(commentDisabled);
                   await onSave(
                     data.title,
                     data.content,
