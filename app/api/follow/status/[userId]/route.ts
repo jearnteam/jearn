@@ -12,7 +12,7 @@ export async function GET(
 
   const session = await getServerSession(authConfig);
   if (!session?.user?.uid) {
-    return NextResponse.json({ following: false });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const client = await clientPromise;

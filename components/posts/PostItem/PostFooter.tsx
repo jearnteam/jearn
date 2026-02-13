@@ -101,18 +101,25 @@ export default function PostFooter({
   return (
     <>
       {/* CENTER: ANSWER */}
-      {post.postType === PostTypes.QUESTION && post.authorId && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            safeAnswer();
-          }}
-          className="flex mx-auto mt-2 items-center border border-slate-600 px-3 py-1 rounded text-xs hover:bg-slate-100 dark:hover:bg-neutral-800"
-        >
-          <div className="inline-block pr-1 font-medium text-sm">回答する</div>
-          <MessageSquareText size={20} className="inline-block text-red-400" />
-        </button>
-      )}
+      {post.postType === PostTypes.QUESTION &&
+        !post.commentDisabled &&
+        post.authorId && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              safeAnswer();
+            }}
+            className="flex mx-auto mt-2 items-center border border-slate-600 px-3 py-1 rounded text-xs hover:bg-slate-100 dark:hover:bg-neutral-800"
+          >
+            <div className="inline-block pr-1 font-medium text-sm">
+              回答する
+            </div>
+            <MessageSquareText
+              size={20}
+              className="inline-block text-red-400"
+            />
+          </button>
+        )}
       <div className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-3 text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center justify-between relative">
           {/* LEFT: ACTIONS */}

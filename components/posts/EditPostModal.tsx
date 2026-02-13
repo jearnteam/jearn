@@ -104,7 +104,7 @@ export default function EditPostModal({
           >
             {/* HEADER */}
             <div className="flex justify-between items-center p-4 border-b dark:border-gray-700">
-              {mode !== PostTypes.QUESTION && (
+              {
                 <button
                   type="button"
                   onClick={() => setCommentDisabled((prev) => !prev)}
@@ -125,7 +125,7 @@ export default function EditPostModal({
                     <MessageCircle size={16} />
                   )}
                 </button>
-              )}
+              }
               <h2 className="text-xl font-semibold">{t("editPost")}</h2>
               <button
                 onClick={onClose}

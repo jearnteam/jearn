@@ -7,6 +7,7 @@ import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { PostTypes, RawPost } from "@/types/post";
 import { deleteMediaUrls } from "@/lib/media/deleteMedia";
+import { resolveAuthor } from "@/lib/post/resolveAuthor";
 
 export const runtime = "nodejs";
 
@@ -24,45 +25,7 @@ type CategoryDoc = {
   myname?: string;
 };
 
-/* ---------------------- AUTHOR RESOLVER ---------------------- */
-async function resolveAuthor(
-  users: Collection,
-  authorId?: string | null
-): Promise<{
-  name: string;
-  uniqueId: string | null;
-  avatarUpdatedAt: Date | null;
-}> {
-  if (!authorId) {
-    return {
-      name: "Anonymous",
-      uniqueId: null,
-      avatarUpdatedAt: null,
-    };
-  }
 
-  let user = null;
-
-  if (ObjectId.isValid(authorId)) {
-    user = await users.findOne(
-      { _id: new ObjectId(authorId) },
-      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
-    );
-  }
-
-  if (!user) {
-    user = await users.findOne(
-      { provider_id: authorId },
-      { projection: { name: 1, uniqueId: 1, avatarUpdatedAt: 1 } }
-    );
-  }
-
-  return {
-    name: user?.name ?? "Anonymous",
-    uniqueId: user?.uniqueId ?? null,
-    avatarUpdatedAt: user?.avatarUpdatedAt ?? null,
-  };
-}
 
 /* ---------------------- CATEGORY RESOLVER ---------------------- */
 // ✅ 追加: カテゴリー解決用ヘルパー
