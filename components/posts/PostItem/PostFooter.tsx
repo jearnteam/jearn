@@ -3,6 +3,8 @@
 import {
   ArrowBigUp,
   MessageCircle,
+  MessageCircleOff,
+  MessageSquareOff,
   MessageSquarePlus,
   MessageSquareText,
   Share2,
@@ -137,8 +139,17 @@ export default function PostFooter({
                 className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MessageCircle size={18} />
-                <span>{post.commentCount ?? 0}</span>
+                {post.commentDisabled ? (
+                  <>
+                    <MessageCircleOff size={18} />
+                    <span>{post.commentCount ?? 0}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageCircle size={18} />
+                    <span>{post.commentCount ?? 0}</span>
+                  </>
+                )}
               </Link>
             )}
 
@@ -150,8 +161,17 @@ export default function PostFooter({
                 className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MessageSquarePlus size={18} color="#c44" />
-                <span>{post.commentCount ?? 0}</span>
+                {post.commentDisabled ? (
+                  <>
+                    <MessageSquareOff size={18} />
+                    <span>{post.commentCount ?? 0}</span>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquarePlus size={18} />
+                    <span>{post.commentCount ?? 0}</span>
+                  </>
+                )}
               </Link>
             )}
 

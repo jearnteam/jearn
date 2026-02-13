@@ -248,6 +248,7 @@ export default function FullPostClient({
       {post.postType !== PostTypes.QUESTION && (
         <div className="mt-6">
           <CommentClientSection
+            post={post}
             comments={comments}
             postId={post._id}
             scrollContainerRef={scrollContainerRef}

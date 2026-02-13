@@ -9,10 +9,12 @@ import { useTranslation } from "react-i18next";
 import { MessageSquarePlus } from "lucide-react";
 
 export default function CommentClientSection({
+  post,
   comments,
   postId,
   scrollContainerRef,
 }: {
+  post: Post;
   comments: Post[];
   postId: string;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
@@ -45,13 +47,15 @@ export default function CommentClientSection({
           </span>
         </h3>
 
-        <button
-          onClick={() => setIsCommentOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-sm hover:shadow-md transition"
-        >
-          <MessageSquarePlus size={18} />
-          {t("addComment")}
-        </button>
+        {!post.commentDisabled && (
+          <button
+            onClick={() => setIsCommentOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-sm hover:shadow-md transition"
+          >
+            <MessageSquarePlus size={18} />
+            {t("addComment")}
+          </button>
+        )}
       </div>
 
       <CommentList

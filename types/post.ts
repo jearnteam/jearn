@@ -94,6 +94,7 @@ export interface Post {
   upvoters: string[];
 
   commentCount?: number;
+  commentDisabled?: boolean;
 
   /** logged-in viewer (client only, injected) */
   viewerId?: string;
