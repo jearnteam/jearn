@@ -4,8 +4,9 @@ import type { Post } from "@/types/post";
 import { motion } from "framer-motion";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse } from "./usePostCollapse";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PostTypes } from "@/types/post";
+import { hasMeaningfulContent } from "@/lib/processText";
 
 /* -------------------------------------------------
  * 🧠 Extract ONLY the first img / video
@@ -15,21 +16,55 @@ function splitFirstMedia(html: string): {
   restHTML: string;
 } {
   const container = document.createElement("div");
-  container.innerHTML = html;
+  container.innerHTML = html.trim();
 
-  const media = container.querySelector("img, video") as HTMLElement | null;
+  // Find first meaningful element (skip empty text nodes)
+  let firstElement: HTMLElement | null = null;
 
-  if (!media) {
+  for (const node of Array.from(container.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim()) {
+      continue; // skip empty text
+    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      firstElement = node as HTMLElement;
+    }
+    break;
+  }
+
+  if (!firstElement) {
     return { firstMediaHTML: null, restHTML: html };
   }
 
-  const firstMediaHTML = media.outerHTML;
-  media.remove();
+  const isMedia = (el: HTMLElement) =>
+    ["IMG", "VIDEO", "PICTURE"].includes(el.tagName);
 
-  return {
-    firstMediaHTML,
-    restHTML: container.innerHTML,
-  };
+  // Case 1: First element is media directly
+  if (isMedia(firstElement)) {
+    const firstMediaHTML = firstElement.outerHTML;
+    firstElement.remove();
+
+    return {
+      firstMediaHTML,
+      restHTML: container.innerHTML,
+    };
+  }
+
+  // Case 2: Wrapped inside <p> and contains only media
+  if (firstElement.tagName === "P" && firstElement.children.length === 1) {
+    const child = firstElement.firstElementChild as HTMLElement | null;
+
+    if (child && isMedia(child)) {
+      const firstMediaHTML = child.outerHTML;
+      firstElement.remove();
+
+      return {
+        firstMediaHTML,
+        restHTML: container.innerHTML,
+      };
+    }
+  }
+
+  return { firstMediaHTML: null, restHTML: html };
 }
 
 /* -------------------------------------------------
@@ -64,32 +99,16 @@ async function extractVideoPoster(url: string): Promise<string> {
   });
 }
 
-/* -------------------------------------------------
- * 🧠 Detect meaningful rest content
- * ------------------------------------------------- */
-function hasMeaningfulContent(html: string): boolean {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-
-  // media is meaningful
-  if (tmp.querySelector("img, video")) return true;
-
-  // 🔑 math is meaningful
-  if (tmp.querySelector("span[data-type='math']")) return true;
-
-  // text is meaningful
-  const text = tmp.textContent?.replace(/\s+/g, "").trim() ?? "";
-  return text.length > 0;
-}
-
 export default function PostContent({
   post,
   wrapperRef,
   scrollContainerRef,
+  disableCollapse = false, // for graphview node post popup
 }: {
   post: Post;
   wrapperRef: React.RefObject<HTMLDivElement | null>;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  disableCollapse?: boolean; // for graphview node post popup
 }) {
   /* =========================================================
    * 🎥 VIDEO THUMBNAIL (FIRST FRAME)
@@ -135,6 +154,41 @@ export default function PostContent({
     initialized,
     shouldTruncate,
   } = usePostCollapse(restHTML);
+
+  const lastTapRef = useRef(0);
+
+  function handleContentClick(e: React.MouseEvent) {
+    if (!expanded) return;
+    if (disableCollapse) return;
+
+    const now = Date.now();
+    const DOUBLE_CLICK_DELAY = 280;
+
+    const target = e.target as HTMLElement;
+
+    // 🚫 Ignore interactive elements
+    if (
+      target.closest("a, button, video, input, textarea") ||
+      target.closest(".katex") ||
+      target.closest("[data-no-collapse]")
+    ) {
+      return;
+    }
+
+    if (now - lastTapRef.current < DOUBLE_CLICK_DELAY) {
+      // 💥 Clear selection (prevents highlight stuck)
+      const selection = window.getSelection();
+      if (selection) selection.removeAllRanges();
+
+      setExpanded(false);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(jumpBeforeCollapseIfNeeded);
+      });
+    }
+
+    lastTapRef.current = now;
+  }
 
   /* =========================================================
    * 🎥 VIDEO POST → VIDEO ONLY
@@ -216,15 +270,21 @@ export default function PostContent({
       {/* 🎬 COLLAPSIBLE CONTENT */}
       {initialized && hasRestContent && (
         <>
-          {shouldTruncate || firstMediaHTML ? (
+          {disableCollapse ? (
+            // ✅ FULL CONTENT (NO COLLAPSE)
+            <div className="mt-2">
+              <MathRenderer html={restHTML} />
+            </div>
+          ) : shouldTruncate || firstMediaHTML ? (
             <>
               <motion.div
+                onClick={handleContentClick}
                 initial={false}
                 animate={{
                   maxHeight: expanded ? fullHeight + SAFE_PADDING : collapsed,
                 }}
                 transition={{ duration: 0.2, ease: "easeOut" }}
-                className="relative overflow-hidden mt-2"
+                className="relative overflow-hidden mt-2 cursor-pointer"
               >
                 <div className="pb-8">
                   <MathRenderer html={restHTML} />
