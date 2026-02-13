@@ -8,6 +8,8 @@ export default function ThreeBall() {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
+  const isSpinning = useRef(false);
+
   const { subscribe } = useScrollBus();
 
   useEffect(() => {
@@ -90,6 +92,11 @@ export default function ThreeBall() {
       spinVelocityX += delta * sensitivity * 0.5;
 
       updateColor(delta * 0.3);
+
+      if (!isSpinning.current) {
+        isSpinning.current = true;
+        render();
+      }
     });
 
     /* -------------------------
@@ -98,6 +105,14 @@ export default function ThreeBall() {
     let rafId = 0;
 
     const render = () => {
+      if (
+        Math.abs(spinVelocityX) < minVelocity &&
+        Math.abs(spinVelocityY) < minVelocity
+      ) {
+        isSpinning.current = false;
+        return;
+      }
+
       rafId = requestAnimationFrame(render);
 
       wireShape.rotation.y += spinVelocityY;
@@ -112,6 +127,7 @@ export default function ThreeBall() {
       renderer.render(scene, camera);
     };
 
+    renderer.render(scene, camera);
     render();
 
     /* -------------------------
