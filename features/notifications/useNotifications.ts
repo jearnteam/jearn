@@ -1,69 +1,45 @@
 "use client";
-
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export function useNotifications() {
   const [items, setItems] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // 🔒 Prevent overlapping fetche
-  const fetchingRef = useRef(false);
-
-  /* ---------------------------------------------
-   * FETCH NOTIFICATIONS (ON DEMAND ONLY)
-   * ------------------------------------------- */
   const fetchNotifications = useCallback(async () => {
-    if (fetchingRef.current) return;
-
-    fetchingRef.current = true;
-
-    try {
-      const res = await fetch("/api/notifications", {
-        cache: "no-store",
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-
-      setItems(data);
-      setUnreadCount(data.filter((n: any) => n.read === false).length);
-    } finally {
-      fetchingRef.current = false;
-    }
+    const res = await fetch("/api/notifications", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setItems(data);
+    setUnreadCount(data.filter((n: any) => !n.read).length);
   }, []);
 
-  /* ---------------------------------------------
-   * SSE — TRIGGER FETCH ON EVENT
-   * ------------------------------------------- */
+  // SSE 接続
   useEffect(() => {
     const es = new EventSource("/api/notifications/stream");
 
-    es.addEventListener("notification", () => {
-      fetchNotifications();
+    es.addEventListener("notification", (e: MessageEvent) => {
+      const data = JSON.parse(e.data);
+      setItems(prev => [data, ...prev]);    // 新着通知を先頭に追加
+      setUnreadCount(prev => prev + 1);     // 未読カウント更新
+      console.log(data);
     });
 
-    return () => {
-      es.close();
+    es.addEventListener("connected", () => {
+      console.log("SSE connected");
+    });
+
+    es.onerror = () => {
+      // ブラウザ自動再接続
     };
-  }, [fetchNotifications]);
 
-  /* ---------------------------------------------
-   * MARK ALL READ
-   * ------------------------------------------- */
-  const clearUnread = useCallback(async () => {
-    await fetch("/api/notifications/read", {
-      method: "POST",
-    });
-
-    setUnreadCount(0);
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+    return () => es.close();
   }, []);
 
-  return {
-    items,
-    unreadCount,
-    fetchNotifications, // call ON TAB OPEN
-    clearUnread,
-  };
+  const clearUnread = useCallback(async () => {
+    await fetch("/api/notifications/read", { method: "POST" });
+    setUnreadCount(0);
+    setItems(prev => prev.map(n => ({ ...n, read: true })));
+  }, []);
+
+  return { items, unreadCount, fetchNotifications, clearUnread };
 }

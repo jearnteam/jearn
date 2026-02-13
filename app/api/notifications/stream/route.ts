@@ -19,34 +19,26 @@ export async function GET(request: Request) {
 
   subscribe(userId, writer);
 
-  // initial connection event
-  await writer.write(
-    encoder.encode("event: connected\ndata: {}\n\n")
-  );
+  // 🔥 ここ重要：awaitしない
+  writer.write(encoder.encode("event: connected\ndata: {}\n\n"));
+  writer.write(encoder.encode("retry: 3000\n\n"));
 
-  // retry hint
-  await writer.write(
-    encoder.encode("retry: 3000\n\n")
-  );
-
-  // keepalive ping
+  // 🔥 heartbeat
   const ping = setInterval(() => {
     writer.write(encoder.encode(": ping\n\n")).catch(() => {});
-  }, 15000);
+  }, 20000);
 
   request.signal.addEventListener("abort", () => {
     clearInterval(ping);
     unsubscribe(userId, writer);
-    try {
-      writer.close();
-    } catch {}
+    try { writer.close(); } catch {}
   });
 
   return new Response(stream.readable, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
+      "Connection": "keep-alive",
     },
   });
 }

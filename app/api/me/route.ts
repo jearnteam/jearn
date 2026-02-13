@@ -15,6 +15,6 @@ export async function GET() {
   return NextResponse.json({
     uid: session.user.uid,
     name: session.user.name,
-    avatar: session.user.image ?? null,
+    avatar: session.user.picture ?? session.user.image ?? null,
   });
 }

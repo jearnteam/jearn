@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import clientPromise from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";

@@ -53,7 +53,7 @@ export const authConfig: AuthOptions = {
         await db.collection("users").insertOne({
           name: user.name ?? "",
           email: user.email,
-          image: user.image ?? null,
+          avatarUrl: user.image ?? null,
           provider: account.provider,
           provider_id: account.providerAccountId,
           createdAt: new Date(),

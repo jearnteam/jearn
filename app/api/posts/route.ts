@@ -9,6 +9,7 @@ import { Poll, PostType, PostTypes, RawPost } from "@/types/post";
 import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
+import { emitGroupedNotification } from "@/lib/emitNotification";
 
 export const runtime = "nodejs";
 
@@ -465,9 +466,11 @@ export async function POST(req: Request) {
     if (safeParentId) {
       if (
         postType !== PostTypes.ANSWER &&
-        (await posts.findOne(
-          { _id: ObjectId.createFromHexString(safeParentId) }
-        ))?.commentDisabled
+        (
+          await posts.findOne({
+            _id: ObjectId.createFromHexString(safeParentId),
+          })
+        )?.commentDisabled
       ) {
         return NextResponse.json(
           { error: "Target post was disabled comment" },
@@ -566,6 +569,60 @@ export async function POST(req: Request) {
 
     const result = await posts.insertOne(doc);
 
+    // ---------------- NOTIFICATION: ANSWER ----------------
+    if (postType === PostTypes.ANSWER && safeParentId) {
+      const parent = await posts.findOne({
+        _id: new ObjectId(safeParentId),
+      });
+
+      if (parent && parent.authorId && parent.authorId !== session.user.uid) {
+        await emitGroupedNotification({
+          userId: parent.authorId.toString(),
+          type: "answer",
+          postId: safeParentId,
+          actorId: session.user.uid,
+        });
+      }
+    }
+
+    // ---------------- NOTIFICATION: COMMENT ----------------
+    if (postType === PostTypes.COMMENT && safeParentId) {
+      const parent = await posts.findOne({
+        _id: new ObjectId(safeParentId),
+      });
+
+      if (parent && parent.authorId && parent.authorId !== session.user.uid) {
+        await emitGroupedNotification({
+          userId: parent.authorId.toString(),
+          type: "comment",
+          postId: safeParentId,
+          actorId: session.user.uid,
+        });
+      }
+    }
+
+    // ---------------- NOTIFICATION: MENTION ----------------
+    function extractMentions(text: string) {
+      const matches = text.match(/@([\w]+)/g);
+      if (!matches) return [];
+      return matches.map((m) => m.slice(1));
+    }
+
+    const mentionedIds = extractMentions(content);
+
+    for (const uid of mentionedIds) {
+      const mentionedUser = await users.findOne({ uniqueId: uid });
+
+      if (mentionedUser && mentionedUser._id.toString() !== session.user.uid) {
+        await emitGroupedNotification({
+          userId: mentionedUser._id.toString(),
+          type: "mention",
+          postId: safeParentId ?? result.insertedId.toString(),
+          actorId: session.user.uid,
+        });
+      }
+    }
+
     /* ---------------- AI Feedback Logging ---------------- */
     try {
       const ai = await categorize(doc.content);
@@ -641,11 +698,11 @@ const r2 = new S3Client({
 /* -------------------------------------------------------------------------- */
 /**
  * @deprecated use api/[id]/ instead
- * @param req 
- * @returns 
+ * @param req
+ * @returns
  */
 export async function PUT(req: Request) {
-  return NextResponse.json({ error: "Use api/[id]/ instead" }, {status: 405});
+  return NextResponse.json({ error: "Use api/[id]/ instead" }, { status: 405 });
 }
 
 async function deleteR2ByUrl(url?: string) {
