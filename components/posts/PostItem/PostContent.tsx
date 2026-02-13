@@ -218,8 +218,7 @@ export default function PostContent({
       </div>
     );
   }
-
-  const collapsed = firstMediaHTML ? 0 : collapsedHeight ?? fullHeight;
+  const collapsed = collapsedHeight ?? fullHeight;
 
   /** 🔒 Mobile safety buffer (prevents last-line clipping) */
   const SAFE_PADDING = 32;
@@ -255,20 +254,20 @@ export default function PostContent({
         </div>
       )}
 
-      {/* 🔒 Measurement layer */}
+      {/* 🔒 Measurement layer (hidden, full height) */}
       {hasRestContent && (
         <div
           className="absolute invisible pointer-events-none"
           style={{ height: 0, overflow: "hidden" }}
         >
           <div ref={measureRef}>
-            <MathRenderer html={restHTML} />
+          <MathRenderer html={restHTML} measureOnly />
           </div>
         </div>
       )}
 
       {/* 🎬 COLLAPSIBLE CONTENT */}
-      {initialized && hasRestContent && (
+      {hasRestContent && (
         <>
           {disableCollapse ? (
             // ✅ FULL CONTENT (NO COLLAPSE)
@@ -281,10 +280,12 @@ export default function PostContent({
                 onClick={handleContentClick}
                 initial={false}
                 animate={{
-                  maxHeight: expanded ? fullHeight + SAFE_PADDING : collapsed,
+                  maxHeight: expanded
+                    ? fullHeight + SAFE_PADDING
+                    : collapsedHeight ?? fullHeight,
                 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className="relative overflow-hidden mt-2 cursor-pointer"
+                transition={{ duration: 0.25 }}
+                className="relative overflow-hidden mt-2"
               >
                 <div className="pb-8">
                   <MathRenderer html={restHTML} />

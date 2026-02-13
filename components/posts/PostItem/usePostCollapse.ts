@@ -10,23 +10,24 @@ export function usePostCollapse(html: string) {
 
   const [expanded, setExpanded] = useState(false);
   const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
-  const [fullHeight, setFullHeight] = useState<number>(0);
+  const [fullHeight, setFullHeight] = useState(0);
   const [initialized, setInitialized] = useState(false);
 
   useLayoutEffect(() => {
     const el = measureRef.current;
     if (!el) return;
 
-    const limit = LINE_HEIGHT * FULL_LINES_LIMIT;
-
     const measure = () => {
-      const style = getComputedStyle(el);
-      const paddingBottom = parseFloat(style.paddingBottom || "0");
-
-      const full = el.scrollHeight + paddingBottom;
+      const full = el.getBoundingClientRect().height;
 
       setFullHeight(full);
-      setCollapsedHeight(full > limit ? limit : null);
+
+      if (full > 400) {
+        setCollapsedHeight(250); // collapse to 250px
+      } else {
+        setCollapsedHeight(null);
+      }
+
       setInitialized(true);
     };
 

@@ -543,6 +543,190 @@ function setupTags(el: HTMLElement) {
 }
 
 /* ----------------------------------------------------------
+ *  EMBED RENDERING (POST DISPLAY)
+ * ---------------------------------------------------------- */
+
+function renderEmbeds(el: HTMLElement) {
+  const embeds = Array.from(
+    el.querySelectorAll("div[data-embed='true']")
+  ) as HTMLElement[];
+
+  embeds.forEach((embedEl) => {
+    if (embedEl.dataset.rendered === "true") return;
+
+    const urlRaw =
+      embedEl.getAttribute("data-url") || embedEl.getAttribute("url");
+    if (!urlRaw) return;
+
+    // decode &amp; etc so URL() works and youtube params parse correctly
+    const decoded = (() => {
+      const t = document.createElement("textarea");
+      t.innerHTML = urlRaw;
+      return t.value;
+    })();
+
+    const normalized = decoded.startsWith("http")
+      ? decoded
+      : "https://" + decoded;
+
+    /* ---------------- YOUTUBE ---------------- */
+    if (normalized.includes("youtube.com") || normalized.includes("youtu.be")) {
+      let embedUrl = "";
+
+      try {
+        const parsed = new URL(normalized);
+
+        if (parsed.hostname.includes("youtu.be")) {
+          const id = parsed.pathname.replace("/", "");
+          if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+        } else {
+          const id = parsed.searchParams.get("v");
+          if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+        }
+      } catch {}
+
+      if (!embedUrl) return;
+
+      embedEl.dataset.rendered = "true";
+
+      // 🔥 FIXED RATIO BOX
+      const wrapper = document.createElement("div");
+      wrapper.style.margin = "16px auto";
+      wrapper.style.maxWidth = "560px";
+      wrapper.style.width = "100%";
+      wrapper.style.height = "315px"; // ✅ FIXED HEIGHT
+      wrapper.style.position = "relative";
+      wrapper.style.borderRadius = "12px";
+      wrapper.style.overflow = "hidden";
+      wrapper.style.border = "1px solid rgba(120,120,120,0.2)";
+      wrapper.style.background = "#000";
+
+      const iframe = document.createElement("iframe");
+      iframe.src = embedUrl;
+      iframe.style.position = "absolute";
+      iframe.style.top = "0";
+      iframe.style.left = "0";
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.allowFullscreen = true;
+
+      wrapper.appendChild(iframe);
+
+      embedEl.replaceWith(wrapper);
+      return;
+    }
+
+    /* ---------------- SPOTIFY ---------------- */
+    if (normalized.includes("spotify.com")) {
+      let embedUrl = "";
+
+      try {
+        const parsed = new URL(normalized);
+
+        // 🔥 remove intl-xx segment if exists
+        const cleanedPath = parsed.pathname.replace(/^\/intl-[^/]+\//, "/");
+
+        embedUrl = `https://open.spotify.com/embed${cleanedPath}`;
+      } catch {
+        return;
+      }
+
+      embedEl.dataset.rendered = "true";
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "560px";
+      wrapper.style.margin = "16px auto";
+      wrapper.style.borderRadius = "15px";
+      wrapper.style.overflow = "hidden";
+      wrapper.style.border = "1px solid rgba(120,120,120,0.2)";
+      wrapper.style.background = "#111";
+
+      // ✅ Determine height by content type (Spotify 2024 spec)
+      if (embedUrl.includes("/track/")) {
+        wrapper.style.height = "82px";
+      } else if (embedUrl.includes("/episode/")) {
+        wrapper.style.height = "152px";
+      } else if (
+        embedUrl.includes("/album/") ||
+        embedUrl.includes("/playlist/")
+      ) {
+        wrapper.style.height = "380px";
+      } else {
+        wrapper.style.height = "380px";
+      }
+
+      const iframe = document.createElement("iframe");
+      iframe.src = embedUrl;
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.style.border = "0";
+      iframe.allow =
+        "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture";
+      iframe.loading = "lazy";
+
+      wrapper.appendChild(iframe);
+      embedEl.replaceWith(wrapper);
+      return;
+    }
+
+    /* ---------------- TWITTER / X  ---------------- */
+    if (normalized.includes("x.com") || normalized.includes("twitter.com")) {
+      const match = normalized.match(/x\.com\/([^/]+)\/status\/(\d+)/);
+      if (!match) return;
+
+      const username = match[1];
+      const tweetId = match[2];
+
+      embedEl.dataset.rendered = "true";
+
+      const card = document.createElement("div");
+
+      card.style.margin = "16px auto";
+      card.style.maxWidth = "560px";
+      card.style.width = "100%";
+      card.style.borderRadius = "12px";
+      card.style.border = "1px solid rgba(120,120,120,0.3)";
+      card.style.background = "#111";
+      card.style.padding = "16px";
+      card.style.display = "flex";
+      card.style.flexDirection = "column";
+      card.style.gap = "8px";
+      card.style.minHeight = "120px"; // 🔥 important
+
+      const header = document.createElement("div");
+      header.textContent = `@${username}`;
+      header.style.fontWeight = "600";
+      header.style.fontSize = "14px";
+      header.style.color = "#fff";
+
+      const idText = document.createElement("div");
+      idText.textContent = `Tweet ID: ${tweetId}`;
+      idText.style.fontSize = "12px";
+      idText.style.opacity = "0.6";
+      idText.style.color = "#ccc";
+
+      const link = document.createElement("a");
+      link.href = normalized;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = "View on X →";
+      link.style.fontSize = "14px";
+      link.style.color = "#1d9bf0";
+      link.style.textDecoration = "none";
+
+      card.appendChild(header);
+      card.appendChild(idText);
+      card.appendChild(link);
+
+      embedEl.replaceWith(card);
+
+      return;
+    }
+  });
+}
+
+/* ----------------------------------------------------------
  *  Prism code highlighting
  * ---------------------------------------------------------- */
 function renderPrism(el: HTMLElement) {
@@ -627,7 +811,13 @@ function addCopyButtons(el: HTMLElement) {
 /* ----------------------------------------------------------
  *  MAIN RENDERER
  * ---------------------------------------------------------- */
-function MathRendererBase({ html }: { html: string }) {
+function MathRendererBase({
+  html,
+  measureOnly,
+}: {
+  html: string;
+  measureOnly?: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -636,6 +826,8 @@ function MathRendererBase({ html }: { html: string }) {
 
     stripEditorUI(el);
 
+    renderEmbeds(el);
+
     renderMath(el);
     styleMentions(el);
     setupMentions(el);
@@ -643,10 +835,23 @@ function MathRendererBase({ html }: { html: string }) {
     setupLegacyImages(el);
     renderPrism(el);
     addCopyButtons(el);
+    // 🔥 NEW: Handle existing twitter blockquotes
+    const hasTwitter = el.querySelector(".twitter-tweet");
+    if (hasTwitter) {
+      function loadTwitter() {
+        (window as any).twttr?.widgets?.load(el);
+      }
 
-    return () => {
-      document.querySelectorAll(".mention-popup").forEach((p) => p.remove());
-    };
+      if (!(window as any).twttr) {
+        const script = document.createElement("script");
+        script.src = "https://platform.twitter.com/widgets.js";
+        script.async = true;
+        script.onload = loadTwitter;
+        document.body.appendChild(script);
+      } else {
+        loadTwitter();
+      }
+    }
   }, [html]);
 
   return (

@@ -59,8 +59,11 @@ export function hasMeaningfulContent(html: string): boolean {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
 
+  // 🔥 embeds are meaningful
+  if (tmp.querySelector("[data-embed='true']")) return true;
+
   // media is meaningful
-  if (tmp.querySelector("img, video")) return true;
+  if (tmp.querySelector("img, video, iframe")) return true;
 
   // 🔑 math is meaningful
   if (tmp.querySelector("span[data-type='math']")) return true;

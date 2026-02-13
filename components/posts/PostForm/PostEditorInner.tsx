@@ -9,7 +9,7 @@ import { Extension, ChainedCommands } from "@tiptap/core";
 import tippy, { type Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import "@/lib/prism";
-import { Plugin, PluginKey, TextSelection } from "prosemirror-state";
+import { Plugin, PluginKey } from "prosemirror-state";
 import type { Node as ProseMirrorNode } from "prosemirror-model";
 
 import Underline from "@tiptap/extension-underline";
@@ -40,6 +40,7 @@ import { ImagePlaceholder } from "@/features/ImagePlaceholder";
 import { CursorExitFix } from "@/features/CursorExitFix";
 import { InlineBackspaceFix } from "@/features/InlineBackspaceFix";
 import { FixHeadingEnter } from "@/features/ExitHeadingOnEnter";
+import { LinkCardExtension } from "@/features/linkcard";
 
 import { useTranslation } from "react-i18next";
 import type { Level } from "@tiptap/extension-heading";
@@ -126,9 +127,15 @@ export default function PostEditorInner({
 }: PostEditorInnerProps) {
   const { t } = useTranslation();
 
-  const finalPlaceholder =
-    placeholder ??
-    t("placeholder");
+  const finalPlaceholder = placeholder ?? t("placeholder");
+  const [linkPopup, setLinkPopup] = useState<{
+    url: string;
+    from: number;
+    to: number;
+  } | null>(null);
+
+  const [linkMode, setLinkMode] = useState<"card" | "link">("card");
+  const [linkText, setLinkText] = useState("");
 
   const menuRef = useRef<HTMLDivElement>(null);
   const tippyRef = useRef<Instance | null>(null);
@@ -170,10 +177,14 @@ export default function PostEditorInner({
       InlineBackspaceFix,
       AtomBoundaryFix,
       MathExtension,
-      Link,
+      Link.configure({
+        autolink: false,
+      }),
+
       BulletList,
       ListItem,
       Blockquote,
+      LinkCardExtension,
 
       // behavior overrides
       FixHeadingEnter,
@@ -277,6 +288,76 @@ export default function PostEditorInner({
       editor.off("transaction", update);
     };
   }, [editor]);
+  function confirmInsert() {
+    if (!editor || !linkPopup) return;
+
+    const { url, from, to } = linkPopup;
+
+    editor.chain().focus().setTextSelection({ from, to });
+
+    if (linkMode === "card") {
+      editor
+        .chain()
+        .deleteRange({ from, to })
+        .insertContent({
+          type: "linkCard",
+          attrs: { url },
+        })
+        .run();
+    } else {
+      if (!linkText.trim()) return;
+
+      // 🔥 convert spaces to underscores
+      const normalizedText = linkText.trim().replace(/\s+/g, "_");
+
+      editor
+        .chain()
+        .deleteRange({ from, to })
+        .insertContent({
+          type: "inlineLink",
+          attrs: {
+            href: url,
+            text: normalizedText,
+          },
+        })
+        .run();
+    }
+
+    setLinkPopup(null);
+  }
+
+  /* JEARN link paste */
+  useEffect(() => {
+    function handler(e: any) {
+      if (!editor) return;
+
+      setLinkPopup({
+        url: e.detail.url,
+        from: e.detail.from,
+        to: e.detail.to,
+      });
+
+      setLinkMode("card");
+      setLinkText("");
+    }
+
+    window.addEventListener("jearn-link-detected", handler);
+    return () => window.removeEventListener("jearn-link-detected", handler);
+  }, [editor]);
+
+  useEffect(() => {
+    if (!linkPopup) return;
+
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        confirmInsert();
+      }
+    }
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [linkPopup, confirmInsert]);
 
   /* Floating menu (tippy) */
   useEffect(() => {
@@ -649,6 +730,64 @@ export default function PostEditorInner({
           {charCount} / {MAX_CHARS}
         </div>
       </div>
+      {linkPopup && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40">
+          <div className="bg-white dark:bg-neutral-900 p-5 rounded-xl w-[400px] space-y-4 shadow-xl">
+            <div className="text-sm font-medium">Insert JEARN link</div>
+
+            <div className="text-xs text-gray-500 break-all">
+              {linkPopup.url}
+            </div>
+
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={linkMode === "card"}
+                  onChange={() => setLinkMode("card")}
+                />
+                Preview Card
+              </label>
+
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={linkMode === "link"}
+                  onChange={() => setLinkMode("link")}
+                />
+                Hyperlink
+              </label>
+            </div>
+
+            {linkMode === "link" && (
+              <input
+                type="text"
+                placeholder="Enter display text"
+                value={linkText}
+                onChange={(e) => setLinkText(e.target.value)}
+                className="w-full border px-3 py-2 rounded-md text-sm"
+              />
+            )}
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setLinkPopup(null)}
+                className="px-3 py-1 text-sm rounded-md bg-gray-200 dark:bg-gray-700"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmInsert}
+                disabled={linkMode === "link" && !linkText.trim()}
+                className="px-3 py-1 text-sm rounded-md bg-black text-white dark:bg-white dark:text-black"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
