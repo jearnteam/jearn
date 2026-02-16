@@ -75,7 +75,7 @@ export default function ThreeBall() {
 
     const sensitivity = 0.0002;
     const friction = 0.925;
-    const minVelocity = 0.0001;
+    const minVelocity = 0.001;
 
     const updateColor = (amount: number) => {
       hue = (hue + amount) % 360;
