@@ -92,6 +92,7 @@ const ja: TranslationSchema = {
       settings: "設定",
       notification: "通知",
       reports: "通報",
+      categoryRequest: "カテゴリー申請",
       loadingDashboard: "ダッシュボードを読み込み中",
     },
   };

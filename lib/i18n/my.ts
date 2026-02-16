@@ -91,6 +91,7 @@ const my: TranslationSchema = {
       settings: "ပြုပြင်ခြင်း",
       notification: "အသိပေးချက်",
       reports: "တိုင်ကြားစာ",
+      categoryRequest: "အမျိုးအစားတောင်းဆိုမှု",
       loadingDashboard: "Loading dashboard",
     },
   };

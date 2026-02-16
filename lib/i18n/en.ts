@@ -59,6 +59,7 @@ const en = {
       answer_noti: "answered your question.",
       follow_noti: "followed you.",
       system_noti: "System notification",
+      loading: "Loading",
     },
     
     // comment

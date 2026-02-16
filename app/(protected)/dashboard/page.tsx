@@ -42,6 +42,38 @@ export default function Dashboard() {
 
   const [hydrated, setHydrated] = useState(false);
 
+  const [notificationCounts, setNotificationCounts] = useState({
+    reports: 0,
+    category: 0,
+  });
+
+  function StatCard({ label, count }: { label: string; count: number }) {
+    return (
+      <div className="p-4 bg-white dark:bg-neutral-900 rounded shadow flex flex-col items-center justify-center">
+        <span className="text-lg font-bold">{count}</span>
+        <span className="text-gray-500 dark:text-gray-400">{label}</span>
+      </div>
+    );
+  }
+
+  async function loadNotifications() {
+    try {
+      const res = await fetch("/api/admin/notifications");
+      if (!res.ok) return;
+
+      const data = await res.json();
+      setNotificationCounts(data);
+    } catch (err) {
+      console.error("Failed to load notifications", err);
+    }
+  }
+
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000); // 30秒ごと
+    return () => clearInterval(interval);
+  }, []);
+
   // Restore last selected tab
   useEffect(() => {
     const savedTab = localStorage.getItem("dashboard-active-tab");
@@ -140,6 +172,11 @@ export default function Dashboard() {
             label={t("reports")}
             active={activeTab === "reports"}
             sidebarFullyOpen={sidebarFullyOpen}
+            badge={
+              notificationCounts.reports > 0
+                ? notificationCounts.reports
+                : undefined
+            }
             onClick={() => setActiveTab("reports")}
           />
 
@@ -148,6 +185,11 @@ export default function Dashboard() {
             label={t("categoryRequest")}
             active={activeTab === "categoryRequest"}
             sidebarFullyOpen={sidebarFullyOpen}
+            badge={
+              notificationCounts.category > 0
+                ? notificationCounts.category
+                : undefined
+            }
             onClick={() => setActiveTab("categoryRequest")}
           />
 
@@ -168,9 +210,33 @@ export default function Dashboard() {
             <h1 className="text-2xl font-bold mb-4">
               Welcome {session?.user?.name ?? "User"}
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              This is your overview dashboard.
-            </p>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <StatCard
+                label="Pending Reports"
+                count={notificationCounts.reports}
+              />
+              <StatCard
+                label="Pending Categories"
+                count={notificationCounts.category}
+              />
+              <StatCard label="Active Users" count={123} />
+              <StatCard label="Posts Today" count={45} />
+            </div>
+
+            {/* Recent Activity */}
+            <div>
+              <h2 className="text-xl font-semibold mb-2">Recent Activity</h2>
+              <ul className="space-y-1">
+                <li className="p-2 border rounded bg-gray-50 dark:bg-neutral-800">
+                  Report #123 submitted by user A
+                </li>
+                <li className="p-2 border rounded bg-gray-50 dark:bg-neutral-800">
+                  Category request "Test" approved
+                </li>
+              </ul>
+            </div>
           </div>
         )}
 
@@ -191,26 +257,34 @@ function SidebarItem({
   active,
   sidebarFullyOpen,
   onClick,
+  badge,
 }: {
   icon: React.ReactNode;
   label: string;
   active: boolean;
   sidebarFullyOpen: boolean;
   onClick: () => void;
+  badge?: number;
 }) {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-200 h-10
+      className={`relative flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-200 h-10
         ${
           active
             ? "bg-yellow-400 dark:bg-yellow-500 text-black"
             : "hover:bg-gray-200 dark:hover:bg-neutral-800"
         }`}
     >
-      {icon}
+      <div className="relative">
+        {icon}
+        {badge && badge > 0 && (
+          <span className="absolute -top-2 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </div>
 
-      {/* Show label *only after* sidebar animations finish */}
       {sidebarFullyOpen && (
         <span className="text-sm opacity-100 transition-opacity duration-150">
           {label}

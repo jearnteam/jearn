@@ -4,14 +4,13 @@ import { useEffect, useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
   Cell,
-  Legend,
 } from "recharts";
 
 /* ---------- Types ---------- */
@@ -21,23 +20,12 @@ interface PostDoc {
   replyTo?: string | null;
   upvoteCount?: number;
   categories?: string[];
+  createdAt?: string;
 }
 
 interface CategoryDoc {
   _id: string;
   label: string;
-}
-
-/* 🎨 Utility: evenly spaced dynamic colors */
-function generateColors(count: number): string[] {
-  const colors: string[] = [];
-  const saturation = 70;
-  const lightness = 55;
-  for (let i = 0; i < count; i++) {
-    const hue = Math.round((360 / count) * i);
-    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
-  }
-  return colors;
 }
 
 export default function AnalyticsPanel() {
@@ -47,8 +35,20 @@ export default function AnalyticsPanel() {
     totalReplies: 0,
     totalUpvotes: 0,
     categories: [] as { name: string; count: number }[],
+    dailyPosts: [] as {
+      date: string;
+      daily: number;
+      cumulative: number;
+      movingAvg: number;
+    }[],
   });
+
+  const [viewMode, setViewMode] = useState<"daily" | "cumulative">("daily");
   const [loading, setLoading] = useState(true);
+
+  const isDark =
+    typeof window !== "undefined" &&
+    document.documentElement.classList.contains("dark");
 
   useEffect(() => {
     async function fetchData() {
@@ -64,21 +64,58 @@ export default function AnalyticsPanel() {
         const postsOnly = posts.filter((p) => !p.parentId && !p.replyTo);
         const commentsOnly = posts.filter((p) => p.parentId && !p.replyTo);
         const repliesOnly = posts.filter((p) => !!p.replyTo);
+
         const totalUpvotes = posts.reduce(
           (sum, p) => sum + (p.upvoteCount || 0),
           0
         );
 
-        const categoryCounts: Record<string, number> = {};
+        const dailyMap: Record<string, number> = {};
+
         postsOnly.forEach((p) => {
-          p.categories?.forEach?.((c) => {
-            categoryCounts[c] = (categoryCounts[c] || 0) + 1;
+          if (!p.createdAt) return;
+          const date = new Date(p.createdAt).toISOString().slice(0, 10);
+          dailyMap[date] = (dailyMap[date] || 0) + 1;
+        });
+
+        const sortedDaily = Object.entries(dailyMap)
+          .map(([date, count]) => ({ date, count }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+
+        let runningTotal = 0;
+
+        const cumulativeData = sortedDaily.map((item) => {
+          runningTotal += item.count;
+          return {
+            date: item.date,
+            daily: item.count,
+            cumulative: runningTotal,
+          };
+        });
+
+        const withMovingAverage = cumulativeData.map((item, index, arr) => {
+          const start = Math.max(0, index - 6);
+          const slice = arr.slice(start, index + 1);
+          const avg = slice.reduce((sum, d) => sum + d.daily, 0) / slice.length;
+
+          return {
+            ...item,
+            movingAvg: Number(avg.toFixed(2)),
+          };
+        });
+
+        const categoryCounts: Record<string, number> = {};
+
+        postsOnly.forEach((p) => {
+          p.categories?.forEach((c) => {
+            const key = String(c);
+            categoryCounts[key] = (categoryCounts[key] || 0) + 1;
           });
         });
 
         const allCatsMerged = cats.map((cat) => ({
           name: cat.label,
-          count: categoryCounts[cat.label] || 0,
+          count: categoryCounts[String(cat._id)] || 0,
         }));
 
         setStats({
@@ -86,10 +123,11 @@ export default function AnalyticsPanel() {
           totalComments: commentsOnly.length,
           totalReplies: repliesOnly.length,
           totalUpvotes,
-          categories: allCatsMerged,
+          categories: allCatsMerged.sort((a, b) => b.count - a.count),
+          dailyPosts: withMovingAverage,
         });
       } catch (err) {
-        console.error("⚠️ Analytics fetch failed:", err);
+        console.error("Analytics fetch failed:", err);
       } finally {
         setLoading(false);
       }
@@ -98,30 +136,37 @@ export default function AnalyticsPanel() {
     fetchData();
   }, []);
 
-  // 🎨 Assign fixed color per category (stable index)
   const colorMap = useMemo(() => {
-    const colors = generateColors(stats.categories.length || 6);
     const map: Record<string, string> = {};
-    stats.categories.forEach((c, i) => {
-      map[c.name] = colors[i % colors.length];
-    });
-    return map;
-  }, [stats.categories]);
+    const total = stats.categories.length;
 
-  if (loading)
+    stats.categories.forEach((c, i) => {
+      const ratio = total > 1 ? i / (total - 1) : 0;
+
+      if (isDark) {
+        const lightness = 75 - ratio * 40;
+        map[c.name] = `hsl(0, 0%, ${lightness}%)`;
+      } else {
+        const lightness = 25 + ratio * 45;
+        map[c.name] = `hsl(0, 0%, ${lightness}%)`;
+      }
+    });
+
+    return map;
+  }, [stats.categories, isDark]);
+
+  if (loading) {
     return (
       <div className="text-center py-10 text-gray-500 dark:text-gray-400">
         Loading analytics...
       </div>
     );
-
-  const nonEmptyCategories = stats.categories.filter((c) => c.count > 0);
+  }
 
   return (
-    <div className="space-y-10">
-      <h1 className="text-2xl font-bold mb-2">Site Analytics</h1>
+    <div className="space-y-12 px-8 py-10 bg-gray-50 dark:bg-neutral-950 min-h-screen text-gray-900 dark:text-gray-100">
+      <h1 className="text-3xl font-semibold tracking-tight">Site Analytics</h1>
 
-      {/* Summary metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <MetricCard label="Posts" value={stats.totalPosts} />
         <MetricCard label="Comments" value={stats.totalComments} />
@@ -133,24 +178,57 @@ export default function AnalyticsPanel() {
         <MetricCard label="Upvotes" value={stats.totalUpvotes} />
       </div>
 
-      {/* 🟨 Bar Chart: All categories (including 0) */}
+      {stats.dailyPosts.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Post Growth</h2>
+
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={stats.dailyPosts}>
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+
+              {viewMode === "daily" ? (
+                <>
+                  <Line
+                    type="monotone"
+                    dataKey="daily"
+                    stroke="#6b7280"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="movingAvg"
+                    stroke="#9ca3af"
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </>
+              ) : (
+                <Line
+                  type="monotone"
+                  dataKey="cumulative"
+                  stroke="#374151"
+                  strokeWidth={3}
+                  dot={false}
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {stats.categories.length > 0 && (
         <div>
-          <h2 className="text-xl font-semibold mb-2">Categories</h2>
+          <h2 className="text-xl font-semibold mb-4">Categories</h2>
+
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats.categories}>
-              <XAxis dataKey="name" stroke="currentColor" />
-              <YAxis stroke="currentColor" />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(0,0,0,0.75)",
-                  border: "none",
-                }}
-                labelStyle={{ color: "#fff" }}
-                itemStyle={{ color: "#fff" }}
-              />
-
-              <Bar dataKey="count" radius={8}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {stats.categories.map((c) => (
                   <Cell key={c.name} fill={colorMap[c.name]} />
                 ))}
@@ -159,41 +237,17 @@ export default function AnalyticsPanel() {
           </ResponsiveContainer>
         </div>
       )}
-
-      {/* 🟢 Pie Chart: Only non-empty categories (same color as bar) */}
-      {nonEmptyCategories.length > 0 && (
-        <div>
-          <h2 className="text-xl font-semibold mb-2">
-            Category Distribution (Non-Empty)
-          </h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={nonEmptyCategories}
-                dataKey="count"
-                nameKey="name"
-                outerRadius={110}
-                label
-              >
-                {nonEmptyCategories.map((c) => (
-                  <Cell key={c.name} fill={colorMap[c.name]} />
-                ))}
-              </Pie>
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      )}
     </div>
   );
 }
 
-/* ---------- Reusable Metric Card ---------- */
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="p-4 rounded-xl bg-gray-100 dark:bg-neutral-800 text-center shadow">
-      <div className="text-2xl font-bold text-yellow-500">{value}</div>
-      <div className="text-sm text-gray-500 dark:text-gray-100">{label}</div>
+    <div className="p-6 rounded-xl bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 text-center">
+      <div className="text-2xl font-semibold">{value}</div>
+      <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        {label}
+      </div>
     </div>
   );
 }
