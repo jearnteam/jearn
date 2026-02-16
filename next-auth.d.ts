@@ -2,12 +2,14 @@ import NextAuth, { DefaultSession } from "next-auth";
 
 declare module "next-auth" {
   interface Session {
+    /**
+     * imageは使用せずにpictureを使うこと！！！
+     */
     user: {
       uid: string;
       provider?: string | null;
       provider_id?: string | null;
       picture?: string | null;
-      bio?: string;
       role?: "user" | "admin";
     } & DefaultSession["user"];
   }

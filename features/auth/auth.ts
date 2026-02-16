@@ -80,6 +80,7 @@ export const authConfig: AuthOptions = {
       // Userが見つかった場合に情報を付与
       if (user) {
         token.uid = user._id.toString();
+        token.name = user.name;
         token.provider = user.provider ?? null;
         token.provider_id = user.provider_id ?? null;
       }
@@ -98,6 +99,7 @@ export const authConfig: AuthOptions = {
       // next-auth.d.ts で型拡張しているので、プロパティが存在することが保証される
       if (session.user) {
         session.user.uid = token.uid;
+        session.user.name = token.name;
         session.user.provider = token.provider ?? null;
         session.user.provider_id = token.provider_id ?? null;
 
