@@ -20,6 +20,7 @@
 
 # production
 /build
+/ai-service/*
 
 # misc
 .DS_Store
