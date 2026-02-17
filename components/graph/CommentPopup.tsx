@@ -52,10 +52,19 @@ export default function CommentPopup({
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
       <div
         ref={ref}
-        className="bg-white dark:bg-neutral-900 w-[480px] max-h-[70vh] rounded-lg shadow-xl flex flex-col"
+        className="
+            bg-white dark:bg-neutral-900
+            w-full
+            max-h-[85vh]
+            sm:max-h-[70vh]]
+            sm:w-[480px]
+            rounded-lg
+            shadow-xl
+            flex flex-col
+          "
       >
         {/* ================= HEADER ================= */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-neutral-800">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-neutral-800 flex-shrink-0">
           <div className="flex items-center gap-3">
             <img
               src={comment.authorAvatar ?? "/default-avatar.png"}
@@ -71,7 +80,6 @@ export default function CommentPopup({
             </div>
           </div>
 
-          {/* Close Button */}
           <button
             onClick={onClose}
             className="p-1 rounded hover:bg-gray-100 dark:hover:bg-neutral-800 transition"
@@ -91,7 +99,7 @@ export default function CommentPopup({
         </div>
 
         {/* ================= FOOTER ================= */}
-        <div className="px-5 py-3 border-t border-gray-200 dark:border-neutral-800">
+        <div className="px-5 py-3 border-t border-gray-200 dark:border-neutral-800 flex-shrink-0">
           <button
             onClick={() => onUpvote(comment._id)}
             className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"

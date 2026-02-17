@@ -12,6 +12,7 @@ import {
   createAuthorNode,
   createHubNode,
   createBoxNode,
+  createReferencePostNode,
 } from "./graphNodeFactory";
 import CommentPopup from "./CommentPopup";
 
@@ -41,6 +42,10 @@ type GraphPost = {
   authorName: string;
   tags: string[];
   categories: { name: string }[];
+  references?: {
+    _id: string;
+    title: string;
+  }[];
 };
 
 type UsageMap = {
@@ -49,12 +54,20 @@ type UsageMap = {
 };
 
 export default function GraphView({ post }: { post: GraphPost }) {
+  const [currentPost, setCurrentPost] = useState<GraphPost>(post);
+  const [history, setHistory] = useState<GraphPost[]>([post]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [graphError, setGraphError] = useState<string | null>(null);
   const graphRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<any>(null);
   const popupRef = useRef<HTMLDivElement>(null);
 
   const [scriptReady, setScriptReady] = useState(false);
   const [comments, setComments] = useState<CommentType[] | null>(null);
+  const [commentCount, setCommentCount] = useState<number | null>(null);
+  const [references, setReferences] = useState<
+    { _id: string; title: string }[] | null
+  >(null);
   const [usage, setUsage] = useState<UsageMap | null>(null);
   const [graphReady, setGraphReady] = useState(false);
 
@@ -66,11 +79,45 @@ export default function GraphView({ post }: { post: GraphPost }) {
   }>({ x: 0, y: 0, comment: null, visible: false });
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
-  const isDark =
-    typeof window !== "undefined" &&
-    document.documentElement.classList.contains("dark");
+  const [isDark, setIsDark] = useState(false);
+  useEffect(() => {
+    const updateTheme = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
 
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
   const palette = getGraphPalette(isDark);
+
+  function switchToPost(newPost: GraphPost) {
+    setGraphReady(false);
+    setComments(null);
+    setReferences(null);
+    setUsage(null);
+
+    setHistory((prev) => {
+      const trimmed = prev.slice(0, historyIndex + 1);
+      return [...trimmed, newPost];
+    });
+
+    setHistoryIndex((prev) => prev + 1);
+    setCurrentPost(newPost);
+  }
+
+  async function safeFetch(url: string) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed: ${url}`);
+    return res.json();
+  }
 
   function closePopup() {
     setPopup({ x: 0, y: 0, comment: null, visible: false });
@@ -145,61 +192,39 @@ export default function GraphView({ post }: { post: GraphPost }) {
     script.onload = () => setScriptReady(true);
     document.body.appendChild(script);
   }, []);
-
-  /* ---------------- Fetch comments ---------------- */
-
   useEffect(() => {
-    fetch(`/api/posts/${post._id}/comments`)
+    setGraphError(null);
+
+    fetch(`/api/posts/${currentPost._id}/graph`)
       .then((r) => r.json())
-      .then((data) => setComments(Array.isArray(data) ? data : []))
-      .catch(() => setComments([]));
-  }, [post._id]);
-
-  /* ---------------- Fetch usage ---------------- */
-
-  useEffect(() => {
-    if (!scriptReady) return;
-
-    async function load() {
-      const tagList = post.tags ?? [];
-      const catList = post.categories.map((c) => c.name);
-
-      const [tagsRes, catsRes] = await Promise.all([
-        fetch("/api/tags/usage/bulk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tags: tagList }),
-        }),
-        fetch("/api/category/usage/bulk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ categories: catList }),
-        }),
-      ]);
-
-      const tags = await tagsRes.json();
-      const cats = await catsRes.json();
-
-      setUsage({
-        tags: tags.usage ?? {},
-        categories: cats.usage ?? {},
+      .then((data) => {
+        setComments(data.comments ?? []);
+        setCommentCount(data.commentCount ?? 0);
+        setReferences(data.references ?? []);
+        setUsage(data.usage ?? { tags: {}, categories: {} });
+      })
+      .catch(() => {
+        setGraphError("Failed to load graph data");
+        setComments([]);
+        setReferences([]);
+        setUsage({ tags: {}, categories: {} });
+        setCommentCount(0);
       });
-    }
-
-    load();
-  }, [scriptReady, post.tags, post.categories]);
+  }, [currentPost._id]);
 
   /* ---------------- Build Graph ---------------- */
-
+  const dataReady =
+    scriptReady && comments !== null && references !== null && usage !== null;
   useEffect(() => {
-    if (
-      !scriptReady ||
-      !graphRef.current ||
-      comments === null ||
-      usage === null ||
-      networkRef.current
-    )
-      return;
+    if (!dataReady || !graphRef.current) return;
+
+    setGraphError(null); // clear old errors
+
+    // 🔥 Destroy old network
+    if (networkRef.current) {
+      networkRef.current.destroy();
+      networkRef.current = null;
+    }
 
     const vis = window.vis;
     const nodes = new vis.DataSet();
@@ -209,8 +234,8 @@ export default function GraphView({ post }: { post: GraphPost }) {
     nodes.add(
       createPostNode(
         {
-          _id: post._id,
-          label: safeTextPreview(post.title, 28),
+          _id: currentPost._id,
+          label: safeTextPreview(currentPost.title, 28),
         },
         palette,
         isDark
@@ -219,12 +244,17 @@ export default function GraphView({ post }: { post: GraphPost }) {
 
     /* ---------- AUTHOR ---------- */
 
-    const authorNodeId = `author-${post.authorId}`;
+    const authorNodeId = `author-${currentPost.authorId}`;
     nodes.add(
-      createAuthorNode(post.authorId, post.authorName, palette, isDark)
+      createAuthorNode(
+        currentPost.authorId,
+        currentPost.authorName,
+        palette,
+        isDark
+      )
     );
 
-    edges.add({ from: post._id, to: `author-${post.authorId}` });
+    edges.add({ from: currentPost._id, to: `author-${currentPost.authorId}` });
 
     /* ---------- CATEGORY HUB ---------- */
 
@@ -240,16 +270,16 @@ export default function GraphView({ post }: { post: GraphPost }) {
       )
     );
 
-    edges.add({ from: post._id, to: "hub-categories" });
+    edges.add({ from: currentPost._id, to: "hub-categories" });
 
-    post.categories.forEach((c) => {
+    currentPost.categories.forEach((c) => {
       const count = usage.categories[c.name] ?? 0;
       const id = `cat-${c.name}`;
 
       nodes.add(
         createBoxNode(
           id,
-          `#${c.name}\n(${count})`,
+          `${c.name}\n(${count})`,
           palette.category,
           isDark ? "#1e293b" : "#ffffff",
           palette,
@@ -275,16 +305,16 @@ export default function GraphView({ post }: { post: GraphPost }) {
       )
     );
 
-    edges.add({ from: post._id, to: "hub-tags" });
+    edges.add({ from: currentPost._id, to: "hub-tags" });
 
-    post.tags.forEach((tag) => {
+    currentPost.tags.forEach((tag) => {
       const count = usage.tags[tag] ?? 0;
       const id = `tag-${tag}`;
 
       nodes.add(
         createBoxNode(
           id,
-          `@${tag}\n(${count})`,
+          `#${tag}\n(${count})`,
           palette.tag,
           isDark ? "#1e293b" : "#ffffff",
           palette,
@@ -294,6 +324,47 @@ export default function GraphView({ post }: { post: GraphPost }) {
       );
 
       edges.add({ from: "hub-tags", to: id, dashes: true });
+    });
+
+    /* ---------- REFERENCE HUB ---------- */
+
+    const referenceHub = "hub-references";
+
+    nodes.add(
+      createHubNode(
+        referenceHub,
+        "/icons/graph/link.svg", // light icon
+        "/icons/graph/link-dark.svg", // dark icon
+        palette.post, // or custom blue
+        palette,
+        isDark
+      )
+    );
+
+    // main post → reference hub
+    edges.add({ from: currentPost._id, to: referenceHub });
+
+    // reference hub → referenced posts
+    references.forEach((ref) => {
+      const refNodeId = `ref-${ref._id}`;
+
+      nodes.add(
+        createReferencePostNode(
+          {
+            _id: ref._id,
+            label: safeTextPreview(ref.title, 24),
+          },
+          palette,
+          isDark
+        )
+      );
+
+      edges.add({
+        from: referenceHub,
+        to: refNodeId,
+        dashes: true,
+        length: 120,
+      });
     });
 
     /* ---------- COMMENT HUB ---------- */
@@ -306,11 +377,12 @@ export default function GraphView({ post }: { post: GraphPost }) {
         "/icons/graph/message-circle-dark.svg",
         palette.comment,
         palette,
-        isDark
+        isDark,
+        commentCount !== null ? `${commentCount}` : ""
       )
     );
 
-    edges.add({ from: post._id, to: "hub-comments" });
+    edges.add({ from: currentPost._id, to: "hub-comments" });
     const commentTree = buildCommentTree(comments as any);
     function addCommentNode(node: any, parentId: string) {
       const id = `comment-${node._id}`;
@@ -357,9 +429,32 @@ export default function GraphView({ post }: { post: GraphPost }) {
 
     networkRef.current = net;
 
+    let didStabilize = false;
+
+    const timeout = setTimeout(() => {
+      if (!didStabilize) {
+        setGraphError("Graph stabilization timeout");
+      }
+    }, 5000);
+
     net.once("stabilizationIterationsDone", () => {
-      net.focus(post._id, { scale: 1.2, animation: true });
+      didStabilize = true;
+      clearTimeout(timeout);
+
+      net.focus(currentPost._id, {
+        scale: 1.2,
+        animation: true,
+      });
+
       setGraphReady(true);
+    });
+
+    // 🧠 Fallback if vis skips stabilization
+    net.once("afterDrawing", () => {
+      if (!didStabilize) {
+        clearTimeout(timeout);
+        setGraphReady(true);
+      }
     });
 
     net.on("click", (params: any) => {
@@ -371,19 +466,34 @@ export default function GraphView({ post }: { post: GraphPost }) {
 
       const nodeId = params.nodes[0];
 
-      if (nodeId === post._id) {
-        closePopup();
+      /* ---------- Reference post ---------- */
+      if (nodeId.startsWith("ref-")) {
+        const postId = nodeId.replace("ref-", "");
 
-        fetch(`/api/posts/${post._id}`)
+        fetch(`/api/posts/${postId}`)
           .then((r) => r.json())
           .then((fullPost) => {
-            setSelectedPost(fullPost);
+            switchToPost(fullPost);
           })
           .catch(() => {});
 
         return;
       }
 
+      /* ---------- Main post ---------- */
+      if (nodeId === currentPost._id) {
+        fetch(`/api/posts/${currentPost._id}`)
+          .then((r) => r.json())
+          .then((fullPost) => {
+            setSelectedPost(fullPost);
+          })
+          .catch(() => {});
+
+        closePopup();
+        return;
+      }
+
+      /* ---------- Comment ---------- */
       if (nodeId.startsWith("comment-")) {
         showCommentPopup(nodeId);
         setSelectedPost(null);
@@ -393,23 +503,112 @@ export default function GraphView({ post }: { post: GraphPost }) {
       closePopup();
       setSelectedPost(null);
     });
-  }, [scriptReady, comments, usage]);
+
+    return () => {
+      clearTimeout(timeout);
+    };
+  }, [dataReady, currentPost._id, isDark]);
+
+  function retryGraph() {
+    setGraphError(null);
+    setGraphReady(false);
+
+    setComments(null);
+    setReferences(null);
+    setUsage(null);
+
+    // Just re-trigger effects naturally
+    setCurrentPost((prev) => ({
+      ...prev,
+      _reloadToken: Date.now(),
+    }));
+  }
+
+  function goBack() {
+    if (historyIndex === 0) return;
+
+    const prevPost = history[historyIndex - 1];
+
+    setGraphReady(false);
+    setComments(null);
+    setReferences(null);
+    setUsage(null);
+
+    setHistoryIndex((i) => i - 1);
+    setCurrentPost(prevPost);
+  }
+
+  function goForward() {
+    if (historyIndex >= history.length - 1) return;
+
+    const nextPost = history[historyIndex + 1];
+
+    setGraphReady(false);
+    setComments(null);
+    setReferences(null);
+    setUsage(null);
+
+    setHistoryIndex((i) => i + 1);
+    setCurrentPost(nextPost);
+  }
 
   /* ---------------- Render ---------------- */
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        background: palette.background,
+        borderRadius: 12,
+      }}
+    >
       <div
         ref={graphRef}
         style={{
           width: "100%",
           height: "100%",
-          background: palette.background,
           borderRadius: 12,
           opacity: graphReady ? 1 : 0,
           transition: "opacity 0.4s ease",
         }}
       />
+
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          display: "flex",
+          gap: 8,
+          zIndex: 10,
+        }}
+      >
+        <button
+          onClick={goBack}
+          disabled={historyIndex === 0}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 8,
+            opacity: historyIndex === 0 ? 0.4 : 1,
+          }}
+        >
+          ←
+        </button>
+
+        <button
+          onClick={goForward}
+          disabled={historyIndex >= history.length - 1}
+          style={{
+            padding: "6px 10px",
+            borderRadius: 8,
+            opacity: historyIndex >= history.length - 1 ? 0.4 : 1,
+          }}
+        >
+          →
+        </button>
+      </div>
 
       {!graphReady && (
         <div
@@ -417,12 +616,31 @@ export default function GraphView({ post }: { post: GraphPost }) {
             position: "absolute",
             inset: 0,
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
+            gap: 12,
             color: palette.text,
           }}
         >
-          Loading graph...
+          {graphError ? (
+            <>
+              <div>⚠ {graphError}</div>
+              <button
+                onClick={retryGraph}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid",
+                  cursor: "pointer",
+                }}
+              >
+                Retry
+              </button>
+            </>
+          ) : (
+            <div>Loading graph...</div>
+          )}
         </div>
       )}
 

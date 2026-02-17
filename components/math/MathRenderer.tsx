@@ -15,8 +15,10 @@ import { loadTwitterWidgets } from "./dom/embeds";
 
 function MathRendererBase({
   html,
+  openLinksInNewTab = false,
 }: {
   html: string;
+  openLinksInNewTab?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -25,7 +27,7 @@ function MathRendererBase({
     if (!el) return;
 
     stripEditorUI(el);
-    renderEmbeds(el);
+    renderEmbeds(el, { openInNewTab: openLinksInNewTab });
     renderMath(el);
     styleMentions(el);
     setupMentions(el);

@@ -2,7 +2,10 @@
 /*  EMBED RENDERING (POST DISPLAY) */
 /* ---------------------------------------------------------- */
 
-export function renderEmbeds(el: HTMLElement) {
+export function renderEmbeds(
+  el: HTMLElement,
+  options?: { openInNewTab?: boolean }
+) {
   const embeds = Array.from(
     el.querySelectorAll("div[data-embed='true'], div[data-link-card='true']")
   ) as HTMLElement[];
@@ -118,13 +121,20 @@ export function renderEmbeds(el: HTMLElement) {
         </div>
       `;
 
-          wrapper.onclick = () => {
-            window.dispatchEvent(
-              new CustomEvent("app:navigate", {
-                detail: { href: `/posts/${post.id}` },
-              })
-            );
-          };
+      wrapper.onclick = () => {
+        const href = `/posts/${post.id}`;
+      
+        if (options?.openInNewTab) {
+          window.open(href, "_blank", "noopener,noreferrer");
+        } else {
+          window.dispatchEvent(
+            new CustomEvent("app:navigate", {
+              detail: { href },
+            })
+          );
+        }
+      };
+      
         })
         .catch(() => {
           wrapper.innerHTML = `

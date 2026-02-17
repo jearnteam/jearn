@@ -16,6 +16,38 @@ export function createPostNode(post: any, palette: any, isDark: boolean) {
   };
 }
 
+export function createReferencePostNode(
+  post: any,
+  palette: any,
+  isDark: boolean
+) {
+  const borderColor = isDark ? "#3b82f6" : "#2563eb";
+  const backgroundColor = isDark ? "#1e293b" : "#eff6ff";
+
+  return {
+    id: `ref-${post._id}`,
+    label: post.label,
+    shape: "box",
+    mass: 3,
+    borderWidth: 1,
+    margin: { top: 8, right: 12, bottom: 8, left: 12 },
+
+    color: createColorStates(borderColor, backgroundColor, palette, isDark),
+
+    font: {
+      color: palette.text,
+      size: 13,
+      face: "Inter, system-ui, sans-serif",
+    },
+
+    data: {
+      type: "post",
+      id: post._id,
+      isReference: true,
+    },
+  };
+}
+
 export function createAuthorNode(
   authorId: string,
   authorName: string,
@@ -44,10 +76,12 @@ export function createHubNode(
   iconDark: string,
   borderColor: string,
   palette: any,
-  isDark: boolean
+  isDark: boolean,
+  label?: string
 ) {
   return {
     id,
+    label: label ?? "",
     shape: "circularImage",
     image: isDark ? iconDark : iconLight,
     size: 20,
@@ -59,14 +93,10 @@ export function createHubNode(
       palette,
       isDark
     ),
-    shadow: {
-      enabled: true,
-      color: borderColor,
-      size: 18,
-      x: 0,
-      y: 0,
+    font: {
+      size: 12,
+      color: palette.text,
     },
-    font: { size: 0 },
   };
 }
 

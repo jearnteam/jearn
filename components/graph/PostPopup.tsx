@@ -31,10 +31,19 @@ export default function PostPopup({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
       <div
         ref={ref}
-        className="bg-white dark:bg-neutral-900 w-[680px] max-h-[80vh] rounded-xl shadow-2xl flex flex-col"
+        className="
+          bg-white dark:bg-neutral-900
+          w-full
+          max-h-[85vh]
+          sm:max-h-[70vh]
+          sm:max-w-2xl
+          rounded-xl
+          shadow-2xl
+          flex flex-col
+        "
       >
         {/* HEADER */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-neutral-800 flex-shrink-0">
@@ -50,7 +59,7 @@ export default function PostPopup({
           </button>
         </div>
 
-        {/* SCROLLABLE BODY */}
+        {/* SCROLL BODY */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           <PostContent
             post={post}
