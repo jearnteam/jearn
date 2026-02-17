@@ -169,7 +169,7 @@ export default function FullPostClient({
     tags: string[],
     parentId: string
   ) => {
-    await hookAddAnswer(postType, title, content, authorId, tags, parentId);
+    await hookAddAnswer(postType, title, content, authorId, parentId, tags);
     setAnswerModalOpen(false);
     fetchAnswers(); // Reload answers
   };
@@ -180,7 +180,12 @@ export default function FullPostClient({
   if (!post) return null;
 
   return (
-    <div className="max-w-3xl mx-auto pb-32">
+    <div
+      className={`
+    max-w-3xl mx-auto pb-32
+    ${!scrollContainerRef ? "pt-[2.6rem]" : ""}
+    `}
+    >
       {/* 🔹 MAIN POST */}
       <PostItem
         post={post}
@@ -216,23 +221,18 @@ export default function FullPostClient({
                 // ✅ Add missing scroll props (answers API fetches all at once for now)
                 hasMore={false}
                 onLoadMore={() => {}}
-                
                 // TODO: Implement Answer Edit
-                onEdit={() => {}} 
-                
+                onEdit={() => {}}
                 onDelete={async (id) => {
                   await hookDeletePost(id);
                   setAnswers((prev) => prev.filter((a) => a._id !== id));
                 }}
-                
                 // ✅ Fix: Wrap to return void (PostList expects Promise<void>)
                 onUpvote={async (id) => {
                   await handleUpvote(id);
                 }}
-                
                 // No nesting answers for now
                 onAnswer={() => {}}
-                
                 scrollContainerRef={scrollContainerRef}
               />
             </div>

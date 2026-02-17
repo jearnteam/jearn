@@ -37,7 +37,7 @@ export default function PostHeader({
   post: Post;
   onEdit?: (post: Post) => Promise<void> | void;
   onDelete?: (id: string) => Promise<void> | void;
-  onToggleGraph: () => void;
+  onToggleGraph?: () => void;
 }) {
   const { user } = useCurrentUser();
 
@@ -73,7 +73,9 @@ export default function PostHeader({
               {post.authorUniqueId && (
                 <>
                   <p className="text-sm text-gray-500"> - </p>
-                  <p className="text-sm text-gray-500">@{post.authorUniqueId}</p>
+                  <p className="text-sm text-gray-500">
+                    @{post.authorUniqueId}
+                  </p>
                 </>
               )}
             </div>
@@ -85,9 +87,11 @@ export default function PostHeader({
       </Link>
 
       <div className="flex items-center gap-1">
-        <button onClick={onToggleGraph}>
-          <Network className="text-blue-500" />
-        </button>
+        {onToggleGraph && (
+          <button onClick={onToggleGraph}>
+            <Network className="text-blue-500" />
+          </button>
+        )}
 
         {/* Edit/Delete only handled inside PostMenu */}
         <PostMenu post={post} onEdit={onEdit} onDelete={onDelete} />

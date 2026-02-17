@@ -1,33 +1,22 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-
 import Navbar from "@/components/Navbar";
-import HomePage from "./HomePage";
 import AppNavigationBridge from "@/components/navigation/AppNavigationBridge";
 import { UploadProvider } from "@/components/upload/UploadContext";
 import { NotificationProvider } from "@/features/notifications/NotificationProvider";
 
-export default function AppLayout({
+export default function PostDirectLayout({
   children,
-  overlay,
 }: {
   children: React.ReactNode;
-  overlay: React.ReactNode;
 }) {
-  const pathname = usePathname();
-
-  const isHome = pathname === "/";
-
   return (
     <NotificationProvider>
       <Navbar />
       <AppNavigationBridge />
       <UploadProvider>
-        {isHome && <HomePage />}
         {children}
       </UploadProvider>
-      {overlay}
     </NotificationProvider>
   );
 }

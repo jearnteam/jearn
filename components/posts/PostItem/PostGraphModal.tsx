@@ -45,22 +45,39 @@ export default function PostGraphModal({
   return (
     <FullScreenPortal>
       <div
-        className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center p-6"
-        onClick={onClose}
+        className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center md:p-6"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            onClose();
+          }
+        }}
       >
         <div
-          className="relative max-w-5xl w-full h-[85vh] rounded-xl shadow-2xl overflow-hidden bg-[#0f0f0f]"
-          onClick={(e) => e.stopPropagation()}
+          className="
+            relative
+            w-full h-full
+            md:max-w-5xl md:h-[85vh]
+            bg-background dark:bg-[#0f0f0f]
+            md:rounded-xl
+            shadow-2xl
+            overflow-hidden
+          "
         >
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 z-[50] w-12 h-12 flex items-center justify-center rounded-full bg-black/70 text-white text-2xl hover:bg-black/90 transition"
+            className="
+              absolute top-4 right-4 z-[50]
+              w-10 h-10
+              flex items-center justify-center
+              rounded-full
+              text-black dark:text-white text-xl
+              transition
+            "
           >
             ×
           </button>
 
-          {/* IMPORTANT: Remove overflow-auto */}
           <div className="w-full h-full">
             <GraphView post={graphPost} />
           </div>

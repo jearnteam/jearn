@@ -1,6 +1,8 @@
 import clientPromise from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
+import { authConfig } from "@/features/auth/auth";
+import { getServerSession } from "next-auth";
 
 export const runtime = "nodejs";
 
@@ -9,6 +11,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authConfig);
+    if (!session) {
+      return new Response("Unauthorized", { status: 401 });
+    }
     const { id } = await params;
 
     if (!id || !ObjectId.isValid(id)) {
@@ -123,21 +129,23 @@ export async function GET(
     /* =========================================================
        4️⃣ TAG USAGE
     ========================================================= */
-    const post = await db.collection("posts").findOne(
-      { _id: postId },
-      { projection: { tags: 1, categories: 1 } }
-    );
+    const post = await db
+      .collection("posts")
+      .findOne({ _id: postId }, { projection: { tags: 1, categories: 1 } });
 
     const tags = post?.tags ?? [];
     const categories = post?.categories ?? [];
 
     const tagUsageResults = tags.length
-      ? await db.collection("posts").aggregate([
-          { $match: { tags: { $in: tags } } },
-          { $unwind: "$tags" },
-          { $match: { tags: { $in: tags } } },
-          { $group: { _id: "$tags", count: { $sum: 1 } } }
-        ]).toArray()
+      ? await db
+          .collection("posts")
+          .aggregate([
+            { $match: { tags: { $in: tags } } },
+            { $unwind: "$tags" },
+            { $match: { tags: { $in: tags } } },
+            { $group: { _id: "$tags", count: { $sum: 1 } } },
+          ])
+          .toArray()
       : [];
 
     const tagUsage: Record<string, number> = {};
@@ -151,11 +159,14 @@ export async function GET(
        5️⃣ CATEGORY USAGE
     ========================================================= */
     const categoryUsageResults = categories.length
-      ? await db.collection("posts").aggregate([
-          { $unwind: "$categories" },
-          { $match: { categories: { $in: categories } } },
-          { $group: { _id: "$categories", count: { $sum: 1 } } }
-        ]).toArray()
+      ? await db
+          .collection("posts")
+          .aggregate([
+            { $unwind: "$categories" },
+            { $match: { categories: { $in: categories } } },
+            { $group: { _id: "$categories", count: { $sum: 1 } } },
+          ])
+          .toArray()
       : [];
 
     const categoryUsage: Record<string, number> = {};
@@ -176,7 +187,6 @@ export async function GET(
         categories: categoryUsage,
       },
     });
-
   } catch (err) {
     console.error("❌ graph route error:", err);
     return NextResponse.json({}, { status: 500 });

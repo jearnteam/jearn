@@ -47,8 +47,35 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // ✅ Public post pages (🔑 ADD THIS)
-  if (pathname === "/posts" || pathname.startsWith("/posts/")) {
+  // 🔐 Authenticated post route
+  if (pathname.startsWith("/posts/")) {
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    // ❌ No session → redirect to public version
+    if (!token) {
+      const id = pathname.split("/").pop();
+      return NextResponse.redirect(new URL(`/post/${id}`, req.url));
+    }
+
+    return NextResponse.next();
+  }
+
+  // 🌍 Public post route
+  if (pathname.startsWith("/post/")) {
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+    });
+
+    // ✅ Logged in → redirect to authenticated version
+    if (token) {
+      const id = pathname.split("/").pop();
+      return NextResponse.redirect(new URL(`/posts/${id}`, req.url));
+    }
+
     return NextResponse.next();
   }
 

@@ -1,3 +1,4 @@
+//@/(app)/@overlay/(.)posts/[id]/page.tsx
 "use client";
 
 import { useParams, notFound } from "next/navigation";
@@ -6,6 +7,7 @@ import PostOverlayShell from "@/app/(app)/posts/[id]/PostOverlayShell";
 import FullPostClient from "@/components/posts/FullPostClient";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import { PostTypes, type Post } from "@/types/post";
+import { UploadProvider } from "@/components/upload/UploadContext";
 
 export default function OverlayPostPage() {
   const { id } = useParams() as { id: string };
@@ -82,11 +84,13 @@ export default function OverlayPostPage() {
     <PostOverlayShell onClose={() => history.back()}>
       {(scrollRef) => (
         // ✅ FullPostClient に表示制御を集約
-        <FullPostClient
-          initialPost={post}
-          initialComments={comments}
-          scrollContainerRef={scrollRef}
-        />
+        <UploadProvider>
+          <FullPostClient
+            initialPost={post}
+            initialComments={comments}
+            scrollContainerRef={scrollRef}
+          />
+        </UploadProvider>
       )}
     </PostOverlayShell>
   );

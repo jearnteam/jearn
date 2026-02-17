@@ -1,6 +1,5 @@
 "use client";
 
-import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import FullScreenLoader from "@/components/common/FullScreenLoader";
