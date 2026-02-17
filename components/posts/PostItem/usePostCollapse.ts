@@ -1,51 +1,42 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
-const LINE_HEIGHT = 20;
-const FULL_LINES_LIMIT = 10;
+export const COLLAPSED_HEIGHT = 250;
 
-export function usePostCollapse(html: string) {
-  const measureRef = useRef<HTMLDivElement | null>(null);
-
+export function usePostCollapse() {
+  const contentRef = useRef<HTMLDivElement>(null);
+  // 初期状態は「省略されている(true)」と仮定してレンダリングを開始する
+  const [isTruncated, setIsTruncated] = useState(true);
   const [expanded, setExpanded] = useState(false);
-  const [collapsedHeight, setCollapsedHeight] = useState<number | null>(null);
-  const [fullHeight, setFullHeight] = useState(0);
-  const [initialized, setInitialized] = useState(false);
+  const [isMeasurementDone, setIsMeasurementDone] = useState(false);
 
-  useLayoutEffect(() => {
-    const el = measureRef.current;
+  useEffect(() => {
+    const el = contentRef.current;
     if (!el) return;
 
-    const measure = () => {
-      const full = el.getBoundingClientRect().height;
-
-      setFullHeight(full);
-
-      if (full > 400) {
-        setCollapsedHeight(250); // collapse to 250px
+    const checkHeight = () => {
+      // scrollHeight は overflow:hidden されていても本来の高さを返す
+      if (el.scrollHeight > COLLAPSED_HEIGHT + 20) {
+        setIsTruncated(true);
       } else {
-        setCollapsedHeight(null);
+        setIsTruncated(false);
       }
-
-      setInitialized(true);
+      setIsMeasurementDone(true);
     };
 
-    requestAnimationFrame(measure);
-
-    const ro = new ResizeObserver(measure);
+    checkHeight();
+    const ro = new ResizeObserver(checkHeight);
     ro.observe(el);
 
     return () => ro.disconnect();
-  }, [html]);
+  }, []);
 
   return {
-    measureRef,
+    contentRef,
+    isTruncated,
     expanded,
     setExpanded,
-    collapsedHeight,
-    fullHeight,
-    initialized,
-    shouldTruncate: initialized && collapsedHeight !== null,
+    isMeasurementDone,
   };
 }
