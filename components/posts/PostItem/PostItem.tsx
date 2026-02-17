@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { PostTypes, type Post } from "@/types/post";
 import PostHeader from "./PostHeader";
 import PostContent from "./PostContent";
@@ -54,6 +55,9 @@ export default function PostItem({
   const randomSpeed = useRef(2 + Math.random() * 2).current;
   const randomHue = useRef(Math.floor(Math.random() * 360)).current;
 
+  const { user } = useCurrentUser();
+  const isAuthed = !!user;
+
   return (
     <>
       <div ref={wrapperRef}>
@@ -77,7 +81,7 @@ export default function PostItem({
             post={post}
             onEdit={onEdit}
             onDelete={onDelete}
-            onToggleGraph={() => setShowGraph((v) => !v)}
+            onToggleGraph={isAuthed ? () => setShowGraph((v) => !v) : undefined}
           />
 
           {/* 🔹 CATEGORIES */}
@@ -121,7 +125,7 @@ export default function PostItem({
                 e.stopPropagation();
                 router.push(`/posts/${post._id}`, { scroll: false });
               }}
-              className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline break-words w-fit"
+              className="font-semibold text-lg text-gray-800 dark:text-gray-100 hover:underline cursor-pointer break-words w-fit"
             >
               {post.postType === PostTypes.QUESTION && (
                 <span className="text-red-500">Q. </span>
@@ -195,11 +199,13 @@ export default function PostItem({
         onCancel={() => setShareOpen(false)}
       />
 
-      <PostGraphModal
-        open={showGraph}
-        post={post}
-        onClose={() => setShowGraph(false)}
-      />
+      {isAuthed && (
+        <PostGraphModal
+          open={showGraph}
+          post={post}
+          onClose={() => setShowGraph(false)}
+        />
+      )}
     </>
   );
 }
