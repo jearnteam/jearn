@@ -81,6 +81,7 @@ export default function PostFormBox({
     authorId: string | null,
     categories: string[],
     tags: string[],
+    references?: string[],
     poll?: any,
     video?: any,
     commentDisabled?: boolean
@@ -106,7 +107,7 @@ export default function PostFormBox({
       <AnimatePresence>
         {open && (
           <motion.div
-            className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm
+            className="fixed inset-0 z-[50] bg-black/50 backdrop-blur-sm
                        flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -266,6 +267,7 @@ export default function PostFormBox({
                 {/* ================= Content ================= */}
                 <section className="flex-1 min-h-0 flex flex-col">
                   <PostForm
+                    key={mode}
                     ref={postFormRef}
                     mode={mode}
                     onSubmit={async (data) => {
@@ -276,6 +278,7 @@ export default function PostFormBox({
                         data.authorId,
                         data.categories,
                         data.tags,
+                        data.references,
                         data.poll,
                         data.video,
                         commentDisabled

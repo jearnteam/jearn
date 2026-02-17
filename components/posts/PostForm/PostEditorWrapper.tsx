@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from "next/dynamic";
 import {
   memo,
@@ -13,12 +15,13 @@ import type { Editor } from "@tiptap/react";
 /* Types                                                                      */
 /* -------------------------------------------------------------------------- */
 
+
 export interface PostEditorWrapperRef {
   clearWithHistory: () => void;
   getHTML: () => string;
   focus: () => void;
 
-  // ✅ IMPORTANT: dynamic getter (see useImperativeHandle)
+  // 🔥 dynamic getter — NEVER stale
   editor: Editor | null;
 }
 
@@ -29,16 +32,23 @@ interface Props {
   onUpdate?: () => void;
   onReady?: () => void;
   onFocus?: () => void;
+
+  // 🔥 NEW — for JEARN link popup
+  onJearnLinkDetected?: (data: {
+    url: string;
+    from: number;
+    to: number;
+  }) => void;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Dynamic Inner Editor                                                       */
 /* -------------------------------------------------------------------------- */
 
-const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
+const PostEditorInner = dynamic(() => import("./editor/PostEditorInner"), {
   ssr: false,
   loading: () => (
-    <div className="p-4 h-[75] rounded-xl animate-pulse bg-gray-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700" />
+    <div className="p-4 h-[75px] rounded-xl animate-pulse bg-gray-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700" />
   ),
 });
 
@@ -46,16 +56,28 @@ const PostEditorInner = dynamic(() => import("./PostEditorInner"), {
 /* Wrapper                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
-  ({ placeholder, onUpdate, onReady, onFocus }, ref) => {
-    const editorRef = useRef<Editor | null>(null);
-    const wrapperRef = useRef<HTMLDivElement>(null);
-    const initializedRef = useRef(false);
 
-    // ✅ stable callbacks stored in refs (so listeners always call latest)
+const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
+  (
+    {
+      placeholder,
+      onUpdate,
+      onReady,
+      onFocus,
+      onJearnLinkDetected,
+    },
+    ref
+  ) => {
+    const editorRef = useRef<Editor | null>(null);
+
+    /* ---------------------------------------------------------------------- */
+    /* Stable callback refs (avoid stale closures)                            */
+    /* ---------------------------------------------------------------------- */
+
     const onUpdateRef = useRef(onUpdate);
     const onFocusRef = useRef(onFocus);
     const onReadyRef = useRef(onReady);
+    const onJearnLinkDetectedRef = useRef(onJearnLinkDetected);
 
     useEffect(() => {
       onUpdateRef.current = onUpdate;
@@ -68,6 +90,14 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
     useEffect(() => {
       onReadyRef.current = onReady;
     }, [onReady]);
+
+    useEffect(() => {
+      onJearnLinkDetectedRef.current = onJearnLinkDetected;
+    }, [onJearnLinkDetected]);
+
+    /* ---------------------------------------------------------------------- */
+    /* Imperative API                                                         */
+    /* ---------------------------------------------------------------------- */
 
     useImperativeHandle(ref, () => ({
       getHTML() {
@@ -98,40 +128,72 @@ const PostEditorWrapper = forwardRef<PostEditorWrapperRef, Props>(
         });
       },
 
-      // ✅ CRITICAL FIX: expose editor as getter so it is NEVER stale
+      // 🔥 CRITICAL: dynamic getter
       get editor() {
         return editorRef.current;
       },
     }));
 
+    /* ---------------------------------------------------------------------- */
+    /* Editor Ready                                                           */
+    /* ---------------------------------------------------------------------- */
+
     const handleReady = (editor: Editor) => {
       editorRef.current = editor;
 
+      /* ---------------- Focus Listener ---------------- */
       const handleEditorFocus = () => {
         onFocusRef.current?.();
       };
 
+      /* ---------------- Update Listener ---------------- */
       const handleEditorUpdate = () => {
         onUpdateRef.current?.();
       };
 
+      /* ---------------- Transaction Listener ---------------- */
+      const handleTransaction = ({ transaction }: any) => {
+        const meta = transaction.getMeta("jearnLinkDetected");
+        if (meta) {
+          onJearnLinkDetectedRef.current?.(meta);
+        }
+      };
+      editor.on("transaction", ({ transaction }) => {
+        const meta = transaction.getMeta("jearnLinkDetected");
+        if (meta) {
+          console.log("🎯 META RECEIVED:", meta);
+        }
+      });
+
       editor.on("focus", handleEditorFocus);
       editor.on("update", handleEditorUpdate);
+      editor.on("transaction", handleTransaction);
 
       editor.on("destroy", () => {
         editor.off("focus", handleEditorFocus);
         editor.off("update", handleEditorUpdate);
+        editor.off("transaction", handleTransaction);
       });
 
       onReadyRef.current?.();
     };
 
+
+    
+    /* ---------------------------------------------------------------------- */
+    /* Render                                                                 */
+    /* ---------------------------------------------------------------------- */
+
     return (
       <div
-        ref={wrapperRef}
-        className={clsx("flex flex-col h-full rounded-lg transition")}
+        className={clsx(
+          "flex flex-col h-full rounded-lg transition"
+        )}
       >
-        <PostEditorInner placeholder={placeholder} onReady={handleReady} />
+        <PostEditorInner
+          placeholder={placeholder}
+          onReady={handleReady}
+        />
       </div>
     );
   }

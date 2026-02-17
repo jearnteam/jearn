@@ -1,3 +1,5 @@
+// app/api/ogp/route.ts
+
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import net from "node:net";
@@ -14,17 +16,16 @@ type OGP = {
 };
 
 const cache = new Map<string, { data: OGP; expires: number }>();
-const TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
+const TTL_MS = 1000 * 60 * 60 * 6;
+
+/* ================= PRIVATE HOST BLOCK ================= */
 
 function isPrivateHost(host: string) {
-  // block localhost
   if (host === "localhost" || host.endsWith(".local")) return true;
 
-  // block raw IP private ranges (basic)
   const ipType = net.isIP(host);
   if (!ipType) return false;
 
-  // IPv4 private checks
   if (ipType === 4) {
     const parts = host.split(".").map((n) => parseInt(n, 10));
     const [a, b] = parts;
@@ -33,23 +34,22 @@ function isPrivateHost(host: string) {
     if (a === 127) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
-    if (a === 169 && b === 254) return true; // link-local
+    if (a === 169 && b === 254) return true;
   }
 
-  // (Optional) Add IPv6 private blocks later
   return false;
 }
+
+/* ================= URL NORMALIZATION ================= */
 
 function normalizeUrl(raw: string) {
   let cleaned = raw.trim();
 
-  // If protocol missing, default to https
   if (!/^https?:\/\//i.test(cleaned)) {
     cleaned = "https://" + cleaned;
   }
 
   let url: URL;
-
   try {
     url = new URL(cleaned);
   } catch {
@@ -63,31 +63,10 @@ function normalizeUrl(raw: string) {
   return url.toString();
 }
 
-function pickMeta($: cheerio.CheerioAPI, prop: string, attr = "property") {
-  const v =
-    $(`meta[${attr}="${prop}"]`).attr("content") ||
-    $(`meta[name="${prop}"]`).attr("content") ||
-    null;
-  return v?.trim() || null;
-}
+/* ================= CORE HANDLER ================= */
 
-function absUrl(base: string, maybe: string | null) {
-  if (!maybe) return null;
-  try {
-    return new URL(maybe, base).toString();
-  } catch {
-    return null;
-  }
-}
-
-export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
-  const inputUrl = body?.url;
-  if (typeof inputUrl !== "string" || !inputUrl.trim()) {
-    return NextResponse.json({ error: "Missing url" }, { status: 400 });
-  }
-
-  const url = normalizeUrl(inputUrl.trim());
+async function handleOGP(inputUrl: string) {
+  const url = normalizeUrl(inputUrl);
   if (!url) {
     return NextResponse.json(
       { error: "Invalid or blocked url" },
@@ -101,7 +80,6 @@ export async function POST(req: Request) {
     return NextResponse.json(cached.data);
   }
 
-  // timeout
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 7000);
 
@@ -127,16 +105,30 @@ export async function POST(req: Request) {
 
     const domain = new URL(url).hostname.replace(/^www\./, "");
 
-    const ogTitle = pickMeta($, "og:title");
-    const ogDesc = pickMeta($, "og:description");
-    const ogImage = pickMeta($, "og:image");
-    const ogSite = pickMeta($, "og:site_name");
+    const pickMeta = (prop: string, attr = "property") =>
+      $(`meta[${attr}="${prop}"]`).attr("content") ||
+      $(`meta[name="${prop}"]`).attr("content") ||
+      null;
 
-    // fallback to <title> / meta description
-    const title = ogTitle || $("title").first().text().trim() || null;
-    const description = ogDesc || pickMeta($, "description", "name");
+    const absUrl = (maybe: string | null) => {
+      if (!maybe) return null;
+      try {
+        return new URL(maybe, url).toString();
+      } catch {
+        return null;
+      }
+    };
 
-    const image = absUrl(url, ogImage);
+    const title =
+      pickMeta("og:title") ||
+      $("title").first().text().trim() ||
+      null;
+
+    const description =
+      pickMeta("og:description") ||
+      pickMeta("description", "name");
+
+    const image = absUrl(pickMeta("og:image"));
 
     const data: OGP = {
       url,
@@ -144,14 +136,50 @@ export async function POST(req: Request) {
       title: title || null,
       description: description || null,
       image,
-      siteName: ogSite || null,
+      siteName: pickMeta("og:site_name"),
     };
 
     cache.set(url, { data, expires: now + TTL_MS });
+
     return NextResponse.json(data);
-  } catch (e: any) {
-    return NextResponse.json({ error: "OGP fetch error" }, { status: 400 });
+  } catch {
+    return NextResponse.json(
+      { error: "OGP fetch error" },
+      { status: 400 }
+    );
   } finally {
     clearTimeout(t);
   }
+}
+
+/* ================= GET ================= */
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const inputUrl = searchParams.get("url");
+
+  if (!inputUrl) {
+    return NextResponse.json(
+      { error: "Missing url" },
+      { status: 400 }
+    );
+  }
+
+  return handleOGP(inputUrl);
+}
+
+/* ================= POST ================= */
+
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => null);
+  const inputUrl = body?.url;
+
+  if (!inputUrl) {
+    return NextResponse.json(
+      { error: "Missing url" },
+      { status: 400 }
+    );
+  }
+
+  return handleOGP(inputUrl);
 }

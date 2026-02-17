@@ -23,15 +23,50 @@ export default function LinkCardView(props: any) {
     [url, node.attrs.domain]
   );
 
-  /* ---------------- FETCH OGP ---------------- */
+  /* ---------------- FETCH PREVIEW ---------------- */
   useEffect(() => {
-    if (startedRef.current) return;
-    startedRef.current = true;
-
-    if (!loading || !url) return;
+    if (!url) return;
+    if (!loading) return; // only fetch when loading = true
 
     const run = async () => {
       try {
+        let parsed: URL | undefined;
+        try {
+          parsed = new URL(url);
+        } catch {}
+
+        if (parsed?.hostname.endsWith("jearn.site")) {
+          const match = parsed.pathname.match(/\/posts\/([a-f0-9]{24})/);
+
+          if (match) {
+            const postId = match[1];
+            const res = await fetch(`/api/ogp/post/${postId}`);
+            const data = await res.json();
+
+            if (!res.ok || !data.ok) {
+              updateAttributes({
+                loading: false,
+                error: data?.error || "Failed to load JEARN preview",
+              });
+              return;
+            }
+
+            const post = data.data;
+
+            updateAttributes({
+              loading: false,
+              error: null,
+              title: post.title ?? null,
+              description: post.description ?? null,
+              image: post.image ?? null,
+              siteName: "JEARN",
+              domain: parsed.hostname,
+            });
+
+            return;
+          }
+        }
+
         const res = await fetch("/api/ogp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -58,12 +93,15 @@ export default function LinkCardView(props: any) {
           domain: data.domain ?? safeDomain,
         });
       } catch {
-        updateAttributes({ loading: false, error: "Network error" });
+        updateAttributes({
+          loading: false,
+          error: "Network error",
+        });
       }
     };
 
     run();
-  }, [url, loading, updateAttributes, safeDomain]);
+  }, [url, loading]);
 
   /* ---------------- OPEN LINK ---------------- */
   const open = () => {
@@ -81,10 +119,7 @@ export default function LinkCardView(props: any) {
     tr.replaceWith(
       pos,
       pos + node.nodeSize,
-      state.schema.nodes.paragraph.create(
-        {},
-        state.schema.text(url)
-      )
+      state.schema.nodes.paragraph.create({}, state.schema.text(url))
     );
 
     editor.view.dispatch(tr);
@@ -182,17 +217,13 @@ export default function LinkCardView(props: any) {
             </div>
 
             {loading ? (
-              <div className="text-sm opacity-80">
-                Loading preview…
-              </div>
+              <div className="text-sm opacity-80">Loading preview…</div>
             ) : error ? (
               <>
                 <div className="text-base font-semibold break-words">
                   {safeDomain}
                 </div>
-                <div className="text-xs text-red-500 mt-1">
-                  {error}
-                </div>
+                <div className="text-xs text-red-500 mt-1">{error}</div>
               </>
             ) : (
               <>

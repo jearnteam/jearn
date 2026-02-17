@@ -24,6 +24,12 @@ type CategoryDoc = {
   myname?: string;
 };
 
+type PostReferenceDoc = {
+  from: ObjectId;
+  to: ObjectId;
+  createdAt: Date;
+};
+
 async function enrichPost(post: RawPost, usersColl: Collection) {
   const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
   const DEFAULT_AVATAR = "/default-avatar.png";
@@ -288,7 +294,8 @@ export async function POST(req: Request) {
     if (!session?.user?.uid) {
       return new Response("Unauthorized", { status: 401 });
     }
-
+    const body = await req.json();
+    console.log("BODY:", body);
     const {
       postType = PostTypes.POST,
       title,
@@ -299,10 +306,11 @@ export async function POST(req: Request) {
       txId = null,
       categories = [],
       tags = [],
+      references = [],
       poll,
       video,
       commentDisabled = false,
-    } = await req.json();
+    } = body;
 
     if (!authorId) {
       return NextResponse.json({ error: "Missing authorId" }, { status: 400 });
@@ -326,6 +334,21 @@ export async function POST(req: Request) {
       !content?.trim()
     ) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
+    }
+
+    let safeReferences: ObjectId[] = [];
+
+    if (Array.isArray(references)) {
+      for (const r of references) {
+        if (!ObjectId.isValid(r)) {
+          return NextResponse.json(
+            { error: "Invalid reference id" },
+            { status: 400 }
+          );
+        }
+
+        safeReferences.push(new ObjectId(r));
+      }
     }
 
     if (
@@ -509,6 +532,7 @@ export async function POST(req: Request) {
       upvoters: string[];
       categories: ObjectId[];
       tags: string[];
+      references?: ObjectId[];
       isAdmin?: boolean;
       commentDisabled?: boolean;
       mediaRefs?: string[];
@@ -533,6 +557,7 @@ export async function POST(req: Request) {
       upvoters: [],
       categories: categories.map((id: string) => new ObjectId(id)),
       tags,
+      references: safeReferences,
       isAdmin: session.user.role === "admin",
       commentDisabled,
       mediaRefs,
@@ -568,6 +593,17 @@ export async function POST(req: Request) {
     }
 
     const result = await posts.insertOne(doc);
+    if (safeReferences.length > 0) {
+      const referencesColl = db.collection<PostReferenceDoc>("post_references");
+
+      const edges = safeReferences.map((toId) => ({
+        from: result.insertedId,
+        to: toId,
+        createdAt: new Date(),
+      }));
+
+      await referencesColl.insertMany(edges);
+    }
 
     // ---------------- NOTIFICATION: ANSWER ----------------
     if (postType === PostTypes.ANSWER && safeParentId) {
@@ -658,6 +694,7 @@ export async function POST(req: Request) {
       ...enrichedNoCats,
       categories: categoryData,
       tags,
+      references: doc.references?.map((r) => r.toString()) ?? [],
       commentCount: 0,
       edited: false,
       video: doc.video ?? undefined, // ✅ expose to client

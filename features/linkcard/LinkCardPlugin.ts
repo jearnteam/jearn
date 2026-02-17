@@ -47,22 +47,20 @@ export const LinkCardPlugin = Extension.create({
 
             // 🔥 CASE 1: JEARN → popup mode
             if (isJearnUrl(normalizedUrl)) {
-              let tr = view.state.tr.insertText(normalizedUrl, from, to);
-              tr = tr.setStoredMarks([]);
+              let tr = view.state.tr
+                .insertText(normalizedUrl, from, to)
+                .setStoredMarks([])
+                .setMeta("jearnLinkDetected", {
+                  url: normalizedUrl,
+                  from,
+                  to: from + normalizedUrl.length,
+                });
+
               view.dispatch(tr);
-
-              window.dispatchEvent(
-                new CustomEvent("jearn-link-detected", {
-                  detail: {
-                    url: normalizedUrl,
-                    from,
-                    to: from + normalizedUrl.length,
-                  },
-                })
-              );
-
               return true;
             }
+
+            console.log("JEARN detected", normalizedUrl);
 
             // 🔥 CASE 2: Whitelisted → embed
             if (isWhitelisted(normalizedUrl)) {
@@ -163,21 +161,20 @@ export const LinkCardPlugin = Extension.create({
 
             // JEARN
             if (isJearnUrl(normalizedUrl)) {
-              tr = tr.insertText(normalizedUrl, paragraphStart);
-              tr = tr.setStoredMarks([]);
+              const { state } = view;
+              const { from, to } = state.selection;
+
+              let tr = state.tr.delete(from, to);
+
+              tr = tr.insertText(normalizedUrl, from);
+
+              tr = tr.setMeta("jearnLinkDetected", {
+                url: normalizedUrl,
+                from,
+                to: from + normalizedUrl.length,
+              });
 
               view.dispatch(tr);
-
-              window.dispatchEvent(
-                new CustomEvent("jearn-link-detected", {
-                  detail: {
-                    url: normalizedUrl,
-                    from: paragraphStart,
-                    to: paragraphStart + normalizedUrl.length,
-                  },
-                })
-              );
-
               return true;
             }
 
@@ -186,19 +183,15 @@ export const LinkCardPlugin = Extension.create({
               const schema = state.schema;
               const nodeType = schema.nodes.embedBlock;
               if (!nodeType) return false;
+              let tr = state.tr.delete(paragraphStart, paragraphEnd);
 
-              const embedNode = nodeType.create({ url: normalizedUrl });
-              tr = tr.insert(paragraphStart, embedNode);
+              tr = tr.insertText(normalizedUrl, paragraphStart);
 
-              const paragraph = schema.nodes.paragraph.create();
-              tr = tr.insert(paragraphStart + embedNode.nodeSize, paragraph);
-
-              tr = tr.setSelection(
-                TextSelection.create(
-                  tr.doc,
-                  paragraphStart + embedNode.nodeSize + 1
-                )
-              );
+              tr = tr.setMeta("jearnLinkDetected", {
+                url: normalizedUrl,
+                from: paragraphStart,
+                to: paragraphStart + normalizedUrl.length,
+              });
 
               view.dispatch(tr);
               return true;

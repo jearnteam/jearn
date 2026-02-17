@@ -76,6 +76,7 @@ export interface Post {
 
   categories?: CategoryObject[];
   tags?: string[];
+  references?: string[];
 
   createdAt?: string;
 
@@ -124,6 +125,7 @@ export type RawPost = {
   createdAt?: Date;
   categories?: unknown[];
   tags?: string[];
+  references?: ObjectId[];
   mediaRefs?: string[];
   poll?: Poll;
   video?: {

@@ -219,6 +219,7 @@ export function usePosts() {
       authorId: string | null,
       categories: string[],
       tags: string[],
+      references?: string[],
       poll?: {
         options: {
           id: string;
@@ -249,6 +250,7 @@ export function usePosts() {
           authorId,
           categories,
           tags,
+          references,
           poll,
           video,
           commentDisabled,
@@ -267,8 +269,9 @@ export function usePosts() {
       title: string,
       content: string,
       authorId: string | null,
-      tags: string[],
       parentId: string,
+      tags: string[],
+      references?: string[],
       commentDisabled?: boolean
     ) => {
       if (!authorId) return;
@@ -281,8 +284,9 @@ export function usePosts() {
           title,
           content,
           authorId,
-          tags,
           parentId,
+          tags,
+          references,
           commentDisabled,
         }),
       }).catch((e) => console.error("🔥 addAnswer error:", e));
@@ -318,6 +322,7 @@ export function usePosts() {
       content: string,
       categories?: string[],
       tags?: string[],
+      references?: string[],
       commentDisabled?: boolean
     ) => {
       // 🧮 compute removed images
@@ -350,6 +355,7 @@ export function usePosts() {
           content,
           categories,
           tags,
+          references,
           removedImages,
           commentDisabled,
         }),

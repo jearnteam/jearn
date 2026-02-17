@@ -34,19 +34,37 @@ export const LinkCardNode = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-link-card="true"]' }];
-  },
-
-  renderHTML({ HTMLAttributes }) {
     return [
-      "div",
-      mergeAttributes(HTMLAttributes, {
-        "data-link-card": "true",
-        "data-url": HTMLAttributes.url,
-      }),
+      {
+        tag: 'div[data-link-card="true"]',
+        getAttrs: (el) => {
+          if (!(el instanceof HTMLElement)) return false;
+
+          return {
+            url: el.getAttribute("data-url") || "",
+            loading: true, // force reload on restore
+            title: null,
+            description: null,
+            image: null,
+            siteName: null,
+            domain: null,
+            error: null,
+          };
+        },
+      },
     ];
   },
+  renderHTML({ node }) {
+    console.log("SERIALIZING LINKCARD URL:", node.attrs.url);
 
+    return [
+      "div",
+      {
+        "data-link-card": "true",
+        "data-url": node.attrs.url,
+      },
+    ];
+  },
   addNodeView() {
     return ReactNodeViewRenderer(LinkCardView);
   },
@@ -80,7 +98,10 @@ declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     linkCard: {
       insertLinkCard: (url: string) => ReturnType;
-      updateLinkCard: (pos: number, attrs: Partial<LinkCardAttrs>) => ReturnType;
+      updateLinkCard: (
+        pos: number,
+        attrs: Partial<LinkCardAttrs>
+      ) => ReturnType;
     };
   }
 }
