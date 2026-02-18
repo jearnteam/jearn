@@ -121,20 +121,19 @@ export function renderEmbeds(
         </div>
       `;
 
-      wrapper.onclick = () => {
-        const href = `/posts/${post.id}`;
-      
-        if (options?.openInNewTab) {
-          window.open(href, "_blank", "noopener,noreferrer");
-        } else {
-          window.dispatchEvent(
-            new CustomEvent("app:navigate", {
-              detail: { href },
-            })
-          );
-        }
-      };
-      
+          wrapper.onclick = () => {
+            const href = `/posts/${post.id}`;
+
+            if (options?.openInNewTab) {
+              window.open(href, "_blank", "noopener,noreferrer");
+            } else {
+              window.dispatchEvent(
+                new CustomEvent("app:navigate", {
+                  detail: { href },
+                })
+              );
+            }
+          };
         })
         .catch(() => {
           wrapper.innerHTML = `
@@ -150,45 +149,98 @@ export function renderEmbeds(
     /* ---------------- YOUTUBE ---------------- */
 
     if (normalized.includes("youtube.com") || normalized.includes("youtu.be")) {
-      let embedUrl = "";
+      let videoId = "";
 
       try {
         const parsed = new URL(normalized);
 
         if (parsed.hostname.includes("youtu.be")) {
-          const id = parsed.pathname.replace("/", "");
-          if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+          videoId = parsed.pathname.replace("/", "");
         } else {
-          const id = parsed.searchParams.get("v");
-          if (id) embedUrl = `https://www.youtube.com/embed/${id}`;
+          videoId = parsed.searchParams.get("v") || "";
         }
       } catch {}
 
-      if (!embedUrl) return;
+      if (!videoId) return;
 
       embedEl.dataset.rendered = "true";
 
       const wrapper = document.createElement("div");
-      wrapper.style.margin = "16px auto";
-      wrapper.style.maxWidth = "560px";
-      wrapper.style.width = "100%";
-      wrapper.style.height = "315px";
       wrapper.style.position = "relative";
+      wrapper.style.width = "100%";
+      wrapper.style.maxWidth = "560px";
+      wrapper.style.margin = "16px auto";
+      wrapper.style.paddingBottom = "56.25%";
+      wrapper.style.height = "0";
       wrapper.style.borderRadius = "12px";
       wrapper.style.overflow = "hidden";
-      wrapper.style.border = "1px solid rgba(120,120,120,0.2)";
       wrapper.style.background = "#000";
+      wrapper.style.cursor = "pointer";
 
-      const iframe = document.createElement("iframe");
-      iframe.src = embedUrl;
-      iframe.style.position = "absolute";
-      iframe.style.top = "0";
-      iframe.style.left = "0";
-      iframe.style.width = "100%";
-      iframe.style.height = "100%";
-      iframe.allowFullscreen = true;
+      const thumbnail = document.createElement("img");
+      thumbnail.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+      thumbnail.style.position = "absolute";
+      thumbnail.style.top = "0";
+      thumbnail.style.left = "0";
+      thumbnail.style.width = "100%";
+      thumbnail.style.height = "100%";
+      thumbnail.style.objectFit = "cover";
 
-      wrapper.appendChild(iframe);
+      const playButton = document.createElement("div");
+      playButton.style.position = "absolute";
+      playButton.style.top = "50%";
+      playButton.style.left = "50%";
+      playButton.style.transform = "translate(-50%, -50%)";
+      playButton.style.width = "72px";
+      playButton.style.height = "50px";
+      playButton.style.background = "#FF0000";
+      playButton.style.borderRadius = "14px";
+      playButton.style.display = "flex";
+      playButton.style.alignItems = "center";
+      playButton.style.justifyContent = "center";
+      playButton.style.boxShadow = "0 6px 20px rgba(0,0,0,0.4)";
+      playButton.style.transition = "transform 0.2s ease, background 0.2s ease";
+
+      /* white triangle */
+      const triangle = document.createElement("div");
+      triangle.style.width = "0";
+      triangle.style.height = "0";
+      triangle.style.borderLeft = "18px solid white";
+      triangle.style.borderTop = "12px solid transparent";
+      triangle.style.borderBottom = "12px solid transparent";
+      triangle.style.marginLeft = "4px";
+
+      playButton.appendChild(triangle);
+
+      /* hover effect */
+      wrapper.onmouseenter = () => {
+        playButton.style.transform = "translate(-50%, -50%) scale(1.1)";
+        playButton.style.background = "#e60000";
+      };
+      wrapper.onmouseleave = () => {
+        playButton.style.transform = "translate(-50%, -50%) scale(1)";
+        playButton.style.background = "#FF0000";
+      };
+
+      wrapper.appendChild(thumbnail);
+      wrapper.appendChild(playButton);
+
+      wrapper.onclick = () => {
+        const iframe = document.createElement("iframe");
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        iframe.allowFullscreen = true;
+        iframe.loading = "lazy";
+        iframe.style.position = "absolute";
+        iframe.style.top = "0";
+        iframe.style.left = "0";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.border = "0";
+
+        wrapper.innerHTML = "";
+        wrapper.appendChild(iframe);
+      };
+
       embedEl.replaceWith(wrapper);
       return;
     }
