@@ -233,7 +233,7 @@ export default function Dashboard() {
                   Report #123 submitted by user A
                 </li>
                 <li className="p-2 border rounded bg-gray-50 dark:bg-neutral-800">
-                  Category request "Test" approved
+                  Category request &quot;Test&quot; approved
                 </li>
               </ul>
             </div>

@@ -61,6 +61,9 @@ export function hasMeaningfulContent(html: string): boolean {
 
   // 🔥 embeds are meaningful
   if (tmp.querySelector("[data-embed='true']")) return true;
+  
+  // link is meaningful
+  if (tmp.querySelector("[data-link-card='true']")) return true;
 
   // media is meaningful
   if (tmp.querySelector("img, video, iframe")) return true;
