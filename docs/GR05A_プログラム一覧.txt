@@ -101,39 +101,39 @@ jearn/
 │   │   │   │       └── route.ts
 │   │   │   └── route.ts (リンク先へリクエストを送り、OGPを取得する)
 │   │   ├── posts (投稿機能関連API)
-│   │   │   ├── byUser
+│   │   │   ├── byUser (ユーザーひとりの投稿を取得する)
 │   │   │   │   └── [id]
 │   │   │   │       └── route.ts
-│   │   │   ├── following
+│   │   │   ├── following (フォロー中のユーザーの投稿を取得する)
 │   │   │   │   └── route.ts
 │   │   │   ├── helpers.ts
-│   │   │   ├── [id]
-│   │   │   │   ├── answers
+│   │   │   ├── [id] (投稿ひとつに関するAPI)
+│   │   │   │   ├── answers (質問についた回答を取得する)
 │   │   │   │   │   └── route.ts
 │   │   │   │   ├── comments
-│   │   │   │   │   ├── count
+│   │   │   │   │   ├── count (投稿についたコメント数を取得する)
 │   │   │   │   │   │   └── route.ts
-│   │   │   │   │   └── route.ts
+│   │   │   │   │   └── route.ts (投稿についたコメントを取得する)
 │   │   │   │   ├── graph
 │   │   │   │   │   └── route.ts
 │   │   │   │   ├── references
 │   │   │   │   │   └── route.ts
-│   │   │   │   ├── route.ts
-│   │   │   │   └── upvote
+│   │   │   │   ├── route.ts (投稿の詳細情報の取得、投稿の編集)
+│   │   │   │   └── upvote (投稿の高評価をトグルする)
 │   │   │   │       └── route.ts
-│   │   │   ├── polls
-│   │   │   │   └── vote
+│   │   │   ├── polls (投票機能関連のAPI)
+│   │   │   │   └── vote (投票する)
 │   │   │   │       └── route.ts
-│   │   │   ├── route.ts
-│   │   │   └── videos
+│   │   │   ├── route.ts (投稿の取得、カテゴリーごとの投稿の取得、新規作成、削除)
+│   │   │   └── videos (動画の取得)
 │   │   │       └── route.ts
-│   │   ├── reports
-│   │   │   ├── check
+│   │   ├── reports (通報機能関連のAPI)
+│   │   │   ├── check (通報済みであるかを取得する)
 │   │   │   │   └── route.ts
-│   │   │   ├── [id]
+│   │   │   ├── [id] (管理者のみ通報のステータスを変更、削除する)
 │   │   │   │   └── route.ts
-│   │   │   └── route.ts
-│   │   ├── search
+│   │   │   └── route.ts (通報の新規作成、取得(管理者のみ))
+│   │   ├── search (検索機能関連のAPI)
 │   │   │   ├── answers
 │   │   │   │   └── route.ts
 │   │   │   ├── polls
@@ -150,52 +150,52 @@ jearn/
 │   │   │   ├── _utils.ts
 │   │   │   └── videos
 │   │   │       └── route.ts
-│   │   ├── stream
-│   │   │   └── route.ts
-│   │   ├── tags
-│   │   │   ├── [tag]
+│   │   ├── stream (SSEによるリアルタイム通信機能関連のAPI)
+│   │   │   └── route.ts (SSEストリームに接続する)
+│   │   ├── tags (ハッシュタグ機能関連のAPI)
+│   │   │   ├── [tag] (ハッシュタグのついた投稿を取得する)
 │   │   │   │   └── route.ts
-│   │   │   └── usage
+│   │   │   └── usage (ハッシュタグ使用量)
 │   │   │       ├── bulk
 │   │   │       │   └── route.ts
 │   │   │       └── route.ts
-│   │   └── user
-│   │       ├── by-uid
+│   │   └── user (ユーザー機能関連のAPI)
+│   │       ├── by-uid (ObjectIdからユーザー情報を取得する)
 │   │       │   └── [uid]
 │   │       │       └── route.ts
-│   │       ├── by-unique-id
+│   │       ├── by-unique-id (ユニークIDからユーザー情報を取得する)
 │   │       │   └── [uniqueId]
 │   │       │       └── route.ts
-│   │       ├── current
+│   │       ├── current (自身のユーザー情報を取得する)
 │   │       │   └── route.ts
-│   │       ├── [id]
+│   │       ├── [id] (ObjectIdからユーザー情報を取得する)
 │   │       │   └── route.ts
-│   │       ├── search
+│   │       ├── search (ユーザー名とユニークIDからユーザーを曖昧検索する)
 │   │       │   └── route.ts
 │   │       ├── subscribe
 │   │       │   └── route.ts
-│   │       ├── update
+│   │       ├── update (ユーザー情報を更新する)
 │   │       │   └── route.ts
-│   │       ├── update-language
+│   │       ├── update-language (ユーザーの言語設定を更新する)
 │   │       │   └── route.ts
-│   │       └── update-theme
+│   │       └── update-theme (ユーザーのテーマを更新する)
 │   │           └── route.ts
 │   ├── (app)
-│   │   ├── category
+│   │   ├── category (カテゴリーごとの投稿画面)
 │   │   │   ├── layout.tsx
 │   │   │   └── [slug]
 │   │   │       ├── CategoryPageClient.tsx
 │   │   │       ├── CategoryPageClientWrapper.tsx
 │   │   │       ├── loading.tsx
 │   │   │       └── page.tsx
-│   │   ├── chat
+│   │   ├── chat (チャット画面)
 │   │   │   └── [roomId]
 │   │   │       └── page.tsx
-│   │   ├── HomePage.tsx
+│   │   ├── HomePage.tsx (ホームページの本体)
 │   │   ├── _layouts
 │   │   │   └── SimpleLayout.tsx
 │   │   ├── layout.tsx
-│   │   ├── @overlay
+│   │   ├── @overlay (画面の上に重ねて表示する画面)
 │   │   │   ├── (.)category
 │   │   │   │   └── [slug]
 │   │   │   │       └── page.tsx
@@ -218,62 +218,56 @@ jearn/
 │   │   │       └── [tag]
 │   │   │           ├── loading.tsx
 │   │   │           └── page.tsx
-│   │   ├── page.tsx
+│   │   ├── page.tsx (ホームページ)
 │   │   ├── posts
-│   │   │   └── [id]
+│   │   │   └── [id] (投稿詳細画面)
 │   │   │       ├── FullPostPageClient.tsx
 │   │   │       ├── loading.tsx
 │   │   │       ├── page.tsx
 │   │   │       └── PostOverlayShell.tsx
-│   │   ├── profile
-│   │   │   ├── [id]
+│   │   ├── profile (ユーザーに関する画面)
+│   │   │   ├── [id] (ユーザーの詳細情報、ユーザーの投稿)
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── ProfileUserClient.tsx
 │   │   │   ├── layout.tsx
 │   │   │   ├── loading.tsx
+│   │   │   └── page.tsx (自身のユーザー情報、設定)
+│   │   ├── search (検索詳細画面)
 │   │   │   └── page.tsx
-│   │   ├── search
-│   │   │   └── page.tsx
-│   │   ├── tags
-│   │   │   └── [tag]
-│   │   │       ├── loading.tsx
-│   │   │       ├── page.tsx
-│   │   │       ├── TagPageClient.tsx
-│   │   │       └── TagPageClientWrapper.tsx
-│   │   └── video-test
-│   │       └── page.tsx
-│   ├── categorizetest
-│   │   └── page.tsx
+│   │   └── tags (ハッシュタグごとの投稿画面)
+│   │       └── [tag]
+│   │           ├── loading.tsx
+│   │           ├── page.tsx
+│   │           ├── TagPageClient.tsx
+│   │           └── TagPageClientWrapper.tsx
 │   ├── ClientLayout.tsx
 │   ├── error.tsx
-│   ├── favicon.ico
 │   ├── head.tsx
-│   ├── layout.tsx
+│   ├── layout.tsx (基本の画面レイアウト)
 │   ├── loading.tsx
-│   ├── login
+│   ├── login (ログイン画面)
 │   │   └── page.tsx
-│   ├── logout
+│   ├── logout (ログアウト画面)
 │   │   └── page.tsx
-│   ├── (protected)
-│   │   └── dashboard
-│   │       ├── AnalyticsPanel.tsx
-│   │       ├── CategoryRequestPanel.tsx
-│   │       ├── DatabasePanel.tsx
+│   ├── (protected) (管理者用画面)
+│   │   └── dashboard (ダッシュボード画面)
+│   │       ├── AnalyticsPanel.tsx (分析)
+│   │       ├── CategoryRequestPanel.tsx (カテゴリーリクエスト)
+│   │       ├── DatabasePanel.tsx (データベース操作)
 │   │       ├── layout.tsx
-│   │       ├── page.tsx
-│   │       └── ReportsPanel.tsx
+│   │       ├── page.tsx (メイン画面)
+│   │       └── ReportsPanel.tsx (通報)
 │   ├── providers.tsx
-│   ├── (public)
-│   │   ├── layout.tsx
-│   │   └── post
-│   │       └── [id]
-│   │           ├── loading.tsx
-│   │           ├── page.tsx
-│   │           ├── PostOverlayShell.tsx
-│   │           └── PublicPostClient.tsx
-│   └── sw-register.tsx
-├── components
-│   ├── 3d_spinner
+│   └── (public) (ログイン不要な画面)
+│       ├── layout.tsx
+│       └── post
+│           └── [id] (投稿詳細画面)
+│               ├── loading.tsx
+│               ├── page.tsx
+│               ├── PostOverlayShell.tsx
+│               └── PublicPostClient.tsx
+├── components (画面の構成要素)
+│   ├── 3d_spinner (スクロールに連動して回転するロゴ)
 │   │   ├── 3d_spinner.tsx
 │   │   └── ScrollContext.tsx
 │   ├── Avatar.tsx
@@ -461,193 +455,6 @@ jearn/
 │   │   ├── api.ts
 │   │   └── useSearch.ts
 │   └── Tag.ts
-├── .git
-│   ├── branches
-│   ├── config
-│   ├── description
-│   ├── FETCH_HEAD
-│   ├── HEAD
-│   ├── hooks
-│   │   ├── applypatch-msg.sample
-│   │   ├── commit-msg.sample
-│   │   ├── fsmonitor-watchman.sample
-│   │   ├── post-update.sample
-│   │   ├── pre-applypatch.sample
-│   │   ├── pre-commit.sample
-│   │   ├── pre-merge-commit.sample
-│   │   ├── prepare-commit-msg.sample
-│   │   ├── pre-push.sample
-│   │   ├── pre-rebase.sample
-│   │   ├── pre-receive.sample
-│   │   ├── push-to-checkout.sample
-│   │   ├── sendemail-validate.sample
-│   │   └── update.sample
-│   ├── index
-│   ├── info
-│   │   └── exclude
-│   ├── logs
-│   │   ├── HEAD
-│   │   └── refs
-│   │       ├── heads
-│   │       │   └── main
-│   │       └── remotes
-│   │           └── origin
-│   │               ├── HEAD
-│   │               └── main
-│   ├── objects
-│   │   ├── 04
-│   │   │   └── df16274a75dec8cc2a9377fc3c174fec5329c7
-│   │   ├── 07
-│   │   │   └── 8f571bb535e7352debf96da25a2fe0e21cd3c1
-│   │   ├── 0b
-│   │   │   └── 2804c2397809ae8b8f18224345a7ceca684b55
-│   │   ├── 0c
-│   │   │   └── a7404103e5926ae27ef4d3d96c6d0a955d92d3
-│   │   ├── 21
-│   │   │   └── 159b0b1333ee80e01a7d7c2e79ade9a7cf878d
-│   │   ├── 23
-│   │   │   └── 96f33ae17771f35fcb7f44e8315b45d330ea86
-│   │   ├── 24
-│   │   │   └── 9d45a5eb8b877227b9f721875de6301fbe98fe
-│   │   ├── 25
-│   │   │   └── 6ab125bdf2953186ecc146db73f35965eb78aa
-│   │   ├── 2a
-│   │   │   └── 436900914e8bde055c01485942dc18fffd8ea0
-│   │   ├── 2e
-│   │   │   └── d970cdd38df76a9e1443b763e0b3e2998b5074
-│   │   ├── 31
-│   │   │   └── 79aa4dea1f80761a1c2374cec85f8e2e681402
-│   │   ├── 33
-│   │   │   └── 3f2351243c41b6499b6c2160555061fad03361
-│   │   ├── 34
-│   │   │   └── 72dbc3b84dbfbc8a85a8b6d8820c03a6c0dcdd
-│   │   ├── 36
-│   │   │   ├── 1c5faa18b7867cae736fe979ea7a968014c8c0
-│   │   │   └── ff99b9a67e8691067ba97f7b30daed035a4574
-│   │   ├── 41
-│   │   │   └── c0a091c6ae4d2923aaf1057337972b6cb326aa
-│   │   ├── 45
-│   │   │   └── 40dd366e1cb02639c5b5b723ea798cb6701326
-│   │   ├── 46
-│   │   │   └── 92ceafe94a5c19e642f53ea4853ac8144d24cf
-│   │   ├── 4f
-│   │   │   └── cec102340a0acec4b318eb5b340963f2f8a13e
-│   │   ├── 50
-│   │   │   └── c5d978f71e8da22f6cefa05ce891aa97c3f15b
-│   │   ├── 51
-│   │   │   ├── 30557b3485548343ad51f6ab1a3f839ad1a41a
-│   │   │   └── c761491bc07128ba8881f7da59310933199b79
-│   │   ├── 52
-│   │   │   └── 2409ed6af3b2a661cd1de4d0ea6f17ca266803
-│   │   ├── 54
-│   │   │   └── cb4818e2bb30a7ac01bfee03b56c307c43ddde
-│   │   ├── 59
-│   │   │   └── 0cfcc8d63250301edfed7bb4c7950a11d77619
-│   │   ├── 5a
-│   │   │   └── c65a891bc8d15868017d582dccea7d3fe1519e
-│   │   ├── 62
-│   │   │   └── 81b1942a5ffb8bbce5299412351b41a0dd0cdf
-│   │   ├── 68
-│   │   │   └── 98afee1fa1bb637b21b3014d50e05fce6a8d7f
-│   │   ├── 6e
-│   │   │   └── 46e3a75f27df91628b323ae6726c7d2bcbb0ec
-│   │   ├── 74
-│   │   │   └── 118bc3122b5c8e0a9f695f611ab8243f732077
-│   │   ├── 77
-│   │   │   └── f7e003081f93bc3990d203528c61504bd99afb
-│   │   ├── 7c
-│   │   │   └── 4ba77d4517999012503e88d36613484bc73ab6
-│   │   ├── 7d
-│   │   │   └── 8bb9737105a111525b120a131909b505dbdfc2
-│   │   ├── 7e
-│   │   │   ├── 563fbf93b829f30829200425f42b8167b35c1f
-│   │   │   └── aa87ac7d8b9fd9363070366a2a8a5685b08ad1
-│   │   ├── 82
-│   │   │   └── fc35195d2f80bf9bad0e221034f2b8e7179404
-│   │   ├── 8f
-│   │   │   └── 3d6f79c1347a6dfb32449eb254375f3a6ddab4
-│   │   ├── 91
-│   │   │   └── de1f4cccc196c22c49189a6f1479902daac05b
-│   │   ├── 9a
-│   │   │   └── 857a213af9bcc9503dcc2524e858b7ce29cc9f
-│   │   ├── 9c
-│   │   │   └── 45cdced36b40ec6d9256117ce433e36a95dde2
-│   │   ├── a3
-│   │   │   └── 8bbcd8f35025a5bb9fb2ee9544451fcb8c9c71
-│   │   ├── a9
-│   │   │   └── 87c907fb4fe261b9fe58b690e6268ffb39a45a
-│   │   ├── b5
-│   │   │   └── a4968f8c450c9bd704fb8ed89b1b80c6d3ff02
-│   │   ├── b8
-│   │   │   └── 075925c27cf411376201f7ec4f82a0c124c86b
-│   │   ├── be
-│   │   │   └── c902832ef9f9687febe288bfac998049b7131f
-│   │   ├── c1
-│   │   │   ├── 1b241bedd031bd4146c9c4901f70e7088084c1
-│   │   │   └── e774c26a43cc3fb0edcab1ceafeaa5d2fc5e36
-│   │   ├── c3
-│   │   │   └── 52aafc61a1867be2109ac7800de52c2f8e454b
-│   │   ├── c4
-│   │   │   └── 0b1cc892d638ba64cdfa1575299ef89d9baf7f
-│   │   ├── c6
-│   │   │   └── 90777d493bb1073e3a3cd960bb5a9fda49030b
-│   │   ├── c8
-│   │   │   └── 41aed8f6d62adfb910b91f73b0b865b15f7568
-│   │   ├── cb
-│   │   │   └── 69bce0c9e967dad576d9c369c33ca679ed781d
-│   │   ├── cd
-│   │   │   └── e3fc15fa57e858a46cb56e8724fecb000de1b3
-│   │   ├── d0
-│   │   │   ├── 4af21ff269a2f93d368ecec4ad4e93fc8e467e
-│   │   │   └── f4cf08cea68b09d6524403c49d2879c4fe5994
-│   │   ├── d1
-│   │   │   └── 0fb0f2715df3ffcae1f31d5b6a006e35ad507b
-│   │   ├── d2
-│   │   │   └── 679929950e03fb99719952bc1aef5581342568
-│   │   ├── d7
-│   │   │   └── 439ce01f10382457e4208a8308ef383ab4651b
-│   │   ├── e0
-│   │   │   └── 93416c5058c1ed7976a7a2ee6d3a49045bd17a
-│   │   ├── e2
-│   │   │   ├── 499a60ccbfe7222315ffff68f77b93f0003dc2
-│   │   │   └── 781ebf33d9595bc8b09a3912d0e93d6922fb74
-│   │   ├── e8
-│   │   │   └── 05ca2da87b1b348058d411b98272ae7a812a6e
-│   │   ├── ec
-│   │   │   └── d4bbfcce3474ad29319bad479841f2689aec93
-│   │   ├── ed
-│   │   │   └── 95ea7091008b98f0439e06c2f09edcad21bec9
-│   │   ├── f1
-│   │   │   └── feac064e8ece6c3755ec256fbd80f50675c6c9
-│   │   ├── f7
-│   │   │   └── 50df970b9df71149b40adfc4a84307cab8d94a
-│   │   ├── f8
-│   │   │   └── 6432703db1d9b197e4bee81c7d495bb313e0da
-│   │   ├── fa
-│   │   │   └── 0d9a611dcf2149330bd2c631d5348b1d662ecc
-│   │   ├── fd
-│   │   │   ├── 2433b126565d3b13a61393e64a1aa5b1dc8e8d
-│   │   │   └── 45b8b383e6783f99c77b14374a6f5c991a0b03
-│   │   ├── fe
-│   │   │   └── 4dc05d354b99a3508bbe6012387ef2a2afe32f
-│   │   ├── info
-│   │   └── pack
-│   │       ├── pack-10c8b4b62ba53bb69c7d3ddfffab609c8fc40d43.idx
-│   │       ├── pack-10c8b4b62ba53bb69c7d3ddfffab609c8fc40d43.pack
-│   │       ├── pack-10c8b4b62ba53bb69c7d3ddfffab609c8fc40d43.rev
-│   │       ├── pack-8f06b5c5374ead258316b20d62f1c1134da2f9e7.idx
-│   │       ├── pack-8f06b5c5374ead258316b20d62f1c1134da2f9e7.pack
-│   │       └── pack-8f06b5c5374ead258316b20d62f1c1134da2f9e7.rev
-│   ├── ORIG_HEAD
-│   ├── packed-refs
-│   └── refs
-│       ├── heads
-│       │   └── main
-│       ├── remotes
-│       │   └── origin
-│       │       ├── HEAD
-│       │       └── main
-│       └── tags
 ├── .gitignore
 ├── globals.css
 ├── hooks
@@ -752,4 +559,4 @@ jearn/
     └── src
         └── server.ts
 
-324 directories, 532 files
+243 directories, 426 files
