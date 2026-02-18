@@ -102,39 +102,75 @@ export async function GET(
     }));
 
     /* =========================================================
-       3️⃣ REFERENCES
-    ========================================================= */
-    const edges = await db
+   3️⃣ REFERENCES (BOTH DIRECTIONS)
+========================================================= */
+
+    // ---------- OUTGOING (this → others) ----------
+    const outgoingEdges = await db
       .collection("post_references")
       .find({ from: postId })
       .project({ to: 1 })
       .toArray();
 
-    const targetIds = edges.map((e) => e.to);
+    const outgoingIds = outgoingEdges.map((e) => e.to);
 
-    const references = targetIds.length
+    const outgoingPosts = outgoingIds.length
       ? await db
           .collection("posts")
-          .find({ _id: { $in: targetIds } })
+          .find({ _id: { $in: outgoingIds } })
           .project({ title: 1, postType: 1 })
           .toArray()
       : [];
 
-    const refResult = references.map((p) => ({
-      _id: p._id.toString(),
-      title: p.title ?? "Untitled",
-      postType: p.postType ?? "Post",
-    }));
+    // ---------- INCOMING (others → this) ----------
+    const incomingEdges = await db
+      .collection("post_references")
+      .find({ to: postId })
+      .project({ from: 1 })
+      .toArray();
+
+    const incomingIds = incomingEdges.map((e) => e.from);
+
+    const incomingPosts = incomingIds.length
+      ? await db
+          .collection("posts")
+          .find({ _id: { $in: incomingIds } })
+          .project({ title: 1, postType: 1 })
+          .toArray()
+      : [];
+
+    // ---------- Normalize ----------
+    const references = {
+      outgoing: outgoingPosts.map((p) => ({
+        _id: p._id.toString(),
+        title: p.title ?? "Untitled",
+        postType: p.postType ?? "Post",
+      })),
+      incoming: incomingPosts.map((p) => ({
+        _id: p._id.toString(),
+        title: p.title ?? "Untitled",
+        postType: p.postType ?? "Post",
+      })),
+    };
 
     /* =========================================================
        4️⃣ TAG USAGE
     ========================================================= */
-    const post = await db
-      .collection("posts")
-      .findOne({ _id: postId }, { projection: { tags: 1, categories: 1 } });
+    const post = await db.collection("posts").findOne(
+      { _id: postId },
+      {
+        projection: {
+          tags: 1,
+          categories: 1,
+          mentionedUserIds: 1,
+          postType: 1,
+          parentId: 1,
+        },
+      }
+    );
+    let effectivePost = post;
 
     const tags = post?.tags ?? [];
-    const categories = post?.categories ?? [];
 
     const tagUsageResults = tags.length
       ? await db
@@ -156,23 +192,101 @@ export async function GET(
     });
 
     /* =========================================================
-       5️⃣ CATEGORY USAGE
+   5️⃣ CATEGORY USAGE (Correct ObjectId version)
     ========================================================= */
-    const categoryUsageResults = categories.length
+    let inheritedCategories = post?.categories ?? [];
+
+    if (
+      post?.postType === "Answer" &&
+      post.parentId &&
+      ObjectId.isValid(post.parentId)
+    ) {
+      const parent = await db
+        .collection("posts")
+        .findOne(
+          { _id: new ObjectId(post.parentId) },
+          { projection: { categories: 1 } }
+        );
+
+      if (parent?.categories?.length) {
+        inheritedCategories = parent.categories;
+      }
+    }
+
+    const categories = inheritedCategories;
+
+    // Get category ObjectIds from current post
+    const categoryIds: ObjectId[] = categories.map(
+      (id: any) => new ObjectId(id)
+    );
+
+    if (categoryIds.length === 0) {
+      return NextResponse.json({
+        comments: limitedComments,
+        commentCount,
+        references,
+        usage: {
+          tags: tagUsage,
+          categories: {},
+        },
+      });
+    }
+
+    // Get category documents to map id → name
+    const categoryDocs = await db
+      .collection("categories")
+      .find({ _id: { $in: categoryIds } })
+      .project({ _id: 1, name: 1 })
+      .toArray();
+
+    // Aggregate usage
+    const categoryUsageResults = await db
+      .collection("posts")
+      .aggregate([
+        { $unwind: "$categories" },
+        { $match: { categories: { $in: categoryIds } } },
+        {
+          $group: {
+            _id: "$categories",
+            count: { $sum: 1 },
+          },
+        },
+      ])
+      .toArray();
+
+    // Map id → name
+    const idToName = new Map(
+      categoryDocs.map((c) => [c._id.toString(), c.name])
+    );
+
+    const categoryUsage: Record<string, number> = {};
+
+    for (const r of categoryUsageResults) {
+      const name = idToName.get(r._id.toString());
+      if (name) {
+        categoryUsage[name] = r.count ?? 0;
+      }
+    }
+
+    /* =========================================================
+   6️⃣ MENTIONED USERS
+    ========================================================= */
+
+    const mentionedIds: ObjectId[] = post?.mentionedUserIds ?? [];
+
+    const mentionedUsers = mentionedIds.length
       ? await db
-          .collection("posts")
-          .aggregate([
-            { $unwind: "$categories" },
-            { $match: { categories: { $in: categories } } },
-            { $group: { _id: "$categories", count: { $sum: 1 } } },
-          ])
+          .collection("users")
+          .find({ _id: { $in: mentionedIds } })
+          .project({ name: 1, uniqueId: 1 })
           .toArray()
       : [];
 
-    const categoryUsage: Record<string, number> = {};
-    categoryUsageResults.forEach((r) => {
-      categoryUsage[r._id.toString()] = r.count ?? 0;
-    });
+    const mentions = mentionedUsers.map((u) => ({
+      _id: u._id.toString(),
+      name: u.name ?? "Unknown",
+      uniqueId: u.uniqueId ?? null,
+    }));
 
     /* =========================================================
        FINAL RESPONSE
@@ -181,7 +295,8 @@ export async function GET(
     return NextResponse.json({
       comments: limitedComments,
       commentCount,
-      references: refResult,
+      references,
+      mentions,
       usage: {
         tags: tagUsage,
         categories: categoryUsage,

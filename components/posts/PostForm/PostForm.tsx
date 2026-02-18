@@ -43,6 +43,7 @@ export interface PostFormData {
   content: string;
   authorId: string | null;
   categories: string[];
+  mentionedUserIds: string[];
   tags: string[];
   references?: string[];
   poll?: Poll;
@@ -70,7 +71,6 @@ export interface PostFormProps {
   mode: PostType;
   questionId?: string;
   onSubmit: (data: PostFormData) => Promise<void>;
-
   initialTitle?: string;
   initialContent?: string;
   initialSelectedCategories?: string[];
@@ -109,8 +109,6 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   const footerRef = useRef<HTMLDivElement>(null);
   const editorReadyRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const clearUndoRef = useRef<ClearSnapshot | null>(null);
-  const clearRedoRef = useRef<ClearSnapshot | null>(null);
   const editorHostRef = useRef<HTMLDivElement>(null);
 
   const isPoll = mode === PostTypes.POLL;

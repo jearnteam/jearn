@@ -218,6 +218,7 @@ export function usePosts() {
       content: string,
       authorId: string | null,
       categories: string[],
+      mentionedUserIds: string[],
       tags: string[],
       references?: string[],
       poll?: {
@@ -249,6 +250,7 @@ export function usePosts() {
           content,
           authorId,
           categories,
+          mentionedUserIds,
           tags,
           references,
           poll,

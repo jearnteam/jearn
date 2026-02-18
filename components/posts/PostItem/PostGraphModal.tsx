@@ -44,14 +44,7 @@ export default function PostGraphModal({
 
   return (
     <FullScreenPortal>
-      <div
-        className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center md:p-6"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            onClose();
-          }
-        }}
-      >
+      <div className="fixed inset-0 z-[99999] bg-black/70 flex items-center justify-center md:p-6">
         <div
           className="
             relative

@@ -5,6 +5,7 @@ import { xhrUpload } from "@/lib/xhrUpload";
 import { PostType, PostTypes, Poll } from "@/types/post";
 import { PostEditorWrapperRef } from "@/components/posts/PostForm/PostEditorWrapper";
 import { extractJearnReferences } from "@/lib/post/extractJearnRelations";
+import { extractMentionedUsers } from "@/lib/post/extractMentions";
 
 type Params = {
   mode: PostType;
@@ -39,6 +40,7 @@ type Params = {
     content: string;
     authorId: string | null;
     categories: string[];
+    mentionedUserIds: string[];
     tags: string[];
     references?: string[];
     poll?: Poll;
@@ -149,11 +151,9 @@ export function usePostSubmit({
       }
 
       html = doc.body.innerHTML;
-      console.log("FINAL HTML STRING:", html);
       const references = extractJearnReferences(html);
-      console.log(references);
       const tags = extractTagsFromHTML(html);
-      console.log(tags);
+      const mentionedUserIds = extractMentionedUsers(html);
 
       /* ================= VIDEO UPLOAD ================= */
 
@@ -186,6 +186,7 @@ export function usePostSubmit({
         content: mode === PostTypes.POLL ? "" : html,
         authorId,
         categories: [...selectedCategories],
+        mentionedUserIds,
         tags,
         references,
         poll:

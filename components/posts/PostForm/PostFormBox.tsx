@@ -80,6 +80,7 @@ export default function PostFormBox({
     content: string,
     authorId: string | null,
     categories: string[],
+    mentionedUserIds: string[],
     tags: string[],
     references?: string[],
     poll?: any,
@@ -252,7 +253,9 @@ export default function PostFormBox({
                         ? "Ask Question"
                         : mode === PostTypes.VIDEO
                         ? "Upload Video"
-                        : "Answer Question"}
+                        : mode === PostTypes.POLL
+                        ? "Create Poll"
+                        : ""}
                     </h2>
 
                     <button
@@ -277,6 +280,7 @@ export default function PostFormBox({
                         data.content,
                         data.authorId,
                         data.categories,
+                        data.mentionedUserIds,
                         data.tags,
                         data.references,
                         data.poll,

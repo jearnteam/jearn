@@ -1,27 +1,42 @@
-export function getGraphOptions() {
-  return {
-    layout: { improvedLayout: true },
+import { Options } from "vis-network";
 
+export function getGraphOptions(): Options {
+  return {
+    autoResize: true,
+    layout: {
+      improvedLayout: true,
+    },
     physics: {
-      stabilization: { enabled: true, iterations: 200 },
+      enabled: true,
+      solver: "barnesHut",
+
       barnesHut: {
-        gravitationalConstant: -1500,
-        springLength: 160,
-        springConstant: 0.035,
-        damping: 0.25,
+        gravitationalConstant: -3500, // stronger repulsion
+        centralGravity: 0.3, // less forced centering
+        springLength: 160, // more breathing space
+        springConstant: 0.02, // more responsive edges
+        damping: 0.45, // smooth settle
+        avoidOverlap: 0.8, // prevent stacking
+      },
+
+      stabilization: {
+        iterations: 200,
+        fit: true,
       },
     },
 
     interaction: {
-      hover: true,
-      tooltipDelay: 150,
+      zoomView: true,
+      dragView: true,
     },
-
-    edges: {
-      smooth: {
-        type: "cubicBezier",
-        roundness: 0.08,
+    nodes: {
+      font: {
+        size: 14,
       },
+    },
+    edges: {
+      smooth: false,
+      length: 140,
     },
   };
 }

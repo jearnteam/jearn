@@ -1,3 +1,5 @@
+import { Mention } from "@/features/Mention";
+
 export function getGraphPalette(isDark: boolean) {
     return isDark
       ? {
@@ -10,6 +12,7 @@ export function getGraphPalette(isDark: boolean) {
           text: "#f8fafc",
           edge: "#545454",
           popupBg: "#1e293b",
+          mention: "#ef4444",
         }
       : {
           background: "#f8fafc",
@@ -21,6 +24,7 @@ export function getGraphPalette(isDark: boolean) {
           text: "#0f172a",
           edge: "#C9C9C9",
           popupBg: "#ffffff",
+          mention: "#dc2626",
         };
   }
   

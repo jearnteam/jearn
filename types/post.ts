@@ -75,6 +75,7 @@ export interface Post {
   };
 
   categories?: CategoryObject[];
+  mentionedUserIds?: string[];
   tags?: string[];
   references?: string[];
 
@@ -124,6 +125,7 @@ export type RawPost = {
   authorAvatar?: string;
   createdAt?: Date;
   categories?: unknown[];
+  mentionedUserIds?: string[];
   tags?: string[];
   references?: ObjectId[];
   mediaRefs?: string[];

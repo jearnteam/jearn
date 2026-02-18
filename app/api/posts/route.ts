@@ -305,6 +305,7 @@ export async function POST(req: Request) {
       replyTo = null,
       txId = null,
       categories = [],
+      mentionedUserIds = [],
       tags = [],
       references = [],
       poll,
@@ -335,6 +336,30 @@ export async function POST(req: Request) {
     ) {
       return NextResponse.json({ error: "Content required" }, { status: 400 });
     }
+
+    let safeMentionedUserIds: ObjectId[] = [];
+
+    if (Array.isArray(mentionedUserIds)) {
+      for (const id of mentionedUserIds) {
+        if (!ObjectId.isValid(id)) {
+          return NextResponse.json(
+            { error: "Invalid mentioned user id" },
+            { status: 400 }
+          );
+        }
+
+        // prevent self mention
+        if (id === session.user.uid) continue;
+
+        safeMentionedUserIds.push(new ObjectId(id));
+      }
+    }
+
+    safeMentionedUserIds = [
+      ...new Map(
+        safeMentionedUserIds.map((id) => [id.toString(), id])
+      ).values(),
+    ];
 
     let safeReferences: ObjectId[] = [];
 
@@ -531,6 +556,7 @@ export async function POST(req: Request) {
       upvoteCount: number;
       upvoters: string[];
       categories: ObjectId[];
+      mentionedUserIds?: ObjectId[];
       tags: string[];
       references?: ObjectId[];
       isAdmin?: boolean;
@@ -556,6 +582,7 @@ export async function POST(req: Request) {
       upvoteCount: 0,
       upvoters: [],
       categories: categories.map((id: string) => new ObjectId(id)),
+      mentionedUserIds: safeMentionedUserIds,
       tags,
       references: safeReferences,
       isAdmin: session.user.role === "admin",
@@ -638,26 +665,18 @@ export async function POST(req: Request) {
     }
 
     // ---------------- NOTIFICATION: MENTION ----------------
-    function extractMentions(text: string) {
-      const matches = text.match(/@([\w]+)/g);
-      if (!matches) return [];
-      return matches.map((m) => m.slice(1));
-    }
-
-    const mentionedIds = extractMentions(content);
-
-    for (const uid of mentionedIds) {
-      const mentionedUser = await users.findOne({ uniqueId: uid });
-
-      if (mentionedUser && mentionedUser._id.toString() !== session.user.uid) {
-        await emitGroupedNotification({
-          userId: mentionedUser._id.toString(),
-          type: "mention",
-          postId: safeParentId ?? result.insertedId.toString(),
-          actorId: session.user.uid,
-        });
-      }
-    }
+    await Promise.all(
+      safeMentionedUserIds
+        .filter((id) => id.toString() !== session.user.uid)
+        .map((id) =>
+          emitGroupedNotification({
+            userId: id.toString(),
+            type: "mention",
+            postId: result.insertedId.toString(),
+            actorId: session.user.uid,
+          })
+        )
+    );
 
     /* ---------------- AI Feedback Logging ---------------- */
     try {

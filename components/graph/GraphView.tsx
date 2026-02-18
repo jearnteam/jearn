@@ -7,20 +7,16 @@ import { getGraphPalette } from "./graphTheme";
 import { buildCommentTree } from "@/lib/buildCommentTree";
 import { getGraphOptions } from "./graphOptions";
 import { safeTextPreview } from "./graphUtils";
+import { Network, DataSet, Node, Edge, Options } from "vis-network/standalone";
 import {
   createPostNode,
   createAuthorNode,
   createHubNode,
   createBoxNode,
   createReferencePostNode,
+  createMentionUserNode,
 } from "./graphNodeFactory";
 import CommentPopup from "./CommentPopup";
-
-declare global {
-  interface Window {
-    vis?: any;
-  }
-}
 
 interface CommentType {
   _id: string;
@@ -61,13 +57,15 @@ export default function GraphView({ post }: { post: GraphPost }) {
   const graphRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<any>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-
-  const [scriptReady, setScriptReady] = useState(false);
   const [comments, setComments] = useState<CommentType[] | null>(null);
   const [commentCount, setCommentCount] = useState<number | null>(null);
-  const [references, setReferences] = useState<
-    { _id: string; title: string }[] | null
+  const [mentions, setMentions] = useState<
+    { _id: string; name: string; uniqueId?: string }[] | null
   >(null);
+  const [references, setReferences] = useState<{
+    outgoing: { _id: string; title: string }[];
+    incoming: { _id: string; title: string }[];
+  } | null>(null);
   const [usage, setUsage] = useState<UsageMap | null>(null);
   const [graphReady, setGraphReady] = useState(false);
 
@@ -111,12 +109,6 @@ export default function GraphView({ post }: { post: GraphPost }) {
 
     setHistoryIndex((prev) => prev + 1);
     setCurrentPost(newPost);
-  }
-
-  async function safeFetch(url: string) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed: ${url}`);
-    return res.json();
   }
 
   function closePopup() {
@@ -177,21 +169,7 @@ export default function GraphView({ post }: { post: GraphPost }) {
       });
     });
   }
-
-  /* ---------------- Load vis ---------------- */
-
-  useEffect(() => {
-    if (window.vis) {
-      setScriptReady(true);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src =
-      "https://unpkg.com/vis-network/standalone/umd/vis-network.min.js";
-    script.onload = () => setScriptReady(true);
-    document.body.appendChild(script);
-  }, []);
+  const EMPTY_REFERENCES = { outgoing: [], incoming: [] };
   useEffect(() => {
     setGraphError(null);
 
@@ -200,21 +178,26 @@ export default function GraphView({ post }: { post: GraphPost }) {
       .then((data) => {
         setComments(data.comments ?? []);
         setCommentCount(data.commentCount ?? 0);
-        setReferences(data.references ?? []);
+        setReferences(data.references ?? EMPTY_REFERENCES);
         setUsage(data.usage ?? { tags: {}, categories: {} });
+        setMentions(data.mentions ?? []);
       })
       .catch(() => {
         setGraphError("Failed to load graph data");
         setComments([]);
-        setReferences([]);
+        setReferences(EMPTY_REFERENCES);
         setUsage({ tags: {}, categories: {} });
         setCommentCount(0);
+        setMentions([]);
       });
   }, [currentPost._id]);
 
   /* ---------------- Build Graph ---------------- */
   const dataReady =
-    scriptReady && comments !== null && references !== null && usage !== null;
+    comments !== null &&
+    references !== null &&
+    usage !== null &&
+    mentions !== null;
   useEffect(() => {
     if (!dataReady || !graphRef.current) return;
 
@@ -226,10 +209,14 @@ export default function GraphView({ post }: { post: GraphPost }) {
       networkRef.current = null;
     }
 
-    const vis = window.vis;
-    const nodes = new vis.DataSet();
-    const edges = new vis.DataSet();
+    const nodes = new DataSet<Node>();
+    const edges = new DataSet<Edge>();
+    const options: Options = getGraphOptions();
+    const net = new Network(graphRef.current, { nodes, edges }, options);
 
+    net.setOptions({
+      physics: { enabled: true },
+    });
     /* ---------- POST ---------- */
     nodes.add(
       createPostNode(
@@ -243,8 +230,6 @@ export default function GraphView({ post }: { post: GraphPost }) {
     );
 
     /* ---------- AUTHOR ---------- */
-
-    const authorNodeId = `author-${currentPost.authorId}`;
     nodes.add(
       createAuthorNode(
         currentPost.authorId,
@@ -254,7 +239,10 @@ export default function GraphView({ post }: { post: GraphPost }) {
       )
     );
 
-    edges.add({ from: currentPost._id, to: `author-${currentPost.authorId}` });
+    edges.add({
+      from: currentPost._id,
+      to: `author-${currentPost.authorId}`,
+    });
 
     /* ---------- CATEGORY HUB ---------- */
 
@@ -272,14 +260,13 @@ export default function GraphView({ post }: { post: GraphPost }) {
 
     edges.add({ from: currentPost._id, to: "hub-categories" });
 
-    currentPost.categories.forEach((c) => {
-      const count = usage.categories[c.name] ?? 0;
-      const id = `cat-${c.name}`;
+    Object.entries(usage.categories).forEach(([name, count]) => {
+      const id = `cat-${name}`;
 
       nodes.add(
         createBoxNode(
           id,
-          `${c.name}\n(${count})`,
+          `${name}\n(${count})`,
           palette.category,
           isDark ? "#1e293b" : "#ffffff",
           palette,
@@ -289,6 +276,56 @@ export default function GraphView({ post }: { post: GraphPost }) {
       );
 
       edges.add({ from: "hub-categories", to: id });
+    });
+
+    /* ---------- MENTION HUB ---------- */
+
+    const mentionHubId = "hub-mentions";
+
+    nodes.add(
+      createHubNode(
+        mentionHubId,
+        "/icons/graph/at-sign.svg",
+        "/icons/graph/at-sign-dark.svg",
+        "#ef4444",
+        palette,
+        isDark
+      )
+    );
+
+    edges.add({
+      from: currentPost._id,
+      to: mentionHubId,
+    });
+
+    mentions.forEach((user) => {
+      const nodeId = `mention-${user._id}`;
+
+      nodes.add(
+        createMentionUserNode(
+          user._id,
+          `@${user.uniqueId ?? user.name}`,
+          palette.category,
+          isDark
+        )
+      );
+
+      edges.add({
+        from: mentionHubId,
+        to: nodeId,
+        color: {
+          color: palette.mention, // normal
+          highlight: palette.mention, // when selected
+          hover: palette.mention, // when hovered
+          inherit: false, // VERY important
+        },
+        smooth: {
+          enabled: true,
+          type: "cubicBezier",
+          roundness: 0.1,
+        },
+        length: 80,
+      });
     });
 
     /* ---------- TAG HUB ---------- */
@@ -333,19 +370,21 @@ export default function GraphView({ post }: { post: GraphPost }) {
     nodes.add(
       createHubNode(
         referenceHub,
-        "/icons/graph/link.svg", // light icon
-        "/icons/graph/link-dark.svg", // dark icon
-        palette.post, // or custom blue
+        "/icons/graph/link.svg",
+        "/icons/graph/link-dark.svg",
+        palette.post,
         palette,
         isDark
       )
     );
 
-    // main post → reference hub
-    edges.add({ from: currentPost._id, to: referenceHub });
+    // Connect main post <-> hub (NO arrows)
+    edges.add({
+      from: currentPost._id,
+      to: referenceHub,
+    });
 
-    // reference hub → referenced posts
-    references.forEach((ref) => {
+    references?.outgoing.forEach((ref) => {
       const refNodeId = `ref-${ref._id}`;
 
       nodes.add(
@@ -362,8 +401,44 @@ export default function GraphView({ post }: { post: GraphPost }) {
       edges.add({
         from: referenceHub,
         to: refNodeId,
+        arrows: "to", // OUTGOING arrow
         dashes: true,
-        length: 120,
+        length: 140,
+        color: { color: palette.post },
+        smooth: {
+          enabled: true,
+          type: "cubicBezier",
+          roundness: 0.1,
+        },
+      });
+    });
+
+    references?.incoming.forEach((ref) => {
+      const refNodeId = `ref-${ref._id}`;
+
+      nodes.add(
+        createReferencePostNode(
+          {
+            _id: ref._id,
+            label: safeTextPreview(ref.title, 24),
+          },
+          palette,
+          isDark
+        )
+      );
+
+      edges.add({
+        from: refNodeId,
+        to: referenceHub,
+        arrows: "to", // arrow pointing toward hub
+        dashes: true,
+        length: 140,
+        color: { color: palette.category },
+        smooth: {
+          enabled: true,
+          type: "cubicBezier",
+          roundness: 0.1,
+        },
       });
     });
 
@@ -407,7 +482,11 @@ export default function GraphView({ post }: { post: GraphPost }) {
       edges.add({
         from: parentId,
         to: id,
-        smooth: { type: "cubicBezier", roundness: 0.1 },
+        smooth: {
+          enabled: true,
+          type: "cubicBezier",
+          roundness: 0.1,
+        },
         physics: true,
         length: 75,
       });
@@ -421,40 +500,41 @@ export default function GraphView({ post }: { post: GraphPost }) {
       addCommentNode(rootComment, commentHub);
     });
 
-    const net = new vis.Network(
-      graphRef.current,
-      { nodes, edges },
-      getGraphOptions()
-    );
-
     networkRef.current = net;
 
-    let didStabilize = false;
-
-    const timeout = setTimeout(() => {
-      if (!didStabilize) {
-        setGraphError("Graph stabilization timeout");
-      }
-    }, 5000);
-
-    net.once("stabilizationIterationsDone", () => {
-      didStabilize = true;
-      clearTimeout(timeout);
-
-      net.focus(currentPost._id, {
-        scale: 1.2,
-        animation: true,
+    net.once("stabilized", () => {
+      net.setOptions({
+        physics: true,
       });
 
-      setGraphReady(true);
-    });
+      // Fit instantly (still hidden)
+      net.fit({
+        animation: false,
+      });
 
-    // 🧠 Fallback if vis skips stabilization
-    net.once("afterDrawing", () => {
-      if (!didStabilize) {
-        clearTimeout(timeout);
-        setGraphReady(true);
-      }
+      // Center instantly (still hidden)
+      net.focus(currentPost._id, {
+        scale: 0.6,
+        animation: false,
+      });
+
+      // 🔥 DO NOT show graph yet
+      setGraphReady(true);
+
+      // 🔥 Wait one frame — then show + animate together
+      requestAnimationFrame(() => {
+        if (graphRef.current) {
+          graphRef.current.style.visibility = "visible";
+        }
+
+        net.focus(currentPost._id, {
+          scale: 1.25,
+          animation: {
+            duration: 900,
+            easingFunction: "easeOutCubic",
+          },
+        });
+      });
     });
 
     net.on("click", (params: any) => {
@@ -493,6 +573,22 @@ export default function GraphView({ post }: { post: GraphPost }) {
         return;
       }
 
+      /* ---------- Mention User ---------- */
+      if (nodeId.startsWith("mention-")) {
+        const userId = nodeId.replace("mention-", "");
+
+        fetch(`/api/users/${userId}`)
+          .then((r) => r.json())
+          .then((userProfile) => {
+            console.log("User clicked:", userProfile);
+            // You can open user popup here later
+          })
+          .catch(() => {});
+
+        closePopup();
+        return;
+      }
+
       /* ---------- Comment ---------- */
       if (nodeId.startsWith("comment-")) {
         showCommentPopup(nodeId);
@@ -503,10 +599,6 @@ export default function GraphView({ post }: { post: GraphPost }) {
       closePopup();
       setSelectedPost(null);
     });
-
-    return () => {
-      clearTimeout(timeout);
-    };
   }, [dataReady, currentPost._id, isDark]);
 
   function retryGraph() {
