@@ -477,14 +477,14 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
-                  label="Videos"
+                  label={t("videos")}
                   active={activeView === "videos"}
                   onClick={() => changeView("videos")}
                 />
               </div>
 
               <SidebarItem
-                label="Chat"
+                label={t("chat")}
                 active={activeView === "chat"}
                 onClick={() => changeView("chat")}
               />

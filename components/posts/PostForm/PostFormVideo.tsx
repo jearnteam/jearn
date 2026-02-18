@@ -1,5 +1,7 @@
 "use client";
 
+import { t } from "i18next";
+
 type Props = {
   videoPreviewUrl: string | null;
   thumbnailPreviewUrl: string | null;
@@ -24,7 +26,7 @@ export default function PostFormVideo({
         />
       ) : (
         <div className="border-2 border-dashed rounded-lg p-6 text-center text-gray-500">
-          No video selected
+          {t("noVideo")}
         </div>
       )}
 
@@ -34,7 +36,7 @@ export default function PostFormVideo({
         onClick={selectVideo}
         className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
       >
-        Select Video
+        {t("selectVideo")}
       </button>
 
       {/* 🖼 Thumbnail Preview */}
@@ -46,7 +48,7 @@ export default function PostFormVideo({
         />
       ) : (
         <div className="text-sm text-gray-500">
-          If the thumbnail is not selected, first frame will be used
+          {t("notSeletThumbnail")}
         </div>
       )}
 
@@ -56,7 +58,7 @@ export default function PostFormVideo({
         onClick={selectThumbnail}
         className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition"
       >
-        Select Thumbnail
+        {t("seletThumbnail")}
       </button>
     </div>
   );

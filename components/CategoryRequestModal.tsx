@@ -95,7 +95,7 @@ export default function CategoryRequestModal({ onClose }: Props) {
                 <textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Why do you need this category?"
+                  placeholder={t("whyReason")}
                   rows={3}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"
                 />

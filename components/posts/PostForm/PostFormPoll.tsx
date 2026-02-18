@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 
 type PollOption = {
   id: string;
@@ -33,7 +35,7 @@ export default function PostFormPoll({
   return (
     <div className="space-y-4 rounded-lg border p-4 bg-gray-50/50 dark:bg-neutral-900/50">
       <p className="text-sm text-gray-500">
-        Create a poll (2–5 options)
+        {t("createPollOpt")}
       </p>
 
       {/* ---------------- Options ---------------- */}
@@ -76,7 +78,7 @@ export default function PostFormPoll({
           "
         >
           <span className="text-lg leading-none">+</span>
-          Add option
+          {t("addOption")}
         </button>
       )}
 
@@ -90,13 +92,13 @@ export default function PostFormPoll({
             onChange={(e) => setAllowMultiple(e.target.checked)}
             className="accent-blue-600"
           />
-          Allow multiple choices
+          {t("multipleChoice")}
         </label>
 
         {/* Expiration */}
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-gray-500">
-            Poll expiration (optional)
+            {t("pollExpiration")}
           </span>
           <input
             type="datetime-local"

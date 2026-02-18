@@ -38,6 +38,7 @@ const en = {
     categoryName: "Category Name",
     search: "Search",
     categoryReason: "Reason (Optional)",
+    whyReason: "Why do you need this category?",
     loadingUser: "Loading User",
     requestSent: "Request sent successfully!",
     sendRequest: "Send Request",
@@ -45,11 +46,27 @@ const en = {
     postAnswer: "Post Answer",
     answers: "Answers",
     noAnswersYet: "No answers yet.",
+    followedYou: "Followed You",
     
     // home page
     home: "Home",
     follow: "Follow",
     notifications: "Notifications",
+    videos: "Videos",
+    chat: "Chat",
+
+    //poll
+    createPoll: "Create Poll",
+    createPollOpt: "Create a poll (2–5 options)",
+    addOption: "Add Option",
+    multipleChoice: "Allow multiple choices",
+    pollExpiration: "Poll expiration (optional)",
+
+    //videos
+    noVideo: "No video selected",
+    selectVideo: "Select Video",
+    notSeletThumbnail: "If the thumbnail is not selected, first frame will be used",
+    seletThumbnail: "Select Thumnail",
     
     notiPage: {
       no_noti_yet: "No notifications yet",
