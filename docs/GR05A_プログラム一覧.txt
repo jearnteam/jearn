@@ -75,32 +75,32 @@ jearn/
 │   │   │   └── status (自身がユーザーをフォローしているか確認する)
 │   │   │       └── [userId]
 │   │   │           └── route.ts
-│   │   ├── images
+│   │   ├── images (画像機能関連API)
 │   │   │   └── [id]
-│   │   │       └── route.ts
-│   │   ├── me
+│   │   │       └── route.ts (失効したAPIのため、現在はエラーを返す)
+│   │   ├── me (ログインしている自身の情報を取得する)
 │   │   │   └── route.ts
-│   │   ├── media
+│   │   ├── media (メディア機能関連API)
 │   │   │   └── upload
-│   │   │       ├── route.ts
+│   │   │       ├── route.ts (画像のアップロード)
 │   │   │       └── video
-│   │   │           └── route.ts
-│   │   ├── notifications
-│   │   │   ├── read
+│   │   │           └── route.ts (動画のアップロード)
+│   │   ├── notifications (通知機能関連API)
+│   │   │   ├── read (通知を既読にする)
 │   │   │   │   └── route.ts
-│   │   │   ├── route.ts
-│   │   │   ├── stream
+│   │   │   ├── route.ts (通知を取得する)
+│   │   │   ├── stream (通知をリアルタイムで取得する)
 │   │   │   │   └── route.ts
-│   │   │   └── unread-count
+│   │   │   └── unread-count (未読件数を取得する)
 │   │   │       └── route.ts
-│   │   ├── ogp
-│   │   │   ├── post
+│   │   ├── ogp (リンクカード生成API)
+│   │   │   ├── post (JEARN投稿へのリンクの場合の情報を取得する)
 │   │   │   │   └── [id]
 │   │   │   │       ├── graph
 │   │   │   │       │   └── route.ts
 │   │   │   │       └── route.ts
-│   │   │   └── route.ts
-│   │   ├── posts
+│   │   │   └── route.ts (リンク先へリクエストを送り、OGPを取得する)
+│   │   ├── posts (投稿機能関連API)
 │   │   │   ├── byUser
 │   │   │   │   └── [id]
 │   │   │   │       └── route.ts
