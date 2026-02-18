@@ -361,7 +361,7 @@ export async function POST(req: Request) {
       ).values(),
     ];
 
-    let safeReferences: ObjectId[] = [];
+    const safeReferences: ObjectId[] = [];
 
     if (Array.isArray(references)) {
       for (const r of references) {

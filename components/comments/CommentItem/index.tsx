@@ -8,6 +8,7 @@ import CommentFooter from "./CommentFooter";
 import PostContent from "@/components/posts/PostItem/PostContent";
 import EditCommentModal from "@/components/comments/EditCommentModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import { VirtuosoHandle } from "react-virtuoso";
 
 export default function CommentItem({
   comment,
@@ -60,7 +61,10 @@ export default function CommentItem({
             <PostContent
               post={comment}
               wrapperRef={wrapperRef}
-              scrollContainerRef={scrollContainerRef}
+              /* TODO: 以下のvirtuosoに必要な項目を正しく追加する */
+              // scrollContainerRef={scrollContainerRef}
+              index={0}
+              virtuosoRef={useRef<VirtuosoHandle | null>(null)}
             />
 
             <CommentFooter

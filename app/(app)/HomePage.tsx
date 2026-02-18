@@ -381,6 +381,7 @@ export default function HomePage() {
               content,
               categories,
               tags,
+              editingPost.references, // TODO: これは正しくない可能性があるので要検証
               commentDisabled
             );
             setEditingPost(null);

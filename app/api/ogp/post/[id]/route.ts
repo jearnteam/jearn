@@ -17,10 +17,7 @@ function extractPlainText(html: string, max = 160) {
   // Remove script/style for safety
   $("script, style").remove();
 
-  return $.text()
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, max);
+  return $.text().replace(/\s+/g, " ").trim().slice(0, max);
 }
 
 /* --------------------------------------------------
@@ -28,10 +25,10 @@ function extractPlainText(html: string, max = 160) {
 -------------------------------------------------- */
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(

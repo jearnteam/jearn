@@ -7,6 +7,7 @@ import PollView from "../posts/PostItem/PollView";
 import { PostTypes } from "@/types/post";
 import { ArrowBigUp } from "lucide-react";
 import dayjs from "dayjs";
+import { VirtuosoHandle } from "react-virtuoso";
 
 export default function PostPopup({
   post,
@@ -65,6 +66,9 @@ export default function PostPopup({
             post={post}
             wrapperRef={{ current: null }}
             disableCollapse
+            /* TODO: 以下のvirtuosoに必要な項目を正しく追加する */
+            index={0}
+            virtuosoRef={useRef<VirtuosoHandle | null>(null)}
           />
 
           {post.postType === PostTypes.POLL && post.poll && onVote && (

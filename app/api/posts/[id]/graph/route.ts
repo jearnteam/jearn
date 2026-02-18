@@ -168,7 +168,7 @@ export async function GET(
         },
       }
     );
-    let effectivePost = post;
+    const effectivePost = post;
 
     const tags = post?.tags ?? [];
 

@@ -21,8 +21,9 @@ interface AnswerModalProps {
     title: string,
     content: string,
     authorId: string | null,
-    tags: string[],
     parentId: string,
+    tags: string[],
+    references: string[],
     commentDisabled?: boolean
   ) => Promise<void>;
 }
@@ -125,8 +126,9 @@ export default function AnswerModal({
                         data.title,
                         data.content,
                         data.authorId,
-                        data.tags,
                         questionPost._id, // parentId として質問IDを渡す
+                        data.tags,
+                        data.references ?? [],
                         commentDisabled
                       );
                       onClose();

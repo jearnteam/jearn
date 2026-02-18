@@ -47,7 +47,7 @@ export const LinkCardPlugin = Extension.create({
 
             // 🔥 CASE 1: JEARN → popup mode
             if (isJearnUrl(normalizedUrl)) {
-              let tr = view.state.tr
+              const tr = view.state.tr
                 .insertText(normalizedUrl, from, to)
                 .setStoredMarks([])
                 .setMeta("jearnLinkDetected", {
@@ -157,7 +157,7 @@ export const LinkCardPlugin = Extension.create({
             event.preventDefault();
 
             // 🔥 Delete only the URL range (not whole paragraph)
-            let tr = state.tr.delete(paragraphStart, paragraphEnd);
+            const tr = state.tr.delete(paragraphStart, paragraphEnd);
 
             // JEARN
             if (isJearnUrl(normalizedUrl)) {

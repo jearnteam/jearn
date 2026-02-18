@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
@@ -16,6 +16,7 @@ import EditPostModal from "@/components/posts/EditPostModal";
 import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
 
 import { usePosts } from "@/features/posts/hooks/usePosts";
+import { VirtuosoHandle } from "react-virtuoso";
 
 interface Props {
   initialPost: Post;
@@ -166,13 +167,17 @@ export default function FullPostClient({
     title: string, // AnswerModal passes title (even if empty)
     content: string,
     authorId: string | null,
+    parentId: string,
     tags: string[],
-    parentId: string
+    references: string[]
   ) => {
     await hookAddAnswer(postType, title, content, authorId, parentId, tags);
     setAnswerModalOpen(false);
     fetchAnswers(); // Reload answers
   };
+
+  /* TODO: 以下のvirtuosoに必要な項目を正しく追加する */
+  const null_virtuoso = useRef<VirtuosoHandle | null>(null);
 
   /* ---------------------------------------------------------
    * Render
@@ -199,6 +204,9 @@ export default function FullPostClient({
           await handleUpvote(id);
         }}
         scrollContainerRef={scrollContainerRef}
+        /* TODO: 以下のvirtuosoに必要な項目を正しく追加する */
+        index={0}
+        virtuosoRef={null_virtuoso}
       />
 
       {/* 🔹 IF QUESTION: SHOW ANSWERS */}
