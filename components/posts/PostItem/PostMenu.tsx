@@ -6,6 +6,7 @@ import { MoreVertical, Pencil, Trash2, Flag } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 import type { Post } from "@/types/post";
+import ReportModal from "@/features/reports/ReportModal";
 
 export default function PostMenu({
   post,
@@ -19,6 +20,7 @@ export default function PostMenu({
   const { user } = useCurrentUser();
   const userId = user?._id ?? "";
   const { t } = useTranslation();
+  const [showReport, setShowReport] = useState(false);
 
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -49,22 +51,29 @@ export default function PostMenu({
   }
 
   async function handleReport() {
-    if (isAuthor) return alert("You can't report your own post.");
-    const reason = prompt("Why report?");
-    if (!reason?.trim()) return;
+    if (isAuthor) return;
+    setOpen(false);
+    setShowReport(true);
+  }
 
-    await fetch("/api/reports", {
+  async function submitReport(reason: string) {
+    const res = await fetch("/api/reports", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         postId: post._id,
         reporterId: userId,
-        reason: reason.trim(),
+        reason,
       }),
     });
 
-    alert("Report submitted.");
-    setOpen(false);
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error); // optional: replace later with toast
+      return;
+    }
+
+    setShowReport(false);
   }
 
   return (
@@ -119,6 +128,11 @@ export default function PostMenu({
           </motion.div>
         )}
       </AnimatePresence>
+      <ReportModal
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        onSubmit={submitReport}
+      />
     </div>
   );
 }
