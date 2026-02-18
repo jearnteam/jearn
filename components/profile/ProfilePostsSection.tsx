@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { RefObject, useState } from "react";
 import type { Post } from "@/types/post";
 import PostList from "@/components/posts/PostList";
 import EditPostModal from "@/components/posts/EditPostModal";
@@ -9,10 +9,12 @@ export default function ProfilePostsSection({
   posts,
   hasMore,
   onLoadMore,
+  scrollRef
 }: {
   posts: Post[];
   hasMore: boolean;
   onLoadMore: () => void;
+  scrollRef?: RefObject<HTMLDivElement | null>; 
 }) {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export default function ProfilePostsSection({
           // optional: add upvote logic later
         }}
         onAnswer={async () => {}}
+        scrollContainerRef={scrollRef}
       />
 
       {editingPost && (

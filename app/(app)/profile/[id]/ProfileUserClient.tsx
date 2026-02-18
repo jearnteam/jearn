@@ -177,7 +177,7 @@ export default function ProfileUserClient({ userId }: Props) {
           onDelete={async () => {}}
           onUpvote={upvotePost}
           onAnswer={() => {}}
-          /* no scrollContainerRef */
+          scrollContainerRef={scrollRef}
         />
       </div>
     </div>

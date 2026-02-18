@@ -3,7 +3,7 @@
 import type { Post } from "@/types/post";
 import PostItem from "./PostItem/PostItem";
 import { motion } from "framer-motion";
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 
 export type VotePollResult = {
@@ -48,9 +48,15 @@ export default function PostList({
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const safePosts = useMemo(() => (Array.isArray(posts) ? posts : []), [posts]);
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   /* ---------------- SCROLL RESTORE ---------------- */
   // 既存の sessionStorage ロジックを Virtuoso のメソッドに適応
   useEffect(() => {
+    if (!isMounted) return;
     // マウント時に一度だけチェック
     const fromNav = sessionStorage.getItem("from-navigation");
     const restoreId = sessionStorage.getItem("restore-post-id");
@@ -71,7 +77,21 @@ export default function PostList({
       sessionStorage.removeItem("restore-post-id");
       sessionStorage.removeItem("from-navigation");
     }
-  }, []); // 初回のみ実行 (depsを空にするか、必要最小限に)
+  }, [isMounted]);
+
+  /* ---------------- SCROLL PARENT RESOLUTION ---------------- */
+  // scrollContainerRef が渡されているのに current が null の場合（＝初期レンダリング時）
+  // Virtuoso に undefined を渡してしまうと Window スクロールモードで暴走してしまうため、
+  // ref が解決するまで（isMountedまで）待機するのが安全。
+  
+  // Refが渡されていない(=Windowスクロール) 場合は即座に true
+  // Refが渡されている場合は、current が存在するまで待つ
+  const isScrollParentReady = !scrollContainerRef || !!scrollContainerRef.current;
+
+  // まだ準備できていないなら、ローディングか空を返す（一瞬なので目視できないレベル）
+  if (!isScrollParentReady && !isMounted) {
+    return <div className="h-full w-full" />; 
+  }
 
   /* ---------------- RENDER ---------------- */
   return (
@@ -79,7 +99,7 @@ export default function PostList({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.4 }}
-      className="h-full w-full" // Virtuosoには高さが必要（親に合わせる）
+      className={!scrollContainerRef ? "w-full min-h-screen" : "w-full h-full"} // Virtuosoには高さが必要（親に合わせる）
     >
       <Virtuoso
         ref={virtuosoRef}
@@ -90,15 +110,20 @@ export default function PostList({
           if (hasMore) onLoadMore();
         }}
         overscan={500} // 描画領域の上下500pxを予備でレンダリング（チラつき防止）
-        increaseViewportBy={200} // さらに余裕を持たせる
-        
+        increaseViewportBy={{
+          top: 800,
+          bottom: 800,
+        }} // さらに余裕を持たせる
         // 各アイテムのレンダリング
         itemContent={(index, post) => {
           const key = viewId ? `${viewId}:${post._id}` : post._id;
+
           return (
-            <div className="pb-[2px]"> {/* space-y-[2px] の代わり */}
+            <div className="pb-[2px]">
               <PostItem
                 key={key}
+                index={index} // 🔥 ADD THIS
+                virtuosoRef={virtuosoRef} // 🔥 ADD THIS
                 post={post}
                 onEdit={() => onEdit(post)}
                 onDelete={() => onDelete(post._id)}
@@ -110,7 +135,6 @@ export default function PostList({
             </div>
           );
         }}
-
         // フッター（ローディング表示）
         components={{
           Footer: () => {

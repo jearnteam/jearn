@@ -34,6 +34,7 @@ export default function ProfilePage({ scrollContainerRef }: ProfilePageProps) {
           posts={posts.posts}
           hasMore={posts.hasMore}
           onLoadMore={posts.loadMore}
+          scrollRef={scrollContainerRef}
         />
       </div>
     </ProfileLayout>

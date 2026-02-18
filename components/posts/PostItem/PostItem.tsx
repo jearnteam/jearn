@@ -10,6 +10,7 @@ import PostFooter from "./PostFooter";
 import PostGraphModal from "./PostGraphModal";
 import SharePostModal from "@/components/common/SharePostModal";
 import PollView from "./PollView";
+import { VirtuosoHandle } from "react-virtuoso";
 
 export type VotePollResult = {
   poll: Post["poll"];
@@ -21,6 +22,8 @@ export type VotePollResult = {
  */
 export default function PostItem({
   post,
+  index,
+  virtuosoRef,
   setPost,
   onEdit,
   onDelete,
@@ -31,7 +34,8 @@ export default function PostItem({
   scrollContainerRef,
 }: {
   post: Post;
-
+  index: number;
+  virtuosoRef: React.RefObject<VirtuosoHandle | null>;
   setPost?: React.Dispatch<React.SetStateAction<Post | null>>;
 
   onEdit?: () => Promise<void> | void;
@@ -169,7 +173,8 @@ export default function PostItem({
 
           <PostContent
             post={post}
-            scrollContainerRef={scrollContainerRef}
+            index={index}
+            virtuosoRef={virtuosoRef}
             wrapperRef={wrapperRef}
           />
 

@@ -1,15 +1,15 @@
 "use client";
 
 import type { Post } from "@/types/post";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import { MathRenderer } from "@/components/math/MathRenderer";
 import { usePostCollapse, COLLAPSED_HEIGHT } from "./usePostCollapse";
-import { useEffect, useMemo, useState, useRef } from "react";
 import { PostTypes } from "@/types/post";
 import { hasMeaningfulContent } from "@/lib/processText";
+import { VirtuosoHandle } from "react-virtuoso";
 
 /* -------------------------------------------------
- * 🧠 Extract ONLY the first img / video (変更なし)
+ * 🧠 Extract ONLY the first img / video
  * ------------------------------------------------- */
 function splitFirstMedia(html: string): {
   firstMediaHTML: string | null;
@@ -62,7 +62,7 @@ function splitFirstMedia(html: string): {
 }
 
 /* -------------------------------------------------
- * 🎥 Extract first frame (変更なし)
+ * 🎥 Extract first frame for video
  * ------------------------------------------------- */
 async function extractVideoPoster(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -93,31 +93,38 @@ async function extractVideoPoster(url: string): Promise<string> {
 
 export default function PostContent({
   post,
-  wrapperRef,
-  scrollContainerRef,
   disableCollapse = false,
+  index,
+  virtuosoRef,
+  wrapperRef,
 }: {
   post: Post;
-  wrapperRef: React.RefObject<HTMLDivElement | null>;
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   disableCollapse?: boolean;
+  index: number;
+  virtuosoRef: React.RefObject<VirtuosoHandle | null>;
+  wrapperRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [poster, setPoster] = useState<string | undefined>(undefined);
 
+  /* ---------------- VIDEO HANDLING ---------------- */
   useEffect(() => {
     if (post.postType !== PostTypes.VIDEO) return;
     if (!post.video?.url) return;
+
     let cancelled = false;
+
     extractVideoPoster(post.video.url)
       .then((img) => {
         if (!cancelled) setPoster(img);
       })
       .catch(() => {});
+
     return () => {
       cancelled = true;
     };
   }, [post.postType, post.video?.url]);
 
+  /* ---------------- SPLIT MEDIA ---------------- */
   const { firstMediaHTML, restHTML } = useMemo(
     () => splitFirstMedia(post.content ?? ""),
     [post.content]
@@ -128,51 +135,53 @@ export default function PostContent({
     [restHTML]
   );
 
-  const { contentRef, isTruncated, expanded, setExpanded, isMeasurementDone } =
+  /* ---------------- COLLAPSE LOGIC ---------------- */
+  const { contentRef, expanded, setExpanded, needsCollapse } =
     usePostCollapse();
 
-  const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const isCollapsed = !disableCollapse && !expanded;
+  const collapseWithSnap = () => {
+    setExpanded(false);
 
-    if (expanded) {
-      // 🔽 Show Less (閉じる)
-      // まず状態を更新して、レンダリング上の高さを縮める
-      setExpanded(false);
+    requestAnimationFrame(() => {
+      const el = wrapperRef.current;
+      if (!el) return;
 
-      // DOM更新完了後(requestAnimationFrame)にスクロール位置を調整する
-      requestAnimationFrame(() => {
-        const wrapper = wrapperRef.current;
-        const scroller = scrollContainerRef?.current;
+      const rect = el.getBoundingClientRect();
 
-        if (wrapper && scroller) {
-          const wrapperRect = wrapper.getBoundingClientRect();
-          const scrollerRect = scroller.getBoundingClientRect();
+      if (rect.top >= 0) return;
 
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              // 「縮んだ後」の状態で、投稿の上端が画面外(上)にあるかチェック
-              if (wrapperRect.top < scrollerRect.top) {
-                // 要素の上端を、画面上端(＋オフセット)に合わせる
-                // scrollIntoViewのような挙動を手動計算で行う
-                const targetScrollTop =
-                  scroller.scrollTop + (wrapperRect.top - scrollerRect.top);
-
-                scroller.scrollTo({
-                  top: targetScrollTop,
-                  behavior: "auto", // アニメーションなしで即時移動
-                });
-              }
-            });
-          });
-        }
+      virtuosoRef.current?.scrollToIndex({
+        index,
+        align: "start",
+        behavior: "auto",
       });
+    });
+  };
+
+  const handleToggleExpand = () => {
+    if (expanded) {
+      collapseWithSnap();
     } else {
-      // 🔼 Show More (開く)
-      // こちらはアニメーションさせたいので普通に更新
       setExpanded(true);
     }
   };
+  const handleContentDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!expanded) return;
 
+    const target = e.target as HTMLElement;
+
+    // Ignore interactive elements
+    if (
+      target.closest("a, button, input, textarea, video, img, [role='button']")
+    ) {
+      return;
+    }
+
+    collapseWithSnap();
+  };
+
+  /* ---------------- VIDEO POST ---------------- */
   if (post.postType === PostTypes.VIDEO && post.video?.url) {
     return (
       <div className="mt-2">
@@ -190,78 +199,58 @@ export default function PostContent({
     );
   }
 
-  // ■ 状態判定
-  // 1. disableCollapse なら全表示
-  // 2. expanded なら全表示
-  // 3. 計測完了済み(isMeasurementDone) で、かつ短い投稿(!isTruncated) と判明したら全表示
-  // 4. それ以外（初期ロード中、または長い投稿の未展開時）は省略表示
-  const isCollapsed =
-    !disableCollapse && !expanded && !(isMeasurementDone && !isTruncated);
-
-  // ✅ 高さのターゲット計算
-  // 初期状態(isMeasurementDone=false)は isTruncated=true なので COLLAPSED_HEIGHT になる
-  const targetHeight = disableCollapse
-    ? "auto"
-    : expanded
-    ? "auto"
-    : !isTruncated
-    ? "auto"
-    : COLLAPSED_HEIGHT;
-
+  /* ---------------- NORMAL POST ---------------- */
   return (
     <>
+      {/* First Media */}
       {firstMediaHTML && (
         <div className="mt-2">
           <MathRenderer html={firstMediaHTML} />
         </div>
       )}
 
+      {/* Rest Content */}
       {hasRestContent && (
         <>
           {disableCollapse ? (
-            // 🔥 FULL DISPLAY MODE (Modal Mode)
+            /* 🔥 Full Display Mode (Modal) */
             <div className="mt-2">
-              <MathRenderer
-                html={restHTML}
-                openLinksInNewTab={disableCollapse}
-              />
+              <MathRenderer html={restHTML} openLinksInNewTab />
             </div>
           ) : (
-            // 🔥 FEED COLLAPSE MODE
+            /* 🔥 Feed Collapse Mode */
             <>
-              <motion.div
+              <div
                 ref={contentRef}
-                initial={false}
-                animate={{ height: targetHeight }}
-                transition={{
-                  duration: expanded ? 0.3 : 0,
-                  ease: "easeInOut",
-                }}
-                className="relative overflow-hidden mt-2"
+                onDoubleClick={handleContentDoubleClick}
+                className={`relative overflow-hidden mt-2 transition-[max-height] duration-300 ease-in-out ${
+                  expanded ? "cursor-zoom-out" : ""
+                }`}
                 style={{
-                  maxHeight:
-                    !expanded && (isTruncated || !isMeasurementDone)
-                      ? COLLAPSED_HEIGHT
-                      : undefined,
+                  maxHeight: !needsCollapse
+                    ? undefined
+                    : expanded
+                    ? undefined
+                    : COLLAPSED_HEIGHT,
+                  overflow: "hidden",
                 }}
               >
                 <div className={expanded ? "pb-4" : ""}>
                   <MathRenderer html={restHTML} />
                 </div>
 
-                {isCollapsed && (
+                {!expanded && needsCollapse && (
                   <div
                     className="
-                absolute bottom-0 left-0 w-full h-24
-                bg-gradient-to-t from-white via-white/80 to-transparent
-                dark:from-black dark:via-black/80
-                pointer-events-none
-              "
+                      absolute bottom-0 left-0 w-full h-24
+                      bg-gradient-to-t from-white via-white/80 to-transparent
+                      dark:from-black dark:via-black/80
+                      pointer-events-none
+                    "
                   />
                 )}
-              </motion.div>
-
-              {isMeasurementDone && (isTruncated || expanded) && (
+              </div>
+              {needsCollapse && (
                 <div className="mt-1 text-left">
                   <button
                     onClick={handleToggleExpand}
