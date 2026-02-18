@@ -1,60 +1,56 @@
 jearn/
-├── ai-service
+├── ai-service (AIカテゴライズシステム)
 │   ├── Dockerfile
-│   ├── main.py
-│   ├── models
+│   ├── main.py (AIによるカテゴライズ)
+│   ├── models (AIモデルのバイナリファイル)
 │   │   ├── sns_clf1.joblib
 │   │   ├── sns_clf5.joblib
 │   │   └── sns_clf_kw_best_verify.joblib
-│   ├── __pycache__
-│   │   └── main.cpython-311.pyc
-│   ├── README.md
-│   └── requirements.txt
-├── app
+├── app (画面とAPI)
 │   ├── actions.ts
-│   ├── after-google-logout
+│   ├── after-google-logout (ログアウト後の画面)
 │   │   └── page.tsx
-│   ├── api
-│   │   ├── admin
-│   │   │   ├── all-posts
+│   ├── api (全てのAPI)
+│   │   ├── admin (管理者専用API)
+│   │   │   ├── all-posts (全ての投稿を取得する)
 │   │   │   │   └── route.ts
-│   │   │   ├── analytics
+│   │   │   ├── analytics (統計に必要な全ての情報を取得する)
 │   │   │   │   └── route.ts
-│   │   │   ├── category-request
-│   │   │   │   ├── approve
+│   │   │   ├── category-request (カテゴリーリクエストに対する操作)
+│   │   │   │   ├── approve (リクエストを承認する)
 │   │   │   │   │   └── route.ts
-│   │   │   │   ├── reject
+│   │   │   │   ├── reject (リクエストを却下する)
 │   │   │   │   │   └── route.ts
-│   │   │   │   └── route.ts
-│   │   │   ├── delete-post
+│   │   │   │   └── route.ts (リクエストを取得する)
+│   │   │   ├── delete-post (投稿を削除する)
 │   │   │   │   └── [id]
 │   │   │   │       └── route.ts
-│   │   │   ├── notifications
+│   │   │   ├── notifications (管理者用最新の通知を取得する)
 │   │   │   │   └── route.ts
-│   │   │   └── update-post
+│   │   │   └── update-post (投稿データを書き換える)
 │   │   │       └── [id]
 │   │   │           └── route.ts
-│   │   ├── auth
+│   │   ├── auth (認証関連API)
 │   │   │   ├── google
 │   │   │   │   └── revoke
 │   │   │   │       └── route.ts
 │   │   │   └── [...nextauth]
 │   │   │       └── route.ts
-│   │   ├── categories
+│   │   ├── categories (全てのカテゴリー)
 │   │   │   └── route.ts
-│   │   ├── categorize
+│   │   ├── categorize (投稿本文からカテゴライズする)
 │   │   │   └── route.ts
 │   │   ├── category
-│   │   │   ├── by-name
+│   │   │   ├── by-name (カテゴリー名からカテゴリー情報を取得する)
 │   │   │   │   └── [slug]
 │   │   │   │       └── route.ts
-│   │   │   └── usage
+│   │   │   └── usage (カテゴリー使用量)
 │   │   │       ├── bulk
 │   │   │       │   └── route.ts
 │   │   │       └── route.ts
-│   │   ├── category-request
+│   │   ├── category-request (カテゴリーリクエストを受ける)
 │   │   │   └── route.ts
-│   │   ├── chat
+│   │   ├── chat (チャット機能関連API)
 │   │   │   ├── list
 │   │   │   │   └── route.ts
 │   │   │   ├── messages
@@ -63,20 +59,20 @@ jearn/
 │   │   │       ├── [roomId]
 │   │   │       │   └── route.ts
 │   │   │       └── route.ts
-│   │   ├── follow
-│   │   │   ├── count
+│   │   ├── follow (フォロー機能関連API)
+│   │   │   ├── count (ユーザーのフォロー・フォロワー数)
 │   │   │   │   └── [userId]
 │   │   │   │       └── route.ts
-│   │   │   ├── followers
+│   │   │   ├── followers (ユーザーのフォロワー情報)
 │   │   │   │   └── [userId]
 │   │   │   │       └── route.ts
-│   │   │   ├── following
+│   │   │   ├── following (ユーザーのフォロー情報)
 │   │   │   │   └── [userId]
 │   │   │   │       └── route.ts
-│   │   │   ├── me
+│   │   │   ├── me (自身のフォローしているユーザーの情報)
 │   │   │   │   └── route.ts
-│   │   │   ├── route.ts
-│   │   │   └── status
+│   │   │   ├── route.ts (フォロー切り替え)
+│   │   │   └── status (自身がユーザーをフォローしているか確認する)
 │   │   │       └── [userId]
 │   │   │           └── route.ts
 │   │   ├── images
@@ -88,105 +84,6 @@ jearn/
 │   │   │   └── upload
 │   │   │       ├── route.ts
 │   │   │       └── video
-│   │   │           └── route.ts
-│   │   ├── mobile
-│   │   │   ├── admin
-│   │   │   │   ├── all-posts
-│   │   │   │   │   └── route.ts
-│   │   │   │   ├── delete-post
-│   │   │   │   │   └── [id]
-│   │   │   │   │       └── route.ts
-│   │   │   │   └── update-post
-│   │   │   │       └── [id]
-│   │   │   │           └── route.ts
-│   │   │   ├── auth
-│   │   │   │   ├── google
-│   │   │   │   │   └── revoke
-│   │   │   │   │       └── route.ts
-│   │   │   │   └── [...nextauth]
-│   │   │   │       └── route.ts
-│   │   │   ├── categories
-│   │   │   │   └── route.ts
-│   │   │   ├── categorize
-│   │   │   │   └── route.ts
-│   │   │   ├── category
-│   │   │   │   ├── by-name
-│   │   │   │   │   └── [slug]
-│   │   │   │   │       └── route.ts
-│   │   │   │   └── usage
-│   │   │   │       ├── bulk
-│   │   │   │       │   └── route.ts
-│   │   │   │       └── route.ts
-│   │   │   ├── follow
-│   │   │   │   ├── count
-│   │   │   │   │   └── [userId]
-│   │   │   │   │       └── route.ts
-│   │   │   │   ├── route.ts
-│   │   │   │   └── status
-│   │   │   │       └── [userId]
-│   │   │   │           └── route.ts
-│   │   │   ├── images
-│   │   │   │   ├── [id]
-│   │   │   │   │   └── route.ts
-│   │   │   │   └── uploadImage
-│   │   │   │       └── route.ts
-│   │   │   ├── notifications
-│   │   │   │   ├── read
-│   │   │   │   │   └── route.ts
-│   │   │   │   ├── route.ts
-│   │   │   │   ├── stream
-│   │   │   │   │   └── route.ts
-│   │   │   │   └── unread-count
-│   │   │   │       └── route.ts
-│   │   │   ├── posts
-│   │   │   │   ├── byUser
-│   │   │   │   │   └── [id]
-│   │   │   │   │       └── route.ts
-│   │   │   │   ├── helpers.ts
-│   │   │   │   ├── [id]
-│   │   │   │   │   ├── comments
-│   │   │   │   │   │   └── route.ts
-│   │   │   │   │   ├── route.ts
-│   │   │   │   │   └── upvote
-│   │   │   │   │       └── route.ts
-│   │   │   │   └── route.ts
-│   │   │   ├── reports
-│   │   │   │   ├── check
-│   │   │   │   │   └── route.ts
-│   │   │   │   ├── [id]
-│   │   │   │   │   └── route.ts
-│   │   │   │   └── route.ts
-│   │   │   ├── stream
-│   │   │   │   └── route.ts
-│   │   │   ├── tags
-│   │   │   │   ├── [tag]
-│   │   │   │   │   └── route.ts
-│   │   │   │   └── usage
-│   │   │   │       ├── bulk
-│   │   │   │       │   └── route.ts
-│   │   │   │       └── route.ts
-│   │   │   ├── upload
-│   │   │   │   └── route.ts
-│   │   │   └── user
-│   │   │       ├── by-uid
-│   │   │       │   └── [uid]
-│   │   │       │       └── route.ts
-│   │   │       ├── by-unique-id
-│   │   │       │   └── [uniqueId]
-│   │   │       │       └── route.ts
-│   │   │       ├── current
-│   │   │       │   └── route.ts
-│   │   │       ├── [id]
-│   │   │       │   └── route.ts
-│   │   │       ├── search
-│   │   │       │   └── route.ts
-│   │   │       ├── subscribe
-│   │   │       │   └── route.ts
-│   │   │       ├── update
-│   │   │       │   └── route.ts
-│   │   │       ├── update-language
-│   │   │       │   └── route.ts
-│   │   │       └── update-theme
 │   │   │           └── route.ts
 │   │   ├── notifications
 │   │   │   ├── read
