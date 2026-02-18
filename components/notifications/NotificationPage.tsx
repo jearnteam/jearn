@@ -34,7 +34,7 @@ export default function NotificationPage() {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const { items, fetchNotifications } = useNotificationContext();
+  const { items, fetchNotifications, loading } = useNotificationContext();
 
   /* ---------------------------------------------
    * FETCH ON OPEN
@@ -44,20 +44,27 @@ export default function NotificationPage() {
   }, [fetchNotifications]);
 
   /* ---------------------------------------------
-   * OVERLAY NAVIGATION (🔑 KEY FIX)
+   * OVERLAY NAVIGATION
    * ------------------------------------------- */
   const openPostOverlay = useCallback(
     (postId: string) => {
-      // mark this navigation as overlay-intent
       sessionStorage.setItem("from-navigation", "true");
       sessionStorage.setItem("restore-post-id", postId);
-
       router.push(`/posts/${postId}`);
     },
     [router]
   );
 
   if (!mounted) return null;
+
+  //Loading 表示
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-20">
+        <p className="text-gray-500 text-sm">{t("notiPage.loading") ?? "Loading…"}</p>
+      </div>
+    );
+  }
 
   const sortedItems = [...items].sort((a, b) => {
     const aTime = new Date(a.updatedAt ?? a.createdAt).getTime();
@@ -117,47 +124,24 @@ function NotificationItem({
     switch (notification.type) {
       case "post_like": {
         const count = notification.count ?? 1;
-        if (count > 1) {
-          return `${notification.lastActorName} and ${count - 1} others ${
-            t("notiPage.upvote_noti")
-          }`;
-        }
-        return `${notification.lastActorName} ${
-          t("notiPage.upvote_noti")
-        }`;
+        return count > 1
+          ? `${notification.lastActorName} and ${count - 1} others ${t("notiPage.upvote_noti")}`
+          : `${notification.lastActorName} ${t("notiPage.upvote_noti")}`;
       }
-
       case "mention":
-        return `${notification.lastActorName} ${
-          t("notiPage.mention_noti")
-        }`;
-
+        return `${notification.lastActorName} ${t("notiPage.mention_noti")}`;
       case "comment":
-        return `${notification.lastActorName} ${
-          t("notiPage.comment_noti")
-        }`;
+        return `${notification.lastActorName} ${t("notiPage.comment_noti")}`;
       case "answer":
-        return `${notification.lastActorName} ${
-          t("notiPage.answer_noti")
-        }`;
-
+        return `${notification.lastActorName} ${t("notiPage.answer_noti")}`;
       case "system":
-        return (
-          notification.postPreview ?? t("notiPage.system_noti")
-        );
-
+        return notification.postPreview ?? t("notiPage.system_noti");
       case "follow": {
         const count = notification.count ?? 1;
-
-        if (count > 1) {
-          return `${notification.lastActorName} and ${
-            count - 1
-          } others followed you`;
-        }
-
-        return `${notification.lastActorName} followed you`;
+        return count > 1
+          ? `${notification.lastActorName} and ${count - 1} others followed you`
+          : `${notification.lastActorName} followed you`;
       }
-
       default:
         return t("notifications");
     }
@@ -167,26 +151,18 @@ function NotificationItem({
 
   return (
     <div
-      onClick={() => {
-        if (notification.postId) {
-          onOpenPost(notification.postId);
-        }
-      }}
-      className={[
-        "cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition",
-        "border-gray-200 dark:border-neutral-800",
-        "hover:bg-neutral-50 dark:hover:bg-neutral-900/60",
-        "bg-white dark:bg-neutral-950",
-      ].join(" ")}
+      onClick={() => notification.postId && onOpenPost(notification.postId)}
+      className="cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition
+                 border-gray-200 dark:border-neutral-800
+                 hover:bg-neutral-50 dark:hover:bg-neutral-900/60
+                 bg-white dark:bg-neutral-950"
     >
-      {/* AVATAR */}
       <img
         src={avatar}
         alt={notification.lastActorName}
         className="w-9 h-9 rounded-full flex-shrink-0 mt-0.5"
       />
 
-      {/* CONTENT */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
         <div className="flex items-center gap-2 min-w-0">
           <p className="text-sm leading-tight truncate">{renderMessage()}</p>
