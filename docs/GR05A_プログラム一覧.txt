@@ -196,25 +196,25 @@ jearn/
 │   │   │   └── SimpleLayout.tsx
 │   │   ├── layout.tsx
 │   │   ├── @overlay (画面の上に重ねて表示する画面)
-│   │   │   ├── (.)category
+│   │   │   ├── (.)category (カテゴリーごとの投稿画面のオーバーレイ)
 │   │   │   │   └── [slug]
 │   │   │   │       └── page.tsx
-│   │   │   ├── (.chat)
+│   │   │   ├── (.chat) (チャット画面のオーバーレイ)
 │   │   │   │   └── chat
 │   │   │   │       ├── page.tsx
 │   │   │   │       └── [roomId]
 │   │   │   │           └── page.tsx
 │   │   │   ├── default.tsx
-│   │   │   ├── (.)posts
+│   │   │   ├── (.)posts (投稿詳細画面のオーバーレイ)
 │   │   │   │   └── [id]
 │   │   │   │       └── page.tsx
-│   │   │   ├── (.)profile
+│   │   │   ├── (.)profile (ユーザーに関する画面のオーバーレイ)
 │   │   │   │   ├── [id]
 │   │   │   │   │   └── page.tsx
 │   │   │   │   └── page.tsx
-│   │   │   ├── (.)search
+│   │   │   ├── (.)search (検索詳細画面のオーバーレイ)
 │   │   │   │   └── page.tsx
-│   │   │   └── (.)tags
+│   │   │   └── (.)tags (ハッシュタグごとの投稿画面のオーバーレイ)
 │   │   │       └── [tag]
 │   │   │           ├── loading.tsx
 │   │   │           └── page.tsx
@@ -270,38 +270,38 @@ jearn/
 │   ├── 3d_spinner (スクロールに連動して回転するロゴ)
 │   │   ├── 3d_spinner.tsx
 │   │   └── ScrollContext.tsx
-│   ├── Avatar.tsx
-│   ├── category
-│   │   └── CategoryPostListClient.tsx
-│   ├── CategoryRequestModal.tsx
-│   ├── chat
-│   │   ├── ChatListClient.tsx
-│   │   ├── ChatOverlayShell.tsx
-│   │   └── ChatRoomClient.tsx
-│   ├── ClientProviders.tsx
-│   ├── comments
-│   │   ├── CommentClientSection.tsx
-│   │   ├── CommentFormModal.tsx
-│   │   ├── CommentForm.tsx
-│   │   ├── CommentItem
-│   │   │   ├── CommentFooter.tsx
-│   │   │   ├── CommentHeader.tsx
+│   ├── Avatar.tsx (ユーザーアイコン)
+│   ├── category (カテゴリー機能関連のコンポーネント)
+│   │   └── CategoryPostListClient.tsx (カテゴリー画面の投稿リスト)
+│   ├── CategoryRequestModal.tsx (カテゴリーリクエストのモーダルウィンドウ)
+│   ├── chat (チャット機能関連のコンポーネント)
+│   │   ├── ChatListClient.tsx (メッセージリスト)
+│   │   ├── ChatOverlayShell.tsx (チャット画面全体のオーバーレイ)
+│   │   └── ChatRoomClient.tsx (チャット画面のメイン)
+│   ├── ClientProviders.tsx (セッションを使用する境界)
+│   ├── comments (コメント機能関連のコンポーネント)
+│   │   ├── CommentClientSection.tsx (コメント画面のメイン)
+│   │   ├── CommentFormModal.tsx (コメント入力モーダルウィンドウ)
+│   │   ├── CommentForm.tsx (コメント入力フォーム)
+│   │   ├── CommentItem (投稿についたコメントの表示)
+│   │   │   ├── CommentFooter.tsx (コメントの下部)
+│   │   │   ├── CommentHeader.tsx (コメントの上部)
 │   │   │   └── index.tsx
-│   │   ├── CommentList.tsx
-│   │   └── EditCommentModal.tsx
+│   │   ├── CommentList.tsx (投稿についたコメントリスト)
+│   │   └── EditCommentModal.tsx (コメント編集モーダルウィンドウ)
 │   ├── common
-│   │   ├── AppGuard.tsx
-│   │   ├── DeleteConfirmModal.tsx
-│   │   ├── FullScreenLoader.tsx
-│   │   ├── HydrationGuard.tsx
-│   │   ├── Portal.tsx
-│   │   ├── PullToRefreshIndicator.tsx
-│   │   └── SharePostModal.tsx
-│   ├── follow
-│   │   ├── FollowButton.tsx
-│   │   ├── FollowListModal.tsx
-│   │   └── FollowStats.tsx
-│   ├── graph
+│   │   ├── AppGuard.tsx (ローディング中とレンダリングの実行の境界を制御する)
+│   │   ├── DeleteConfirmModal.tsx (投稿削除確認モーダルウィンドウ)
+│   │   ├── FullScreenLoader.tsx (全画面ローディング画面)
+│   │   ├── HydrationGuard.tsx (レンダリング完了とユーザーへの準備完了の境界を制御する)
+│   │   ├── Portal.tsx (画面の中心にモーダルウィンドウを配置する)
+│   │   ├── PullToRefreshIndicator.tsx (モバイル環境で引っ張ることでリストを更新する機能)
+│   │   └── SharePostModal.tsx (投稿共有モーダルウィンドウ)
+│   ├── follow (フォロー機能関連のコンポーネント)
+│   │   ├── FollowButton.tsx (フォローボタン)
+│   │   ├── FollowListModal.tsx (フォロー中ユーザーリストモーダルウィンドウ)
+│   │   └── FollowStats.tsx (フォロー情報の表示)
+│   ├── graph (グラフビュー機能関連のコンポーネント)
 │   │   ├── CommentPopup.tsx
 │   │   ├── graphColorFactory.ts
 │   │   ├── graphNodeFactory.ts
@@ -311,12 +311,12 @@ jearn/
 │   │   ├── graphUtils.ts
 │   │   ├── GraphView.tsx
 │   │   └── PostPopup.tsx
-│   ├── I18nProvider.tsx
-│   ├── LangSwitcher.tsx
-│   ├── LanguageInitializer.tsx
-│   ├── LoadingOwl.tsx
-│   ├── math
-│   │   ├── dom
+│   ├── I18nProvider.tsx (翻訳機能を利用する境界)
+│   ├── LangSwitcher.tsx (言語切り替えメニュー)
+│   ├── LanguageInitializer.tsx (初期言語読込)
+│   ├── LoadingOwl.tsx (ローディング中の梟のアニメーション)
+│   ├── math (リッチテキスト表示機能関連のコンポーネント)
+│   │   ├── dom (拡張機能)
 │   │   │   ├── copy.ts
 │   │   │   ├── editor.ts
 │   │   │   ├── embeds.ts
@@ -325,76 +325,74 @@ jearn/
 │   │   │   ├── mentions.ts
 │   │   │   ├── prism.ts
 │   │   │   └── tags.ts
-│   │   ├── MathExtension.ts
-│   │   └── MathRenderer.tsx
-│   ├── MobileNavbar.tsx
-│   ├── Navbar.tsx
+│   │   ├── MathExtension.ts (画面要素の拡張機能を定義する)
+│   │   └── MathRenderer.tsx (画面にレンダリングする機能)
+│   ├── MobileNavbar.tsx (モバイル環境用のナビゲーションバー)
+│   ├── Navbar.tsx (PC環境用のナビゲーションバー)
 │   ├── navigation
-│   │   └── AppNavigationBridge.tsx
-│   ├── notifications
-│   │   └── NotificationPage.tsx
-│   ├── posts
-│   │   ├── AnswerModal.tsx
-│   │   ├── EditPostModal.tsx
-│   │   ├── FloatingMenuActions.ts
-│   │   ├── FullPostClient.tsx
+│   │   └── AppNavigationBridge.tsx (画面遷移時のふるまいを制御する)
+│   ├── notifications (通知機能関連のコンポーネント)
+│   │   └── NotificationPage.tsx (通知画面)
+│   ├── posts (投稿機能関連のコンポーネント)
+│   │   ├── AnswerModal.tsx (回答入力モーダルウィンドウ)
+│   │   ├── EditPostModal.tsx (投稿編集モーダルウィンドウ)
+│   │   ├── FloatingMenuActions.ts (テキスト範囲選択時のオプションのふるまいを定義する)
+│   │   ├── FullPostClient.tsx (投稿をフルページ表示する)
 │   │   ├── index.ts
-│   │   ├── PostForm
-│   │   │   ├── editor
+│   │   ├── PostForm (投稿入力関連のコンポーネント)
+│   │   │   ├── editor (テキストエディター関連の機能)
 │   │   │   │   ├── characterCount.ts
 │   │   │   │   ├── extensions.ts
 │   │   │   │   ├── FLOATING_MENU_ACTIONS.ts
 │   │   │   │   ├── FloatingToolbar.tsx
-│   │   │   │   └── PostEditorInner.tsx
-│   │   │   ├── PostEditorWrapper.tsx
-│   │   │   ├── PostFormBox.tsx
-│   │   │   ├── PostFormCategories.tsx
-│   │   │   ├── PostFormFooter.tsx
-│   │   │   ├── PostFormPoll.tsx
-│   │   │   ├── PostForm.tsx
-│   │   │   └── PostFormVideo.tsx
-│   │   ├── PostItem
-│   │   │   ├── PollView.tsx
-│   │   │   ├── PostContent.tsx
-│   │   │   ├── PostFooter.tsx
-│   │   │   ├── PostGraphModal.tsx
-│   │   │   ├── PostHeader.tsx
-│   │   │   ├── PostItem.tsx
-│   │   │   ├── PostMenu.tsx
-│   │   │   ├── usePostCollapse.ts
-│   │   │   └── usePostUpvote.ts
-│   │   └── PostList.tsx
-│   ├── profile
-│   │   ├── ProfileHeader.tsx
-│   │   ├── ProfileLayout.tsx
-│   │   └── ProfilePostsSection.tsx
-│   ├── PublicNavbar.tsx
-│   ├── search
+│   │   │   │   └── PostEditorInner.tsx (テキストエディター)
+│   │   │   ├── PostEditorWrapper.tsx (テキストエディターを囲むボックス)
+│   │   │   ├── PostFormBox.tsx (投稿入力モーダルウィンドウ)
+│   │   │   ├── PostFormCategories.tsx (投稿時に選択するカテゴリーのリスト)
+│   │   │   ├── PostFormFooter.tsx (投稿入力フォームの下部)
+│   │   │   ├── PostFormPoll.tsx (投票モーダルウィンドウ)
+│   │   │   ├── PostForm.tsx (投稿入力フォーム)
+│   │   │   └── PostFormVideo.tsx (動画アップロードモーダルウィンドウ)
+│   │   ├── PostItem (投稿表示関連のコンポーネント)
+│   │   │   ├── PollView.tsx (投票を表示する)
+│   │   │   ├── PostContent.tsx (投稿本文を表示する)
+│   │   │   ├── PostFooter.tsx (投稿の下部)
+│   │   │   ├── PostGraphModal.tsx (グラフビューモーダルウィンドウ)
+│   │   │   ├── PostHeader.tsx (投稿の上部)
+│   │   │   ├── PostItem.tsx (投稿全体)
+│   │   │   ├── PostMenu.tsx (投稿に対する操作メニュー)
+│   │   │   ├── usePostCollapse.ts (投稿本文の展開/縮小)
+│   │   │   └── usePostUpvote.ts (投稿の高評価)
+│   │   └── PostList.tsx (投稿リスト)
+│   ├── profile (プロフィール画面関連のコンポーネント)
+│   │   ├── ProfileHeader.tsx (プロフィール画面の上部)
+│   │   ├── ProfileLayout.tsx (プロフィール画面のレイアウト)
+│   │   └── ProfilePostsSection.tsx (ユーザーの投稿を表示する)
+│   ├── PublicNavbar.tsx (未ログイン時のナビゲーションバー)
+│   ├── search (検索機能関連のコンポーネント)
 │   │   ├── SearchOverlayShell.tsx
-│   │   ├── SearchPageClient.tsx
+│   │   ├── SearchPageClient.tsx (検索画面)
 │   │   ├── SearchPageClientWrapper.tsx
-│   │   ├── SearchResultsList.tsx
-│   │   ├── SearchResults.tsx
-│   │   └── SearchTabs.tsx
-│   ├── ThemeTransitionOverlay.tsx
+│   │   ├── SearchResultsList.tsx (検索結果リスト)
+│   │   ├── SearchResults.tsx (検索結果)
+│   │   └── SearchTabs.tsx (検索画面のタブ切り替え)
+│   ├── ThemeTransitionOverlay.tsx (テーマ切り替え時のアニメーション)
 │   ├── upload
-│   │   └── UploadContext.tsx
-│   ├── UserMenu.tsx
-│   ├── UserThemeSync.tsx
-│   └── videos
+│   │   └── UploadContext.tsx (投稿アップロード時のパーセント表示を制御する)
+│   ├── UserMenu.tsx (ユーザー設定メニュー)
+│   ├── UserThemeSync.tsx (保存されたテーマを読込)
+│   └── videos (動画機能関連のコンポーネント)
 │       ├── VideoPlaybackContext.tsx
 │       ├── VideoSettingsContext.tsx
 │       ├── VideosItem.tsx
 │       └── VideosPage.tsx
 ├── components.json
-├── docker-compose.dev.yml
-├── docker-compose.yml
-├── Dockerfile
-├── .dockerignore
-├── docs
-│   └── GR05A_プログラム一覧.txt
-├── eslint.config.mjs
-├── features
+├── docker-compose.dev.yml (開発環境用Dockerコンテナ管理設定ファイル)
+├── docker-compose.yml (本番環境用Dockerコンテナ管理設定ファイル)
+├── Dockerfile (JearnのDockerコンテナ設定ファイル)
+├── .dockerignore (Dockerに含まないファイル定義)
+├── eslint.config.mjs (リンターの設定ファイル)
+├── features (ユーティリティ関数)
 │   ├── AtomBoundaryFix.ts
 │   ├── auth
 │   │   └── auth.ts
@@ -459,16 +457,15 @@ jearn/
 │   │   ├── api.ts
 │   │   └── useSearch.ts
 │   └── Tag.ts
-├── .gitignore
-├── globals.css
-├── hooks
+├── globals.css (システム全体で共通のスタイル)
+├── hooks (React Hooks)
 │   ├── profile
 │   │   ├── useProfileAuth.ts
 │   │   ├── useProfileForm.ts
 │   │   └── useUserPosts.ts
 │   ├── useCurrentUser.ts
 │   └── useScrollDirection.ts
-├── lib
+├── lib (ユーティリティ関数)
 │   ├── admin.ts
 │   ├── ai.ts
 │   ├── authz.ts
@@ -508,57 +505,32 @@ jearn/
 │   ├── upload.ts
 │   ├── utils.ts
 │   └── xhrUpload.ts
-├── middleware.ts
-├── next-auth.d.ts
-├── next.config.ts
-├── package.json
+├── middleware.ts (リクエスト間を仲介する)
+├── next-auth.d.ts (セッショントークンに含む情報の型定義)
+├── next.config.ts (Next.jsフレームワークの設定ファイル)
+├── package.json (使用するライブラリの定義)
 ├── package-lock.json
-├── pnpm-lock.yaml
 ├── postcss.config.js
-├── public
-│   ├── default-avatar.png
-│   ├── file.svg
-│   ├── fonts
-│   │   └── Shadows Into Light_Regular.json
-│   ├── globe.svg
-│   ├── icons
-│   │   ├── graph
-│   │   │   ├── at-sign-dark.svg
-│   │   │   ├── at-sign.svg
-│   │   │   ├── folder-git-2-dark.svg
-│   │   │   ├── folder-git-2.svg
-│   │   │   ├── link-dark.svg
-│   │   │   ├── link.svg
-│   │   │   ├── message-circle-dark.svg
-│   │   │   ├── message-circle.svg
-│   │   │   ├── tag-dark.svg
-│   │   │   └── tag.svg
-│   │   ├── icon-192.png
-│   │   ├── icon-512.png
-│   │   └── link-icon.png
+├── public (公開されるファイル)
 │   ├── index.html
-│   ├── manifest.webmanifest
-│   ├── next.svg
-│   ├── owl_draw.json
-│   ├── vercel.svg
-│   └── window.svg
-├── README.md
-├── scripts
-│   └── cleanup-orphan-post-images.ts
-├── tailwind.config.js
-├── tsconfig.json
-├── types
-│   ├── category.ts
-│   ├── db.types.ts
-│   ├── follow.ts
-│   ├── i18next.d.ts
-│   ├── Notification.ts
-│   ├── post.ts
-│   ├── Report.ts
-│   ├── search.ts
-│   ├── tiptap-commands.d.ts
+│   ├── manifest.webmanifest (PWAの設定ファイル)
+│   └── owl_draw.json (ローディングアニメーションの設定ファイル)
+├── scripts (バッチ処理)
+│   └── cleanup-orphan-post-images.ts (使用されていない画像をクリーンアップする)
+├── tailwind.config.js (Tailwind CSSの設定ファイル)
+├── tsconfig.json (TypeScriptの設定ファイル)
+├── types (型定義)
+│   ├── category.ts (カテゴリーの型定義)
+│   ├── db.types.ts (データベースの型定義)
+│   ├── follow.ts (フォローの型定義)
+│   ├── i18next.d.ts (翻訳機能のオプションの型定義)
+│   ├── Notification.ts (通知の型定義)
+│   ├── post.ts (投稿の型定義)
+│   ├── Report.ts (通報の型定義)
+│   ├── search.ts (検索の型定義)
+│   ├── tiptap-commands.d.ts (テキストエディターのコマンドの型定義)
 │   └── vis-network.d.ts
-└── ws
+└── ws (ウェブソケット機能用サブシステム)
     ├── Dockerfile
     ├── .dockerignore
     ├── package.json
