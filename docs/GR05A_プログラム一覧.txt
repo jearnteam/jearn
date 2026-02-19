@@ -393,48 +393,48 @@ jearn/
 ├── .dockerignore (Dockerに含まないファイル定義)
 ├── eslint.config.mjs (リンターの設定ファイル)
 ├── features (ユーティリティ関数)
-│   ├── AtomBoundaryFix.ts
+│   ├── AtomBoundaryFix.ts (テキストエディターのカーソル位置境界を調整する)
 │   ├── auth
-│   │   └── auth.ts
+│   │   └── auth.ts (認証機能の総合的な設定)
 │   ├── BackspaceExitListLikeEnter.ts
 │   ├── categorize
 │   │   └── services
-│   │       └── categorize.ts
-│   ├── ClearFormatting.ts
-│   ├── CodeFenceHandler.ts
-│   ├── comments
+│   │       └── categorize.ts (カテゴライズAIとの接続をする)
+│   ├── ClearFormatting.ts (テキストエディターのスタイルをデフォルトに設定する)
+│   ├── CodeFenceHandler.ts (テキストエディターのコードブロック)
+│   ├── comments (コメント機能に関する関数)
 │   │   ├── hooks
-│   │   │   └── useComments.ts
-│   │   └── sse.ts
-│   ├── CursorExitFix.ts
-│   ├── embed
+│   │   │   └── useComments.ts (コメント機能)
+│   │   └── sse.ts (コメントをリアルタイムで配信する)
+│   ├── CursorExitFix.ts (テキストエディターのカーソル位置調整)
+│   ├── embed (埋め込みコンテンツ)
 │   │   ├── EmbedNode.ts
 │   │   └── EmbedView.tsx
-│   ├── ExitHeadingOnEnter.ts
-│   ├── FloatingMenuIndexedShortcuts.ts
-│   ├── follow
+│   ├── ExitHeadingOnEnter.ts (テキストエディターの改行時に見出しスタイルを解除する)
+│   ├── FloatingMenuIndexedShortcuts.ts (テキストエディターのメニューのショートカットを定義する)
+│   ├── follow (フォロー機能に関する関数)
 │   │   └── hooks
-│   │       ├── useFollowCount.ts
-│   │       └── useFollow.ts
-│   ├── FullScreenPortal.tsx
-│   ├── HeadingPatch.ts
-│   ├── ImagePlaceholder.ts
-│   ├── InlineBackspaceFix.ts
-│   ├── linkcard
+│   │       ├── useFollowCount.ts (フォロー人数を使用する)
+│   │       └── useFollow.ts (フォロー機能を使用する)
+│   ├── FullScreenPortal.tsx (画面の中心に全画面モーダルウィンドウを配置する)
+│   ├── HeadingPatch.ts (テキストエディターの見出しレベルを設定する)
+│   ├── ImagePlaceholder.ts (画像挿入時にプレースホルダーを配置する)
+│   ├── InlineBackspaceFix.ts (テキストエディターのバックスペース時のカーソル位置を調整する)
+│   ├── linkcard (リンクカード表示)
 │   │   ├── embedWhitelist.ts
 │   │   ├── index.ts
 │   │   ├── InlineLinkNode.ts
 │   │   ├── LinkCardNode.ts
 │   │   ├── LinkCardPlugin.ts
 │   │   └── LinkCardView.tsx
-│   ├── MentionSuggestion.ts
-│   ├── Mention.ts
-│   ├── NoRulesStarterKit.ts
-│   ├── notifications
-│   │   ├── NotificationProvider.tsx
-│   │   └── useNotifications.ts
+│   ├── MentionSuggestion.ts (メンション時の補完をする)
+│   ├── Mention.ts (テキストエディター内のメンションブロックを作成する)
+│   ├── NoRulesStarterKit.ts (テキストエディター内に水平区切りブロックを作成する)
+│   ├── notifications (通知機能に関する関数)
+│   │   ├── NotificationProvider.tsx (通知機能を使用する境界)
+│   │   └── useNotifications.ts (通知機能を使用する)
 │   ├── ParagraphIntegrityFix.ts
-│   ├── posts
+│   ├── posts (投稿機能に関する関数)
 │   │   └── hooks
 │   │       ├── useCategoryState.ts
 │   │       ├── useFollowingPosts.ts
@@ -446,65 +446,63 @@ jearn/
 │   │       ├── usePullToRefresh.ts
 │   │       └── useVideoState.ts
 │   ├── PreserveEmptyLinesOnPaste.ts
-│   ├── PrismBlock.ts
+│   ├── PrismBlock.ts (コードブロック)
 │   ├── PrismBlockView.tsx
 │   ├── PrismBlockWithView.ts
 │   ├── reports
-│   │   └── ReportModal.tsx
+│   │   └── ReportModal.tsx (通報機能モーダルウィンドウ)
 │   ├── RestorePrismBlockOnDelete.ts
 │   ├── SafeCode.ts
-│   ├── search
-│   │   ├── api.ts
-│   │   └── useSearch.ts
-│   └── Tag.ts
+│   ├── search (検索機能に関する関数)
+│   │   ├── api.ts (APIコールをする関数)
+│   │   └── useSearch.ts (検索機能を使用する)
+│   └── Tag.ts (テキストエディター内のタグ)
 ├── globals.css (システム全体で共通のスタイル)
 ├── hooks (React Hooks)
-│   ├── profile
+│   ├── profile (プロフィール画面で使用するHooks)
 │   │   ├── useProfileAuth.ts
 │   │   ├── useProfileForm.ts
 │   │   └── useUserPosts.ts
-│   ├── useCurrentUser.ts
-│   └── useScrollDirection.ts
+│   ├── useCurrentUser.ts (ログイン中の自身のユーザー情報を取得する)
+│   └── useScrollDirection.ts (現在のスクロール方向を取得する)
 ├── lib (ユーティリティ関数)
-│   ├── admin.ts
-│   ├── ai.ts
-│   ├── authz.ts
-│   ├── avatar.ts
-│   ├── avatarUrl.ts
-│   ├── buildCommentTree.ts
-│   ├── dayjs-burmese.ts
-│   ├── dayjs.ts
-│   ├── emitNotification.ts
-│   ├── googleLogout.ts
-│   ├── i18n
+│   ├── admin.ts (管理者認証)
+│   ├── authz.ts (権限所持確認)
+│   ├── avatarUrl.ts (アバターURLをCDNへのURLに解決する)
+│   ├── buildCommentTree.ts (コメント返信をネストする)
+│   ├── dayjs-burmese.ts (日時表示のミャンマー語対応)
+│   ├── dayjs.ts (日時表示ライブラリの設定ファイル)
+│   ├── emitNotification.ts (通知をリアルタイム配信する)
+│   ├── googleLogout.ts (Googleアカウントのログアウトを制御する)
+│   ├── i18n (翻訳辞書ファイル)
 │   │   ├── en.ts
 │   │   ├── index.ts
 │   │   ├── ja.ts
 │   │   └── my.ts
-│   ├── image
+│   ├── image (画像処理)
 │   │   ├── compress.ts
 │   │   └── config.ts
 │   ├── insertImageHtml.ts
 │   ├── lucide-icons.ts
-│   ├── media
+│   ├── media (画像に関する関数)
 │   │   ├── deleteMedia.ts
 │   │   └── media.ts
-│   ├── mongodb.ts
-│   ├── normalizePosts.ts
-│   ├── notificationHub.ts
+│   ├── mongodb.ts (データベースの設定ファイル)
+│   ├── normalizePosts.ts (Postの型チェック)
+│   ├── notificationHub.ts (通知のリアルタイム受信を制御する)
 │   ├── post
-│   │   ├── extractJearnRelations.ts
-│   │   ├── extractMentions.ts
-│   │   └── resolveAuthor.ts
-│   ├── postDraftDB.ts
-│   ├── postDraft.ts
-│   ├── prism.ts
-│   ├── processText.ts
+│   │   ├── extractJearnRelations.ts (投稿本文から投稿へのリンクを抽出する)
+│   │   ├── extractMentions.ts (投稿本文からメンション情報を抽出する)
+│   │   └── resolveAuthor.ts (投稿の作成者情報を取得する)
+│   ├── postDraftDB.ts (下書きをIndexedDBに保存する)
+│   ├── postDraft.ts (下書きを制御する)
+│   ├── prism.ts (コードブロックのシンタックスハイライトの設定ファイル)
+│   ├── processText.ts (投稿本文に関するヘルパー)
 │   ├── recentTx.ts
-│   ├── sse.ts
-│   ├── upload.ts
-│   ├── utils.ts
-│   └── xhrUpload.ts
+│   ├── sse.ts (リアルタイム通信を制御する)
+│   ├── upload.ts (投稿アップロード時のパーセント表示を制御する)
+│   ├── utils.ts (その他のヘルパー関数)
+│   └── xhrUpload.ts (通信の進捗情報が必要なリクエストを制御する)
 ├── middleware.ts (リクエスト間を仲介する)
 ├── next-auth.d.ts (セッショントークンに含む情報の型定義)
 ├── next.config.ts (Next.jsフレームワークの設定ファイル)
@@ -531,11 +529,11 @@ jearn/
 │   ├── tiptap-commands.d.ts (テキストエディターのコマンドの型定義)
 │   └── vis-network.d.ts
 └── ws (ウェブソケット機能用サブシステム)
-    ├── Dockerfile
-    ├── .dockerignore
-    ├── package.json
+    ├── Dockerfile (ウェブソケット機能用サブシステムのDockerコンテナ設定ファイル)
+    ├── .dockerignore (Dockerに含まないファイル定義)
+    ├── package.json (使用するライブラリの定義)
     ├── package-lock.json
     └── src
-        └── server.ts
+        └── server.ts (クライアントとのWebSocket接続を制御する)
 
 244 directories, 430 files
