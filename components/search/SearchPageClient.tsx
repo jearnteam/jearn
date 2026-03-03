@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SearchItem, SearchMode } from "@/types/search";
 import SearchTabs from "./SearchTabs";
 import Link from "next/link";
@@ -8,42 +8,70 @@ import PostList from "@/components/posts/PostList";
 import type { Post } from "@/types/post";
 import { User, FolderGit2, Pencil } from "lucide-react";
 
+import EditPostModal from "@/components/posts/EditPostModal";
+import DeleteConfirmModal from "@/components/common/DeleteConfirmModal";
+import AnswerModal from "@/components/posts/AnswerModal";
+
+import { useEditPostModal } from "@/features/posts/hooks/useEditPostModal";
+import { useDeletePostModal } from "@/features/posts/hooks/useDeletePostModal";
+import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
+import { usePosts } from "@/features/posts/hooks/usePosts";
+import { useSearchSSEPosts } from "@/hooks/search/useSearchSSEPosts";
+
 type Props = {
   query: string;
   mode: SearchMode;
-  results?: SearchItem[];
+  results: SearchItem[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
   onChangeMode: (m: SearchMode) => void;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
-  hasMore: boolean;
-  onLoadMore: () => void;
-  loadingMore: boolean;
 };
 
 export default function SearchPageClient({
   query,
   mode,
-  results = [],
+  results,
+  hasMore,
+  loadingMore,
+  onLoadMore,
   onChangeMode,
   scrollContainerRef,
-  hasMore,
-  onLoadMore,
-  loadingMore,
 }: Props) {
   const localScrollRef = useRef<HTMLDivElement | null>(null);
   const activeScrollRef = scrollContainerRef ?? localScrollRef;
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
+  /* ---------------- SPLIT RESULTS ---------------- */
+
   const safeResults = Array.isArray(results) ? results : [];
 
-  const users = safeResults.filter((r) => r.type === "user");
-  const categories = safeResults.filter((r) => r.type === "category");
+  const users = safeResults.filter((r) => r.type === "user").map((r) => r.data);
 
-  const allPosts: Post[] = safeResults
-    .filter((r) => r.type === "post")
-    .map((r) => r.data as Post);
+  const categories = safeResults
+    .filter((r) => r.type === "category")
+    .map((r) => r.data);
 
-  // API already returns correct post type
-  const visiblePosts: Post[] = allPosts;
+  const initialPosts = useMemo(() => {
+    return safeResults
+      .filter((r) => r.type === "post")
+      .map((r) => r.data as Post);
+  }, [safeResults]);
+
+  // 🔥 SSE patching
+  const posts = useSearchSSEPosts(initialPosts);
+
+  /* ---------------- POST INTERACTIONS ---------------- */
+
+  const { editingPost, openEdit, closeEdit } = useEditPostModal();
+  const { deleteId, requestDelete, closeDelete } = useDeletePostModal();
+  const [answeringPost, setAnsweringPost] = useState<Post | null>(null);
+
+  const { addAnswer, editPost, deletePost } = usePosts();
+  const { upvote, vote, answer } = usePostInteractions({
+    setAnsweringPost,
+  });
 
   /* ---------------- INFINITE SCROLL ---------------- */
 
@@ -57,120 +85,98 @@ export default function SearchPageClient({
 
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, onLoadMore, mode]);
+  }, [hasMore, loadingMore, mode, onLoadMore]);
+
+  /* ---------------- RENDER ---------------- */
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-black">
-      {/* HEADER */}
       <div className="z-30 bg-white dark:bg-black border-b">
         <SearchTabs mode={mode} onChange={onChangeMode} />
       </div>
 
-      {/* SCROLL */}
       <main
         ref={activeScrollRef}
         className="flex-1 overflow-y-auto no-scrollbar"
       >
         <div className="feed-container py-4 space-y-10">
-          {/* ================= ALL ================= */}
-          {mode === "all" && (
-            <>
-              {/* USERS */}
-              {users.length > 0 && (
-                <section>
-                  <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
-                    <User size={16} /> Users
-                  </h2>
-                  <div className="grid gap-2">
-                    {users.map((u) => (
-                      <UserCard key={u.data._id} user={u.data} />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* CATEGORIES */}
-              <section>
-                <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
-                  <FolderGit2 size={16} /> Categories
-                </h2>
-                {categories.length === 0 ? (
-                  <div className="text-sm text-gray-400">
-                    No matching categories
-                  </div>
-                ) : (
-                  <div className="grid gap-2">
-                    {categories.map((c) => (
-                      <Link
-                        key={c.data.id}
-                        href={`/categories/${c.data.id}`}
-                        className="block p-4 border rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-900"
-                      >
-                        <div className="font-medium">{c.data.name}</div>
-                        {(c.data.jname || c.data.myname) && (
-                          <div className="text-xs text-gray-400">
-                            {c.data.jname || c.data.myname}
-                          </div>
-                        )}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              {/* POSTS */}
-              {allPosts.length > 0 && (
-                <section>
-                  <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
-                    <Pencil size={16} /> Posts
-                  </h2>
-                  <PostList
-                    posts={allPosts}
-                    hasMore={false}
-                    onLoadMore={() => {}}
-                    onEdit={() => {}}
-                    onDelete={async () => {}}
-                    onUpvote={async () => {}}
-                    onAnswer={() => {}}
-                    scrollContainerRef={activeScrollRef}
-                  />
-                </section>
-              )}
-            </>
+          {/* USERS */}
+          {(mode === "all" || mode === "users") && users.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
+                <User size={16} /> Users
+              </h2>
+              <div className="grid gap-2">
+                {users.map((u: any) => (
+                  <UserCard key={u._id} user={u} />
+                ))}
+              </div>
+            </section>
           )}
 
-          {/* ================= POST TYPES ================= */}
-          {mode !== "all" && mode !== "users" && (
-            <>
-              {visiblePosts.length === 0 ? (
+          {/* CATEGORIES */}
+          {mode === "all" && (
+            <section>
+              <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
+                <FolderGit2 size={16} /> Categories
+              </h2>
+
+              {categories.length === 0 ? (
+                <div className="text-sm text-gray-400">
+                  No matching categories
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  {categories.map((c: any) => (
+                    <Link
+                      key={c.id}
+                      href={`/categories/${c.id}`}
+                      className="block p-4 border rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-900"
+                    >
+                      <div className="font-medium">{c.name}</div>
+                      {(c.jname || c.myname) && (
+                        <div className="text-xs text-gray-400">
+                          {c.jname || c.myname}
+                        </div>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* POSTS */}
+          {mode !== "users" && (
+            <section>
+              {posts.length === 0 ? (
                 <div className="py-12 text-center text-sm text-gray-400">
                   No results
                 </div>
               ) : (
-                <PostList
-                  posts={visiblePosts}
-                  hasMore={hasMore}
-                  onLoadMore={onLoadMore}
-                  onEdit={() => {}}
-                  onDelete={async () => {}}
-                  onUpvote={async () => {}}
-                  onAnswer={() => {}}
-                  scrollContainerRef={activeScrollRef}
-                />
+                <>
+                  <h2 className="mb-3 text-sm font-semibold text-gray-500 flex items-center gap-2">
+                    <Pencil size={16} /> Posts
+                  </h2>
+                  <PostList
+                    posts={posts}
+                    hasMore={hasMore}
+                    onLoadMore={onLoadMore}
+                    onUpvote={upvote}
+                    onVote={vote}
+                    onAnswer={answer}
+                    capabilities={{
+                      edit: openEdit,
+                      delete: requestDelete,
+                    }}
+                    scrollContainerRef={activeScrollRef}
+                  />
+                </>
               )}
-            </>
-          )}
-
-          {/* ================= USERS ================= */}
-          {mode === "users" && (
-            <section className="space-y-2">
-              {users.map((u) => (
-                <UserCard key={u.data._id} user={u.data} />
-              ))}
             </section>
           )}
 
-          {/* LOAD MORE */}
+          {/* LOAD MORE TRIGGER */}
           {hasMore && mode !== "users" && (
             <div
               ref={loadMoreRef}
@@ -181,6 +187,55 @@ export default function SearchPageClient({
           )}
         </div>
       </main>
+
+      {/* EDIT */}
+      {editingPost && (
+        <EditPostModal
+          post={editingPost}
+          onClose={closeEdit}
+          onSave={async (
+            title,
+            content,
+            categories,
+            tags,
+            poll,
+            commentDisabled
+          ) => {
+            await editPost(
+              editingPost._id,
+              editingPost.content ?? "",
+              title,
+              content,
+              categories,
+              tags,
+              editingPost.references,
+              poll,
+              commentDisabled
+            );
+            closeEdit();
+          }}
+        />
+      )}
+
+      {/* ANSWER */}
+      {answeringPost && (
+        <AnswerModal
+          questionPost={answeringPost}
+          onClose={() => setAnsweringPost(null)}
+          onSubmit={addAnswer}
+        />
+      )}
+
+      {/* DELETE */}
+      <DeleteConfirmModal
+        open={!!deleteId}
+        onCancel={closeDelete}
+        onConfirm={async () => {
+          if (!deleteId) return;
+          await deletePost(deleteId);
+          closeDelete();
+        }}
+      />
     </div>
   );
 }

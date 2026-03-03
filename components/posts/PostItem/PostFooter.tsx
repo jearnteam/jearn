@@ -33,8 +33,6 @@ export default function PostFooter({
   setPost?: React.Dispatch<React.SetStateAction<Post | null>>;
   onUpvote?: (id: string, userId: string, txId?: string) => Promise<void>;
   isSingle?: boolean;
-
-  /** Optional actions (safe defaults below) */
   onShare?: () => void;
   onAnswer?: () => void;
 }) {
@@ -42,9 +40,6 @@ export default function PostFooter({
   const userId = user?._id;
   const { t } = useTranslation();
 
-  /* -------------------------------------------------
-   * SAFE FALLBACK HANDLERS (do not remove)
-   * ------------------------------------------------- */
   const safeShare = useCallback(() => {
     if (onShare) onShare();
   }, [onShare]);
@@ -54,53 +49,55 @@ export default function PostFooter({
   }, [onAnswer]);
 
   /* -------------------------------------------------
-   * LOCAL RENDER STATE (optimistic)
+   * DERIVED STATE (NO DRIFT)
    * ------------------------------------------------- */
-  const upvoterIds = (post.upvoters ?? []).map(String);
+  const upvoters = (post.upvoters ?? []).map(String);
+  const isUpvoted = !!userId && upvoters.includes(userId);
 
-  const [localCount, setLocalCount] = useState(post.upvoteCount ?? 0);
-  const [localUpvoted, setLocalUpvoted] = useState(
-    !!userId && upvoterIds.includes(userId)
-  );
+  const [localUpvoted, setLocalUpvoted] = useState(isUpvoted);
 
   useEffect(() => {
-    setLocalCount(post.upvoteCount ?? 0);
-    setLocalUpvoted(!!userId && upvoterIds.includes(userId));
-  }, [post.upvoteCount, post.upvoters, userId]);
+    setLocalUpvoted(isUpvoted);
+  }, [isUpvoted]);
 
   function handleUpvote(e: React.MouseEvent) {
     e.stopPropagation();
     if (!userId || !onUpvote) return;
 
-    // ✅ optimistic local UI
-    setLocalCount((c) => c + (localUpvoted ? -1 : 1));
-    setLocalUpvoted((v) => !v);
+    const hasUpvoted = upvoters.includes(userId);
 
-    // ✅ optimistic parent state (null-safe)
+    /* -------------------------------
+       OPTIMISTIC UPDATE (SAFE)
+       Always derive count from Set
+    -------------------------------- */
     if (setPost) {
       setPost((prev) => {
         if (!prev) return prev;
 
-        const upvoters = (prev.upvoters ?? []).map(String);
-        const hasUpvoted = upvoters.includes(userId);
+        const set = new Set((prev.upvoters ?? []).map(String));
+
+        if (hasUpvoted) {
+          set.delete(userId);
+        } else {
+          set.add(userId);
+        }
 
         return {
           ...prev,
-          upvoteCount: (prev.upvoteCount ?? 0) + (hasUpvoted ? -1 : 1),
-          upvoters: hasUpvoted
-            ? upvoters.filter((id) => id !== userId)
-            : [...upvoters, userId],
+          upvoters: Array.from(set),
+          upvoteCount: set.size,
         };
       });
     }
 
-    // 🔥 fire-and-forget
+    setLocalUpvoted(!hasUpvoted);
+
+    // fire and forget
     onUpvote(post._id, userId);
   }
 
   return (
     <>
-      {/* CENTER: ANSWER */}
       {post.postType === PostTypes.QUESTION &&
         !post.commentDisabled &&
         post.authorId && (
@@ -120,9 +117,9 @@ export default function PostFooter({
             />
           </button>
         )}
+
       <div className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-3 text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center justify-between relative">
-          {/* LEFT: ACTIONS */}
           <div className="flex items-center gap-6">
             {/* UPVOTE */}
             <button
@@ -135,7 +132,7 @@ export default function PostFooter({
               )}
             >
               <ArrowBigUp size={18} />
-              <span>{localCount}</span>
+              <span>{upvoters.length}</span>
             </button>
 
             {/* COMMENTS */}
@@ -195,7 +192,7 @@ export default function PostFooter({
             </button>
           </div>
 
-          {/* RIGHT: EDITED INFO */}
+          {/* EDITED INFO */}
           {post.edited && post.editedAt && (
             <span className="text-xs text-gray-500 dark:text-gray-500">
               (edited {dayjs(post.editedAt).locale(i18n.language).fromNow()})

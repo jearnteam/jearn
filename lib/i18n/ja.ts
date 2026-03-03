@@ -100,6 +100,7 @@ const ja: TranslationSchema = {
       postsByBefore: "",
       postsByAfter: "の投稿",
       following: "フォロー済み",
+      followers: "フォロワー",
       yourPosts: "あなたの投稿",
     },
 

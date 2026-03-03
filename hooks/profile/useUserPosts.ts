@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { normalizePosts } from "@/lib/normalizePosts";
 import type { Post } from "@/types/post";
+import { useSSE } from "@/features/sse/SSEProvider";
 
 export function useUserPosts(userId?: string) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -8,6 +9,8 @@ export function useUserPosts(userId?: string) {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+
+  const { lastMessage } = useSSE(); // ✅ LISTEN
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -38,6 +41,74 @@ export function useUserPosts(userId?: string) {
     setHasMore(Boolean(data.nextCursor));
     setLoadingMore(false);
   }
+
+  /* -------------------------------------------------------------------------- */
+  /*                            GLOBAL SSE LISTENER                              */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!lastMessage || !userId) return;
+
+    setPosts((prev) => {
+      console.log(
+        "🟡 PROFILE current post IDs:",
+        prev.map((p) => p._id)
+      );
+
+      switch (lastMessage.type) {
+        case "new-post":
+          console.log("🟡 new-post event received");
+
+          if (!lastMessage.post) {
+            console.log("❌ No post in message");
+            return prev;
+          }
+
+          console.log("🟡 new-post author:", lastMessage.post.authorId);
+
+          if (lastMessage.post.authorId !== userId) {
+            console.log("❌ Not this user's post");
+            return prev;
+          }
+
+          if (prev.some((p) => p._id === lastMessage.post._id)) {
+            console.log("❌ Already exists in profile");
+            return prev;
+          }
+
+          console.log("✅ Adding new post to profile");
+          return [lastMessage.post, ...prev];
+
+        case "update-post":
+        case "update-comment":
+        case "update-reply":
+          console.log("🟡 update event received");
+
+          const exists = prev.some(
+            (p) => String(p._id) === String(lastMessage.postId)
+          );
+
+          console.log("🟡 Exists in profile?", exists);
+
+          if (!exists) {
+            console.log("❌ Post not found in profile state");
+          }
+
+          return prev.map((p) =>
+            String(p._id) === String(lastMessage.postId)
+              ? { ...p, ...lastMessage.post }
+              : p
+          );
+
+        case "delete-post":
+          console.log("🟡 delete event received");
+
+          return prev.filter((p) => String(p._id) !== String(lastMessage.id));
+
+        default:
+          return prev;
+      }
+    });
+  }, [lastMessage, userId]);
 
   useEffect(() => {
     load();

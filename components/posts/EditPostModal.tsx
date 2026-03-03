@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Portal from "@/components/common/Portal";
 import PostForm, { Category } from "@/components/posts/PostForm/PostForm";
 import { useTranslation } from "react-i18next";
-import type { Post } from "@/types/post";
+import type { Post, Poll } from "@/types/post";
 import { PostTypes, PostType } from "@/types/post";
 import { MessageCircle, MessageCircleOff } from "lucide-react";
 
@@ -17,6 +17,7 @@ interface EditPostModalProps {
     content: string,
     categories: string[],
     tags: string[],
+    poll: Poll | undefined,
     commentDisabled?: boolean
   ) => Promise<void>;
 }
@@ -35,12 +36,9 @@ export default function EditPostModal({
   /* -------------------------------------------------
    * Resolve safe post type
    * ------------------------------------------------- */
-  const mode: PostType =
-    post.postType === PostTypes.POST ||
-    post.postType === PostTypes.QUESTION ||
-    post.postType === PostTypes.ANSWER
-      ? post.postType
-      : PostTypes.POST;
+  const mode: PostType = Object.values(PostTypes).includes(post.postType)
+    ? post.postType
+    : PostTypes.POST;
 
   /* -------------------------------------------------
    * Load categories (edit-only)
@@ -141,6 +139,9 @@ export default function EditPostModal({
                 mode={mode}
                 initialTitle={post.title}
                 initialContent={post.content}
+                initialPoll={post.poll}
+                initialVideo={post.video}
+                initialCommentDisabled={post.commentDisabled}
                 initialSelectedCategories={
                   post.categories?.map((c) => c.id) ?? []
                 }
@@ -153,6 +154,7 @@ export default function EditPostModal({
                     data.content,
                     data.categories,
                     data.tags,
+                    data.poll,
                     commentDisabled
                   );
 

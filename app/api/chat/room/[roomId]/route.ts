@@ -17,10 +17,7 @@ export async function GET(
   const session = await getServerSession(authConfig);
 
   if (!session?.user?.uid || !ObjectId.isValid(session.user.uid)) {
-    return NextResponse.json(
-      { error: "Unauthorized" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const myUid = session.user.uid; // 🔥 STRING UID
@@ -31,10 +28,7 @@ export async function GET(
   const { roomId } = await params;
 
   if (!ObjectId.isValid(roomId)) {
-    return NextResponse.json(
-      { error: "Invalid room" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid room" }, { status: 400 });
   }
 
   const roomObjectId = new ObjectId(roomId);
@@ -51,30 +45,32 @@ export async function GET(
   /* ──────────────────────────────
    * 4️⃣ Find room & validate membership
    * ────────────────────────────── */
+  const myObjectId = new ObjectId(myUid);
+
   const room = await roomsCol.findOne({
     _id: roomObjectId,
-    members: myUid, // 🔥 STRING MATCH
+    members: myObjectId,
   });
 
   if (!room) {
-    return NextResponse.json(
-      { error: "Not found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   /* ──────────────────────────────
    * 5️⃣ Get partner UID
    * ────────────────────────────── */
-  const partnerUid = room.members.find(
-    (uid: string) => uid !== myUid
+  const partnerObjectId = room.members.find(
+    (uid: ObjectId) => !uid.equals(myObjectId)
   );
 
+  if (!partnerObjectId) {
+    return NextResponse.json({ error: "Invalid room" }, { status: 400 });
+  }
+
+  const partnerUid = partnerObjectId.toString();
+
   if (!partnerUid || !ObjectId.isValid(partnerUid)) {
-    return NextResponse.json(
-      { error: "Invalid room" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid room" }, { status: 400 });
   }
 
   /* ──────────────────────────────
@@ -93,10 +89,7 @@ export async function GET(
   );
 
   if (!partner) {
-    return NextResponse.json(
-      { error: "User missing" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "User missing" }, { status: 404 });
   }
 
   return NextResponse.json({

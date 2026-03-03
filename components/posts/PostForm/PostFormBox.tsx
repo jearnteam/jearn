@@ -94,6 +94,7 @@ export default function PostFormBox({
   const [openTypeMenu, setOpenTypeMenu] = useState(false);
   const [commentDisabled, setCommentDisabled] = useState(false);
   const postFormRef = useRef<PostFormHandle>(null);
+  const typeMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) setMode(type);
@@ -102,6 +103,20 @@ export default function PostFormBox({
   useEffect(() => {
     if (!open) setOpenTypeMenu(false);
   }, [open]);
+
+  useEffect(() => {
+    if (!openTypeMenu) return;
+  
+    function handleClickOutside(e: MouseEvent) {
+      if (!typeMenuRef.current?.contains(e.target as Node)) {
+        setOpenTypeMenu(false);
+      }
+    }
+  
+    document.addEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
+  }, [openTypeMenu]);
 
   return (
     <Portal>
@@ -150,7 +165,7 @@ export default function PostFormBox({
                 <header className="relative p-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-2">
                     {mode !== PostTypes.ANSWER && (
-                      <div className="relative">
+                      <div className="relative" ref={typeMenuRef}>
                         <button
                           onClick={() => setOpenTypeMenu((v) => !v)}
                           className="flex items-center gap-2 px-3 py-1.5

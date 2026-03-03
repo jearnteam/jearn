@@ -156,12 +156,19 @@ export async function GET(
      * ------------------------------------------------------- */
     const enriched = await Promise.all(
       limitedComments.map(async (c) => {
-        const author = await resolveAuthor(users, c.authorId as string | null);
+        const authorId =
+          typeof c.authorId === "string"
+            ? c.authorId
+            : c.authorId?.toString() ?? null;
+
+        const author = await resolveAuthor(users, authorId);
 
         return {
           _id: c._id.toString(),
           parentId: c.parentId?.toString(),
           replyTo: c.replyTo?.toString() ?? null,
+
+          authorId, // ✅ ADD THIS
 
           postType: c.postType ?? "Comment",
           title: typeof c.title === "string" ? c.title : null,

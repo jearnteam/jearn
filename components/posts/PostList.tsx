@@ -11,25 +11,25 @@ export type VotePollResult = {
   votedOptionIds: string[];
 };
 
+type PostListCapabilities = {
+  edit?: (post: Post) => void;
+  delete?: (id: string) => void | Promise<void>;
+};
+
 interface Props {
   posts: Post[];
   hasMore: boolean;
   onLoadMore: () => void;
-  onEdit: (post: Post) => void;
-  onDelete: (id: string) => Promise<void>;
-  onVote?: (
-    postId: string,
-    optionId: string
-  ) => Promise<{
-    poll: Post["poll"];
-    votedOptionIds: string[];
-  } | null>;
 
+  // REQUIRED core behaviors
   onUpvote: (id: string) => Promise<void>;
+  onVote: (postId: string, optionId: string) => Promise<VotePollResult | null>;
   onAnswer: (post: Post) => void;
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 
-  /** 🔑 OPTIONAL view namespace */
+  // OPTIONAL management behaviors
+  capabilities?: PostListCapabilities;
+
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   viewId?: string;
 }
 
@@ -37,11 +37,12 @@ export default function PostList({
   posts,
   hasMore,
   onLoadMore,
-  onEdit,
-  onDelete,
+
   onUpvote,
   onVote,
   onAnswer,
+
+  capabilities,
   scrollContainerRef,
   viewId,
 }: Props) {
@@ -83,14 +84,15 @@ export default function PostList({
   // scrollContainerRef が渡されているのに current が null の場合（＝初期レンダリング時）
   // Virtuoso に undefined を渡してしまうと Window スクロールモードで暴走してしまうため、
   // ref が解決するまで（isMountedまで）待機するのが安全。
-  
+
   // Refが渡されていない(=Windowスクロール) 場合は即座に true
   // Refが渡されている場合は、current が存在するまで待つ
-  const isScrollParentReady = !scrollContainerRef || !!scrollContainerRef.current;
+  const isScrollParentReady =
+    !scrollContainerRef || !!scrollContainerRef.current;
 
   // まだ準備できていないなら、ローディングか空を返す（一瞬なので目視できないレベル）
   if (!isScrollParentReady && !isMounted) {
-    return <div className="h-full w-full" />; 
+    return <div className="h-full w-full" />;
   }
 
   /* ---------------- RENDER ---------------- */
@@ -122,12 +124,20 @@ export default function PostList({
             <div className="pb-[2px]">
               <PostItem
                 key={key}
-                index={index} // 🔥 ADD THIS
-                virtuosoRef={virtuosoRef} // 🔥 ADD THIS
+                index={index}
+                virtuosoRef={virtuosoRef}
                 post={post}
-                onEdit={() => onEdit(post)}
-                onDelete={() => onDelete(post._id)}
-                onUpvote={(id) => onUpvote(id)}
+                onEdit={
+                  capabilities?.edit
+                    ? () => capabilities.edit!(post)
+                    : undefined
+                }
+                onDelete={
+                  capabilities?.delete
+                    ? () => capabilities.delete!(post._id)
+                    : undefined
+                }
+                onUpvote={onUpvote}
                 onVote={onVote}
                 onAnswer={onAnswer}
                 scrollContainerRef={scrollContainerRef}

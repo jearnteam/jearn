@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useTranslation } from "react-i18next";
 
-import type { Post, PostType } from "@/types/post";
+import type { Poll, Post, PostType } from "@/types/post";
 import { PostTypes } from "@/types/post";
+import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
 
 import PostItem from "@/components/posts/PostItem/PostItem";
 import PostList from "@/components/posts/PostList";
@@ -39,13 +40,21 @@ export default function FullPostClient({
   const [answers, setAnswers] = useState<Post[]>([]);
   const [loadingAnswers, setLoadingAnswers] = useState(false);
 
+  const { upvote, vote, answer } = usePostInteractions({
+    setAnsweringPost: (post) => setAnswerModalOpen(true),
+  });
+
   // Modals
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [answerModalOpen, setAnswerModalOpen] = useState(false);
 
   // Hooks
-  const { deletePost: hookDeletePost, addAnswer: hookAddAnswer } = usePosts();
+  const {
+    deletePost: hookDeletePost,
+    addAnswer: hookAddAnswer,
+    editPost,
+  } = usePosts();
 
   /* ---------------------------------------------------------
    * SSE Listener
@@ -116,24 +125,6 @@ export default function FullPostClient({
       fetchAnswers();
     }
   }, [fetchAnswers, post?.postType]);
-
-  /* ---------------------------------------------------------
-   * Actions: Upvote
-   * --------------------------------------------------------- */
-  const handleUpvote = async (id: string, userId?: string) => {
-    const targetUserId = userId || user?._id;
-    if (!targetUserId) return;
-
-    const res = await fetch(`/api/posts/${id}/upvote`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: targetUserId }),
-    });
-
-    const data = await res.json();
-    return { ok: res.ok, action: data.action };
-  };
-
   /* ---------------------------------------------------------
    * Actions: Edit / Delete / Answer
    * --------------------------------------------------------- */
@@ -141,19 +132,37 @@ export default function FullPostClient({
     title: string,
     content: string,
     categories: string[],
-    tags: string[]
+    tags: string[],
+    poll?: Poll
   ) => {
+  
     if (!post) return;
-    const res = await fetch(`/api/posts/${post._id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, content, categories, tags }),
-    });
-    if (res.ok) {
-      const { post: updated } = await res.json();
-      setPost(updated);
-      setEditOpen(false);
-    }
+
+    await editPost(
+      post._id,
+      post.content ?? "",
+      title,
+      content,
+      categories,
+      tags,
+      post.references,
+      poll,
+      post.commentDisabled
+    );
+
+    // optimistic local update instead of refetch
+    setPost((prev) =>
+      prev
+        ? {
+            ...prev,
+            title,
+            content,
+            tags,
+          }
+        : prev
+    );
+
+    setEditOpen(false);
   };
 
   const handleConfirmDelete = async () => {
@@ -199,12 +208,9 @@ export default function FullPostClient({
         onEdit={() => setEditOpen(true)}
         onDelete={() => setDeleteOpen(true)}
         onAnswer={() => setAnswerModalOpen(true)}
-        // ✅ Fix: Wrap to return void
-        onUpvote={async (id) => {
-          await handleUpvote(id);
-        }}
+        onUpvote={upvote}
+        onVote={vote}
         scrollContainerRef={scrollContainerRef}
-        /* TODO: 以下のvirtuosoに必要な項目を正しく追加する */
         index={0}
         virtuosoRef={null_virtuoso}
       />
@@ -226,21 +232,18 @@ export default function FullPostClient({
             <div className="space-y-4">
               <PostList
                 posts={answers}
-                // ✅ Add missing scroll props (answers API fetches all at once for now)
                 hasMore={false}
                 onLoadMore={() => {}}
-                // TODO: Implement Answer Edit
-                onEdit={() => {}}
-                onDelete={async (id) => {
-                  await hookDeletePost(id);
-                  setAnswers((prev) => prev.filter((a) => a._id !== id));
+                onUpvote={upvote}
+                onVote={vote} // ✅ real poll vote
+                onAnswer={answer} // ✅ real answer handler
+                capabilities={{
+                  edit: (post) => setEditOpen(true),
+                  delete: async (id: string) => {
+                    await hookDeletePost(id);
+                    setAnswers((prev) => prev.filter((a) => a._id !== id));
+                  },
                 }}
-                // ✅ Fix: Wrap to return void (PostList expects Promise<void>)
-                onUpvote={async (id) => {
-                  await handleUpvote(id);
-                }}
-                // No nesting answers for now
-                onAnswer={() => {}}
                 scrollContainerRef={scrollContainerRef}
               />
             </div>

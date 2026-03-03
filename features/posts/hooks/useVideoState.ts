@@ -1,17 +1,28 @@
 import { useRef, useState, useEffect } from "react";
 
-export function useVideoState() {
+type InitialVideo = {
+  url: string;
+  thumbnailUrl?: string | null;
+};
+
+export function useVideoState(initialVideo?: InitialVideo, isEdit?: boolean) {
   const videoFileRef = useRef<File | null>(null);
   const thumbnailFileRef = useRef<File | null>(null);
 
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
-  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] =
-    useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(
+    isEdit ? initialVideo?.url ?? null : null
+  );
+
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(
+    isEdit ? initialVideo?.thumbnailUrl ?? null : null
+  );
 
   useEffect(() => {
     return () => {
-      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
-      if (thumbnailPreviewUrl)
+      if (videoPreviewUrl?.startsWith("blob:"))
+        URL.revokeObjectURL(videoPreviewUrl);
+
+      if (thumbnailPreviewUrl?.startsWith("blob:"))
         URL.revokeObjectURL(thumbnailPreviewUrl);
     };
   }, [videoPreviewUrl, thumbnailPreviewUrl]);
@@ -25,7 +36,7 @@ export function useVideoState() {
       const file = input.files?.[0];
       if (!file) return;
 
-      if (videoPreviewUrl)
+      if (videoPreviewUrl?.startsWith("blob:"))
         URL.revokeObjectURL(videoPreviewUrl);
 
       videoFileRef.current = file;
@@ -44,7 +55,7 @@ export function useVideoState() {
       const file = input.files?.[0];
       if (!file) return;
 
-      if (thumbnailPreviewUrl)
+      if (thumbnailPreviewUrl?.startsWith("blob:"))
         URL.revokeObjectURL(thumbnailPreviewUrl);
 
       thumbnailFileRef.current = file;

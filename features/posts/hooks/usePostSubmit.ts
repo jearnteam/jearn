@@ -33,6 +33,8 @@ type Params = {
     finish: () => void;
   };
 
+  commentDisabled?: boolean; 
+
   onSubmit: (data: {
     postType: PostType;
     questionId?: string;
@@ -45,6 +47,7 @@ type Params = {
     references?: string[];
     poll?: Poll;
     video?: any;
+    commentDisabled?: boolean;
   }) => Promise<void>;
 
   clearDraft: () => void;
@@ -66,6 +69,7 @@ export function usePostSubmit({
   thumbnailFileRef,
   selectedCategories,
   upload,
+  commentDisabled,
   onSubmit,
   clearDraft,
   onSuccess,
@@ -183,7 +187,7 @@ export function usePostSubmit({
         postType: mode,
         questionId,
         title,
-        content: mode === PostTypes.POLL ? "" : html,
+        content: html,
         authorId,
         categories: [...selectedCategories],
         mentionedUserIds,
@@ -207,6 +211,7 @@ export function usePostSubmit({
               }
             : undefined,
         video,
+        commentDisabled,
       });
 
       clearDraft();

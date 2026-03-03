@@ -1,8 +1,7 @@
 // lib/emitNotification.ts
 import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { notifyWithData } from "@/lib/notificationHub";
-import { avatarUrl } from "./avatarUrl";
+import { notifyUser } from "@/lib/sse";
 
 export async function emitGroupedNotification({
   userId,
@@ -11,7 +10,7 @@ export async function emitGroupedNotification({
   actorId,
 }: {
   userId: string;
-  type: "post_like" | "comment" | "mention" | "answer" | "comment";
+  type: "post_like" | "comment" | "mention" | "answer";
   postId: string;
   actorId: string;
 }) {
@@ -22,7 +21,9 @@ export async function emitGroupedNotification({
   const actorObjId = new ObjectId(actorId);
   const postObjId = new ObjectId(postId);
 
-  // ① DB更新
+  /* -------------------------------------------------- */
+  /* ① ATOMIC UPSERT + UNIQUE ACTOR + COUNT UPDATE    */
+  /* -------------------------------------------------- */
   await db.collection("notifications").updateOne(
     {
       userId: receiverId,
@@ -30,24 +31,36 @@ export async function emitGroupedNotification({
       postId: postObjId,
       read: false,
     },
-    {
-      $setOnInsert: {
-        createdAt: new Date(),
+    [
+      {
+        $set: {
+          createdAt: {
+            $ifNull: ["$createdAt", new Date()],
+          },
+          read: {
+            $ifNull: ["$read", false],
+          },
+          actorIds: {
+            $setUnion: [
+              { $ifNull: ["$actorIds", []] },
+              [actorObjId],
+            ],
+          },
+        },
       },
-      $addToSet: {
-        actorIds: actorObjId,
+      {
+        $set: {
+          count: { $size: "$actorIds" },
+          updatedAt: new Date(),
+        },
       },
-      $inc: {
-        count: 1,
-      },
-      $set: {
-        updatedAt: new Date(),
-      },
-    },
+    ],
     { upsert: true }
   );
 
-  // ② 最新通知を取得
+  /* -------------------------------------------------- */
+  /* ② FETCH UPDATED NOTIFICATION                      */
+  /* -------------------------------------------------- */
   const notification = await db.collection("notifications").findOne({
     userId: receiverId,
     type,
@@ -57,13 +70,17 @@ export async function emitGroupedNotification({
 
   if (!notification) return;
 
-  // ③ actor情報取得（表示用）
+  /* -------------------------------------------------- */
+  /* ③ FETCH ACTOR INFO                                */
+  /* -------------------------------------------------- */
   const actor = await db.collection("users").findOne(
     { _id: actorObjId },
     { projection: { name: 1, avatarUrl: 1, image: 1 } }
   );
 
-  // ④ フロント用payload作成
+  /* -------------------------------------------------- */
+  /* ④ BUILD SSE PAYLOAD                               */
+  /* -------------------------------------------------- */
   const payload = {
     _id: notification._id.toString(),
     type: notification.type,
@@ -76,6 +93,8 @@ export async function emitGroupedNotification({
     read: notification.read,
   };
 
-  // ⑤ SSEで即時送信
-  notifyWithData(userId, payload);
+  /* -------------------------------------------------- */
+  /* ⑤ EMIT SSE                                        */
+  /* -------------------------------------------------- */
+  notifyUser(userId, payload);
 }

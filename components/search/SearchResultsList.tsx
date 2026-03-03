@@ -64,7 +64,7 @@ export default function SearchResultsList({
               return (
                 <li key={`user-${user._id}`}>
                   <Link
-                    href={`/users/${user.uniqueId}`}
+                    href={`/profile/${user._id}`}
                     className="
                       flex items-center gap-3
                       px-4 py-1

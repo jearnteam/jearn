@@ -634,3 +634,16 @@ html.theme-switching *::after {
   content: "";
   animation: dots 1.4s steps(4, end) infinite;
 }
+
+/*tippy theme*/
+
+.tippy-box[data-theme~='jearn-mention'] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.tippy-box[data-theme~='jearn-mention'] > .tippy-arrow {
+  display: none;
+}

@@ -1,26 +1,37 @@
-// app/api/stream/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authConfig } from "@/features/auth/auth";
 import { addClient, removeClient } from "@/lib/sse";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const session = await getServerSession(authConfig);
+  const userId = session?.user?.uid ?? null;
+
   const stream = new ReadableStream({
     start(controller) {
       const enc = new TextEncoder();
-      const write = (msg: string) => controller.enqueue(enc.encode(msg));
-      const client = { write };
+
+      const write = (msg: string) => {
+        controller.enqueue(enc.encode(msg));
+      };
+
+      const client = {
+        write,
+        userId, // ✅ attach user id for notifications
+      };
 
       addClient(client);
 
-      write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+      // connection confirmation
+      write(`event: connected\ndata: {}\n\n`);
 
+      // keep alive ping
       const ping = setInterval(() => {
-        write(
-          `data: ${JSON.stringify({ type: "ping", t: Date.now() })}\n\n`
-        );
-      }, 30_000);
+        write(`event: ping\ndata: {}\n\n`);
+      }, 30000);
 
       req.signal.addEventListener("abort", () => {
         clearInterval(ping);
@@ -31,7 +42,6 @@ export async function GET(req: NextRequest) {
   });
 
   return new NextResponse(stream, {
-    status: 200,
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",

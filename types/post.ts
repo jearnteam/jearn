@@ -113,29 +113,49 @@ export interface Post {
 /* -------------------------------------------------------------------------- */
 
 export type RawPost = {
-  _id: ObjectId | string;
+  _id: ObjectId;
+
   postType?: PostType;
   title?: string;
   content?: string;
-  parentId?: string;
-  replyTo?: string;
+
+  parentId?: string | null;
+  replyTo?: string | null;
+
   commentDisabled?: boolean;
+
   authorId?: string;
   authorName?: string;
   authorAvatar?: string;
+
   createdAt?: Date;
-  categories?: unknown[];
-  mentionedUserIds?: string[];
+
+  categories?: (ObjectId | string)[];
+  mentionedUserIds?: ObjectId[];
   tags?: string[];
   references?: ObjectId[];
+
   mediaRefs?: string[];
+
   poll?: Poll;
+
   video?: {
     url: string;
     thumbnailUrl?: string;
     duration?: number;
     aspectRatio?: number;
   };
+
+  /* ✅ ADD THESE */
+  edited?: boolean;
+  editedAt?: Date;
+
+  upvoteCount?: number;
+  upvoters?: string[];
+
+  commentCount?: number;
+
+  isAdmin?: boolean;
 };
 
 /* -------------------------------------------------------------------------- */

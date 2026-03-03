@@ -140,7 +140,7 @@ function NotificationItem({
         const count = notification.count ?? 1;
         return count > 1
           ? `${notification.lastActorName} and ${count - 1} others followed you`
-          : `${notification.lastActorName} followed you`;
+          : `${notification.lastActorName} ${t("followedYou")}`;
       }
       default:
         return t("notifications");

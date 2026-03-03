@@ -10,6 +10,9 @@ import { extractPostImageKeys } from "@/lib/media/media";
 import { DeleteObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { categorize } from "@/features/categorize/services/categorize";
 import { emitGroupedNotification } from "@/lib/emitNotification";
+import { buildFeedResponse } from "@/lib/post/buildFeedResponse";
+import { updateLastActive } from "@/lib/updateLastActive";
+import { extractPlainText } from "@/lib/post/extractPlainText";
 
 export const runtime = "nodejs";
 
@@ -219,56 +222,12 @@ export async function GET(req: Request) {
       );
     }
 
-    // comment count map (page-scoped)
-    const commentCounts = (await posts
-      .aggregate([
-        { $match: { parentId: { $in: docs.map((d) => d._id.toString()) } } },
-        { $group: { _id: "$parentId", count: { $sum: 1 } } },
-      ])
-      .toArray()) as { _id: ObjectId; count: number }[];
-
-    const countMap: Record<string, number> = {};
-    commentCounts.forEach((c) => {
-      countMap[c._id.toString()] = c.count;
+    const enriched = await buildFeedResponse(docs, {
+      usersColl: users,
+      categoriesColl,
+      viewerId,
+      postsColl: posts,
     });
-
-    const enriched = await Promise.all(
-      docs.map(async (p: RawPost) => {
-        const categories = await enrichCategories(
-          Array.isArray(p.categories) ? p.categories : [],
-          categoriesColl
-        );
-
-        const post = await enrichPost(p, users);
-
-        const poll = p.poll
-          ? {
-              ...p.poll,
-
-              votedOptionIds: viewerId
-                ? Array.isArray(p.poll.votes?.[viewerId])
-                  ? p.poll.votes[viewerId]
-                  : typeof p.poll.votes?.[viewerId] === "string"
-                  ? [p.poll.votes[viewerId]]
-                  : []
-                : [],
-            }
-          : undefined;
-
-        return {
-          ...post,
-          poll, // 👈 THIS IS THE IMPORTANT LINE
-          categories,
-          tags: p.tags ?? [],
-          mediaRefs: p.mediaRefs ?? [],
-          commentCount: countMap[p._id.toString()] ?? 0,
-          parentPost:
-            p.postType === PostTypes.ANSWER && p.parentId
-              ? parentMap[p.parentId.toString()]
-              : undefined,
-        };
-      })
-    );
 
     const nextCursor =
       docs.length > 0
@@ -276,6 +235,10 @@ export async function GET(req: Request) {
             docs.length - 1
           ]._id.toString()}`
         : null;
+
+    if (session?.user?.uid) {
+      updateLastActive(session.user.uid);
+    }
 
     return NextResponse.json({ items: enriched, nextCursor });
   } catch (err) {
@@ -541,6 +504,9 @@ export async function POST(req: Request) {
       }
     }
 
+    const plainContent =
+      postType === PostTypes.VIDEO ? "" : extractPlainText(safeContent ?? "");
+
     /* ------------------------------------------------------------------ */
     /* INSERT                                                             */
     /* ------------------------------------------------------------------ */
@@ -549,6 +515,7 @@ export async function POST(req: Request) {
       postType: PostType;
       title: string;
       content: string;
+      plainContent: string;
       authorId: string;
       parentId?: string | null;
       replyTo?: string | null;
@@ -575,6 +542,7 @@ export async function POST(req: Request) {
       postType,
       title,
       content: safeContent,
+      plainContent,
       authorId,
       parentId: safeParentId,
       replyTo,
@@ -723,12 +691,30 @@ export async function POST(req: Request) {
     /* SSE                                                                */
     /* ------------------------------------------------------------------ */
 
-    broadcastSSE({
-      type: safeParentId ? "new-comment" : "new-post",
-      txId,
-      postId: finalPost._id,
-      post: finalPost,
-    });
+    if (safeParentId) {
+      // 1️⃣ broadcast new comment
+      broadcastSSE({
+        type: "new-comment",
+        txId,
+        postId: finalPost._id,
+        post: finalPost,
+      });
+
+      // 2️⃣ broadcast comment count increment
+      broadcastSSE({
+        type: "update-comment-count",
+        parentId: safeParentId,
+        delta: 1,
+      });
+    } else {
+      // normal post
+      broadcastSSE({
+        type: "new-post",
+        txId,
+        postId: finalPost._id,
+        post: finalPost,
+      });
+    }
 
     return NextResponse.json({ ok: true, post: finalPost });
   } catch (err) {
@@ -870,11 +856,25 @@ export async function DELETE(req: Request) {
       }
 
       /* ---------------- SSE ---------------- */
-      broadcastSSE({
-        type: existing.parentId ? "delete-comment" : "delete-post",
-        txId,
-        postId: id,
-      });
+      if (existing.parentId) {
+        broadcastSSE({
+          type: "delete-comment",
+          txId,
+          postId: id,
+        });
+
+        broadcastSSE({
+          type: "update-comment-count",
+          parentId: existing.parentId,
+          delta: -1,
+        });
+      } else {
+        broadcastSSE({
+          type: "delete-post",
+          txId,
+          postId: id,
+        });
+      }
     } else {
       // Answerが存在するものは削除しない
       posts.updateOne(

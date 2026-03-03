@@ -51,13 +51,12 @@ export default function RootLayout({
       >
         <Providers>
           <LanguageInitializer />
-          <ClientLayout>
-            <UserThemeSync />
-            <I18nProvider>
-              {/* ⬇️ NOTHING APP-SPECIFIC HERE */}
-              {children}
-            </I18nProvider>
-          </ClientLayout>
+            <ClientLayout>
+              <UserThemeSync />
+              <I18nProvider>
+                {children}
+              </I18nProvider>
+            </ClientLayout>
         </Providers>
       </body>
     </html>

@@ -8,6 +8,8 @@ import { authConfig } from "@/features/auth/auth";
 import { PostTypes, RawPost } from "@/types/post";
 import { deleteMediaUrls } from "@/lib/media/deleteMedia";
 import { resolveAuthor } from "@/lib/post/resolveAuthor";
+import { extractPostImageKeys } from "@/lib/media/media";
+import { extractPlainText } from "@/lib/post/extractPlainText";
 
 export const runtime = "nodejs";
 
@@ -24,8 +26,6 @@ type CategoryDoc = {
   jname?: string;
   myname?: string;
 };
-
-
 
 /* ---------------------- CATEGORY RESOLVER ---------------------- */
 // ✅ 追加: カテゴリー解決用ヘルパー
@@ -181,12 +181,15 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    /* -------------------- BODY -------------------- */
     const {
       title,
       content,
       categories,
       tags,
+      mentionedUserIds = [],
+      references = [],
+      poll,
+      video,
       removedImages = [],
       txId = null,
       commentDisabled,
@@ -198,6 +201,7 @@ export async function PUT(
     const posts = db.collection("posts");
     const users = db.collection("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
+    const referencesColl = db.collection("post_references");
 
     const existing = await posts.findOne({ _id: new ObjectId(id) });
     if (!existing) {
@@ -208,14 +212,23 @@ export async function PUT(
       return new Response("Forbidden", { status: 403 });
     }
 
-    /* ---------------- UPDATE ---------------- */
     const updateFields: Record<string, unknown> = {};
 
-    if (title != undefined && existing.postType !== PostTypes.QUESTION) {
+    /* ---------------- BASIC FIELDS ---------------- */
+
+    if (title !== undefined && existing.postType !== PostTypes.QUESTION) {
       updateFields.title = title;
     }
-    if (content != undefined) updateFields.content = content;
-    if (commentDisabled != undefined) updateFields.commentDisabled = commentDisabled; 
+
+    if (content !== undefined) {
+      updateFields.content = content;
+      updateFields.plainContent = extractPlainText(content);
+      updateFields.mediaRefs = extractPostImageKeys(content);
+    }
+
+    if (commentDisabled !== undefined) {
+      updateFields.commentDisabled = commentDisabled;
+    }
 
     if (Array.isArray(categories)) {
       updateFields.categories = categories
@@ -230,12 +243,94 @@ export async function PUT(
       updateFields.tags = tags;
     }
 
+    if (Array.isArray(mentionedUserIds)) {
+      updateFields.mentionedUserIds = mentionedUserIds
+        .filter(
+          (id): id is string => typeof id === "string" && ObjectId.isValid(id)
+        )
+        .map((id) => new ObjectId(id));
+    }
+
+    /* ==========================================================
+         🔥 POLL EDIT (SAFE + VOTE PRESERVATION)
+         ========================================================== */
+
+    if (existing.postType === PostTypes.POLL && poll) {
+      const existingVotes = existing.poll?.votes ?? {};
+
+      // Build new options list while preserving voteCount
+      const newOptions = poll.options.map((o: any) => {
+        const oldOption = existing.poll?.options?.find(
+          (x: any) => x.id === o.id
+        );
+
+        return {
+          id: o.id,
+          text: o.text,
+          voteCount: oldOption?.voteCount ?? 0,
+        };
+      });
+
+      // Recalculate totalVotes safely
+      const totalVotes = newOptions.reduce(
+        (sum: number, opt: any) => sum + (opt.voteCount ?? 0),
+        0
+      );
+
+      updateFields.poll = {
+        options: newOptions,
+        totalVotes,
+        votes: existingVotes, // 🔒 DO NOT ERASE
+        allowMultiple: !!poll.allowMultiple,
+        expiresAt: poll.expiresAt ?? null,
+      };
+    }
+
+    /* ---------------- VIDEO EDIT ---------------- */
+
+    if (existing.postType === PostTypes.VIDEO && video) {
+      updateFields.video = video;
+    }
+
     updateFields.edited = true;
     updateFields.editedAt = new Date();
 
-    await posts.updateOne({ _id: new ObjectId(id) }, { $set: updateFields });
+    console.log("UPDATE FIELDS:", updateFields);
+
+    const result = await posts.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateFields }
+    );
+
+    console.log("UPDATE RESULT:", result);
+
+    const after = await posts.findOne({ _id: new ObjectId(id) });
+    console.log("AFTER UPDATE:", after);
+
+    /* ---------------- SYNC REFERENCES ---------------- */
+
+    if (Array.isArray(references)) {
+      const safeRefs = references
+        .filter(
+          (r): r is string => typeof r === "string" && ObjectId.isValid(r)
+        )
+        .map((r) => new ObjectId(r));
+
+      await referencesColl.deleteMany({ from: new ObjectId(id) });
+
+      if (safeRefs.length > 0) {
+        await referencesColl.insertMany(
+          safeRefs.map((to) => ({
+            from: new ObjectId(id),
+            to,
+            createdAt: new Date(),
+          }))
+        );
+      }
+    }
 
     /* ---------------- DELETE REMOVED MEDIA ---------------- */
+
     if (Array.isArray(removedImages) && removedImages.length > 0) {
       try {
         await deleteMediaUrls(removedImages);
@@ -245,17 +340,18 @@ export async function PUT(
     }
 
     /* ---------------- ENRICH ---------------- */
+
     const updated = await posts.findOne({ _id: new ObjectId(id) });
 
-    // ✅ PUT側も共通化した関数を利用してエンリッチ
     const enrichedPost = await enrichSinglePost(
       updated as RawPost,
       users,
       categoriesColl
     );
 
-    // コメント数取得 (既存コード踏襲)
-    const commentCount = await posts.countDocuments({ parentId: id });
+    const commentCount = await posts.countDocuments({
+      parentId: id,
+    });
 
     const final = {
       ...enrichedPost,
@@ -263,11 +359,8 @@ export async function PUT(
     };
 
     /* ---------------- SSE ---------------- */
-    const type = existing.replyTo
-      ? "update-reply"
-      : existing.parentId
-      ? "update-comment"
-      : "update-post";
+
+    const type = "update-post";
 
     broadcastSSE({
       type,

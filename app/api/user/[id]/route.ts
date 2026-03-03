@@ -20,15 +20,21 @@ export async function GET(
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
-    const user = await db.collection("users").findOne(
+    const users = db.collection("users");
+    const follows = db.collection("follow");
+
+    /* ---------------------------------------------------------------- */
+    /* GET USER */
+    /* ---------------------------------------------------------------- */
+    const user = await users.findOne(
       { _id: new ObjectId(id) },
       {
         projection: {
           name: 1,
           uniqueId: 1,
           bio: 1,
-          avatarR2Key: 1, // optional: if stored
-          picture: 1, // backward compatibility
+          avatarR2Key: 1,
+          picture: 1,
         },
       }
     );
@@ -40,9 +46,17 @@ export async function GET(
       );
     }
 
-    // -------------------------------------------------------------------------
-    // ⭐ AVATAR LOGIC (R2 CDN)
-    // -------------------------------------------------------------------------
+    /* ---------------------------------------------------------------- */
+    /* FOLLOW COUNTS (parallel) */
+    /* ---------------------------------------------------------------- */
+    const [followers, following] = await Promise.all([
+      follows.countDocuments({ followingId: id }),
+      follows.countDocuments({ followerId: id }),
+    ]);
+
+    /* ---------------------------------------------------------------- */
+    /* AVATAR URL */
+    /* ---------------------------------------------------------------- */
     let avatarUrl: string;
 
     if (user.avatarR2Key) {
@@ -51,6 +65,9 @@ export async function GET(
       avatarUrl = `${process.env.R2_PUBLIC_URL}/avatars/${id}.webp?t=${Date.now()}`;
     }
 
+    /* ---------------------------------------------------------------- */
+    /* RESPONSE */
+    /* ---------------------------------------------------------------- */
     return NextResponse.json({
       ok: true,
       user: {
@@ -59,6 +76,8 @@ export async function GET(
         uniqueId: user.uniqueId ?? null,
         bio: user.bio ?? "",
         picture: avatarUrl,
+        followers,
+        following,
       },
     });
   } catch (err) {

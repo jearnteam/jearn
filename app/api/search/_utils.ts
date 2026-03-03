@@ -105,7 +105,7 @@ export async function searchByPostType(
     postType: { $eq: postType, $ne: PostTypes.COMMENT },
     $or: [
       { title: regex },
-      { content: regex },
+      { plainContent: regex },
       { tags: { $elemMatch: { $regex: regex } } },
     ],
   };

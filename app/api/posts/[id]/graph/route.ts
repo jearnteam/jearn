@@ -98,7 +98,7 @@ export async function GET(
       postType: c.postType ?? "Comment",
       upvoteCount: c.upvoteCount ?? 0,
       createdAt: c.createdAt ?? null,
-      authorName: c.authorName ?? "Anonymous",
+      authorName: c.authorName ?? "Anonymous", // It always anonymoo fix thisなぜならpostにauthorNameは無くenrichがneedだからです
     }));
 
     /* =========================================================

@@ -1,11 +1,25 @@
 "use client";
 
-import { Plus, Home, Users, Bell, Banana,MessageCircle  } from "lucide-react";
+import {
+  Plus,
+  Home,
+  Users,
+  Bell,
+  Video,
+  MessageCircle,
+  Earth,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useUpload } from "@/components/upload/UploadContext";
 
-export type HomeView = "home" | "notify" | "users" | "videos" | "chat";
+export type HomeView =
+  | "home"
+  | "notify"
+  | "users"
+  | "videos"
+  | "chat"
+  | "about";
 
 interface MobileNavbarProps {
   visible: boolean;
@@ -13,6 +27,7 @@ interface MobileNavbarProps {
   onChangeView: (view: HomeView) => void;
   onCreatePost: () => void;
   unreadCount?: number;
+  chatUnread?: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -29,6 +44,7 @@ export default function MobileNavbar({
   onChangeView,
   onCreatePost,
   unreadCount = 0,
+  chatUnread = 0,
 }: MobileNavbarProps) {
   /* ------------------------------------------------------------------ */
   /* refs                                                               */
@@ -40,6 +56,7 @@ export default function MobileNavbar({
   const notifyRef = useRef<HTMLButtonElement | null>(null);
   const videosRef = useRef<HTMLButtonElement | null>(null);
   const chatRef = useRef<HTMLButtonElement | null>(null);
+  const aboutRef = useRef<HTMLButtonElement | null>(null);
   const { uploading, progress } = useUpload();
 
   /* ------------------------------------------------------------------ */
@@ -61,6 +78,7 @@ export default function MobileNavbar({
       notify: notifyRef,
       videos: videosRef,
       chat: chatRef,
+      about: aboutRef,
     };
 
     const btn = map[activeView]?.current;
@@ -125,7 +143,7 @@ export default function MobileNavbar({
       <button
         ref={buttonRef}
         onClick={() => onChangeView(tab)}
-        className="relative w-16 h-12 flex items-center justify-center"
+        className="relative flex-1 h-12 flex items-center justify-center"
       >
         <motion.div
           variants={iconVariants}
@@ -143,7 +161,7 @@ export default function MobileNavbar({
 
         {/* unread badge */}
 
-        {tab === "notify" && badge > 0 && (
+        {badge > 0 && (
           <motion.span
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
             className="
@@ -187,17 +205,23 @@ export default function MobileNavbar({
         ["--mobile-navbar-h" as any]: "80px",
       }}
       className="
-    lg:hidden fixed bottom-0 left-0 right-0
-    h-20
-    bg-white dark:bg-black
-    border-t border-neutral-200 dark:border-neutral-800
-    flex items-center justify-evenly
-    z-40 pt-1 pb-3 px-[5vw]
-  "
+      lg:hidden fixed bottom-0 left-0 right-0
+      h-20
+      bg-white dark:bg-black
+      border-t border-neutral-200 dark:border-neutral-800
+      flex items-center
+      z-40 pt-1 pb-3
+    "
     >
       <NavButton tab="home" icon={<Home size={24} />} buttonRef={homeRef} />
 
       <NavButton tab="users" icon={<Users size={24} />} buttonRef={usersRef} />
+
+      <NavButton
+        tab="videos"
+        icon={<Video size={24} />}
+        buttonRef={videosRef}
+      />
 
       {/* CREATE */}
       <button
@@ -238,23 +262,20 @@ export default function MobileNavbar({
       </button>
 
       <NavButton
+        tab="chat"
+        icon={<MessageCircle size={24} />}
+        badge={chatUnread} // 🔥
+        buttonRef={chatRef}
+      />
+
+      <NavButton
         tab="notify"
         icon={<Bell size={24} />}
         badge={unreadCount}
         buttonRef={notifyRef}
       />
 
-<NavButton
-  tab="chat"
-  icon={<MessageCircle size={24} />}
-  buttonRef={chatRef}
-/>
-
-      <NavButton
-        tab="videos"
-        icon={<Banana size={24} />}
-        buttonRef={videosRef}
-      />
+      <NavButton tab="about" icon={<Earth size={24} />} buttonRef={aboutRef} />
 
       {/* indicator */}
       {indicatorLeft !== null && (

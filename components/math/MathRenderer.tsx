@@ -12,6 +12,7 @@ import { setupLegacyImages } from "./dom/images";
 import { renderPrism } from "./dom/prism";
 import { addCopyButtons } from "./dom/copy";
 import { loadTwitterWidgets } from "./dom/embeds";
+import { setupMentionHoverPopups } from "./dom/mentionHoverPopup";
 
 function MathRendererBase({
   html,
@@ -31,6 +32,7 @@ function MathRendererBase({
     renderMath(el);
     styleMentions(el);
     setupMentions(el);
+    setupMentionHoverPopups(el);
     setupTags(el);
     setupLegacyImages(el);
     renderPrism(el);

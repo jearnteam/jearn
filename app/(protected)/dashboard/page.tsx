@@ -159,13 +159,13 @@ export default function Dashboard() {
             onClick={() => setActiveTab("database")}
           />
 
-          <SidebarItem
+          {/* <SidebarItem
             icon={<Bell size={18} />}
             label={t("notification")}
             active={activeTab === "notification"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("notification")}
-          />
+          /> */}
 
           <SidebarItem
             icon={<FileBarChart size={18} />}
@@ -193,13 +193,13 @@ export default function Dashboard() {
             onClick={() => setActiveTab("categoryRequest")}
           />
 
-          <SidebarItem
+          {/* <SidebarItem
             icon={<Settings size={18} />}
             label={t("settings")}
             active={activeTab === "settings"}
             sidebarFullyOpen={sidebarFullyOpen}
             onClick={() => setActiveTab("settings")}
-          />
+          /> */}
         </div>
       </motion.aside>
 

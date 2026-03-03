@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { PostTypes, type Post, type PostType } from "@/types/post";
 import { isRecentTx } from "@/lib/recentTx";
+import { useSSE } from "@/features/sse/SSEProvider"; // GLOBAL SSE
 
 export function usePosts() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -11,9 +12,10 @@ export function usePosts() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const sseRef = useRef<EventSource | null>(null);
   const fetchingRef = useRef(false);
   const hasMountedRef = useRef(false);
+
+  const { lastMessage } = useSSE(); // GLOBAL SSE
 
   /* -------------------------------------------------------------------------- */
   /*                               FETCH NEXT BATCH                              */
@@ -68,7 +70,6 @@ export function usePosts() {
 
       const data = await res.json();
 
-      // 🔑 状態をすべて初期化
       setPosts(data.items);
       setCursor(data.nextCursor);
       setHasMore(Boolean(data.nextCursor));
@@ -119,94 +120,89 @@ export function usePosts() {
     hasMountedRef.current = true;
 
     fetchNext();
-
-    const es = new EventSource("/api/stream");
-    sseRef.current = es;
-
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        setPosts((prev) => {
-          switch (data.type) {
-            case "new-post":
-              if (!data.post || data.post.parentId) return prev;
-              if (prev.some((p) => p._id === data.post._id)) return prev;
-              return [data.post, ...prev];
-
-            case "update-post":
-              return prev.map((p) =>
-                p._id === data.postId ? { ...p, ...data.post } : p
-              );
-
-            case "delete-post":
-              return prev.filter((p) => p._id !== data.id);
-
-            case "upvote":
-              if (isRecentTx(data.txId)) return prev;
-              return prev.map((p) =>
-                p._id === data.postId
-                  ? {
-                      ...p,
-                      upvoteCount:
-                        (p.upvoteCount ?? 0) +
-                        (data.action === "added" ? 1 : -1),
-                      upvoters:
-                        data.action === "added"
-                          ? [...(p.upvoters ?? []), data.userId]
-                          : (p.upvoters ?? []).filter((u) => u !== data.userId),
-                    }
-                  : p
-              );
-
-            case "update-comment-count":
-              return prev.map((p) =>
-                p._id === data.parentId
-                  ? {
-                      ...p,
-                      commentCount: (p.commentCount ?? 0) + data.delta,
-                    }
-                  : p
-              );
-
-            case "poll-vote":
-              if (isRecentTx(data.txId)) return prev;
-
-              return prev.map((p) =>
-                p._id === data.postId && p.poll
-                  ? {
-                      ...p,
-                      poll: {
-                        ...p.poll,
-                        totalVotes: p.poll.totalVotes + 1,
-                        options: p.poll.options.map((o) =>
-                          o.id === data.optionId
-                            ? { ...o, voteCount: o.voteCount + 1 }
-                            : o
-                        ),
-                      },
-                    }
-                  : p
-              );
-
-            default:
-              return prev;
-          }
-        });
-      } catch {
-        console.warn("⚠️ SSE parse error");
-      }
-    };
-
-    es.onerror = () => {
-      console.warn("⚠️ SSE error — reconnecting automatically");
-    };
-
-    return () => {
-      es.close();
-      sseRef.current = null;
-    };
   }, [fetchNext]);
+
+  /* -------------------------------------------------------------------------- */
+  /*                            GLOBAL SSE LISTENER                              */
+  /* -------------------------------------------------------------------------- */
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    setPosts((prev) => {
+      switch (lastMessage.type) {
+        case "new-post": {
+          const post = lastMessage.post;
+
+          if (!post || post.parentId) return prev;
+
+          // prevent duplicates
+          if (prev.some((p) => p._id === post._id)) return prev;
+
+          return [...prev, post]; // append to bottom
+        }
+
+        case "update-post":
+          return prev.map((p) =>
+            p._id === lastMessage.postId ? { ...p, ...lastMessage.post } : p
+          );
+
+        case "delete-post":
+          return prev.filter((p) => p._id !== lastMessage.id);
+
+        case "upvote":
+          if (isRecentTx(lastMessage.txId)) return prev;
+          return prev.map((p) =>
+            p._id === lastMessage.postId
+              ? {
+                  ...p,
+                  upvoteCount:
+                    (p.upvoteCount ?? 0) +
+                    (lastMessage.action === "added" ? 1 : -1),
+                  upvoters:
+                    lastMessage.action === "added"
+                      ? [...(p.upvoters ?? []), lastMessage.userId]
+                      : (p.upvoters ?? []).filter(
+                          (u) => u !== lastMessage.userId
+                        ),
+                }
+              : p
+          );
+
+        case "update-comment-count":
+          return prev.map((p) =>
+            p._id === lastMessage.parentId
+              ? {
+                  ...p,
+                  commentCount: (p.commentCount ?? 0) + lastMessage.delta,
+                }
+              : p
+          );
+
+        case "poll-vote":
+          if (isRecentTx(lastMessage.txId)) return prev;
+
+          return prev.map((p) =>
+            p._id === lastMessage.postId && p.poll
+              ? {
+                  ...p,
+                  poll: {
+                    ...p.poll,
+                    totalVotes: p.poll.totalVotes + 1,
+                    options: p.poll.options.map((o) =>
+                      o.id === lastMessage.optionId
+                        ? { ...o, voteCount: o.voteCount + 1 }
+                        : o
+                    ),
+                  },
+                }
+              : p
+          );
+
+        default:
+          return prev;
+      }
+    });
+  }, [lastMessage]);
 
   /* -------------------------------------------------------------------------- */
   /*                               CREATE POST                                   */
@@ -221,22 +217,8 @@ export function usePosts() {
       mentionedUserIds: string[],
       tags: string[],
       references?: string[],
-      poll?: {
-        options: {
-          id: string;
-          text: string;
-          voteCount: number;
-        }[];
-        totalVotes: number;
-        allowMultiple?: boolean;
-        expiresAt?: string | null;
-      },
-      video?: {
-        url: string;
-        thumbnailUrl?: string;
-        duration?: number;
-        aspectRatio?: number;
-      },
+      poll?: any,
+      video?: any,
       commentDisabled?: boolean
     ) => {
       if (!authorId) return;
@@ -297,9 +279,9 @@ export function usePosts() {
   );
 
   /* -------------------------------------------------------------------------- */
-  /*                               EDIT POST                                    */
+  /*                               EDIT POST                                     */
   /* -------------------------------------------------------------------------- */
-  /* helper */
+
   function extractCdnImages(html?: string): Set<string> {
     if (!html) return new Set();
 
@@ -315,7 +297,6 @@ export function usePosts() {
     );
   }
 
-  /* -------------------------------------------------------------------------- */
   const editPost = useCallback(
     async (
       id: string,
@@ -325,15 +306,13 @@ export function usePosts() {
       categories?: string[],
       tags?: string[],
       references?: string[],
+      poll?: any,
       commentDisabled?: boolean
     ) => {
-      // 🧮 compute removed images
       const oldImages = extractCdnImages(originalContent);
       const newImages = extractCdnImages(content);
-
       const removedImages = [...oldImages].filter((url) => !newImages.has(url));
 
-      // ⚡ optimistic update
       setPosts((prev) =>
         prev.map((p) =>
           p._id === id
@@ -341,6 +320,7 @@ export function usePosts() {
                 ...p,
                 title,
                 content,
+                poll: poll ?? p.poll,
                 edited: true,
                 editedAt: new Date().toISOString(),
               }
@@ -348,7 +328,6 @@ export function usePosts() {
         )
       );
 
-      // 🌐 API request
       const res = await fetch(`/api/posts/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -358,17 +337,19 @@ export function usePosts() {
           categories,
           tags,
           references,
+          poll,
           removedImages,
           commentDisabled,
         }),
       });
 
       if (!res.ok) {
-        console.error("❌ editPost failed, refetching");
+        console.error("❌ editPost failed");
         return;
       }
 
       const { post: updated } = await res.json();
+
       if (updated) {
         setPosts((prev) => prev.map((p) => (p._id === id ? updated : p)));
       }
@@ -387,9 +368,6 @@ export function usePosts() {
     }).catch((e) => console.error("❌ deletePost:", e));
   }, []);
 
-  /* -------------------------------------------------------------------------- */
-  /*                               RETURN                                        */
-  /* -------------------------------------------------------------------------- */
   return {
     posts,
     setPosts,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import PostList from "@/components/posts/PostList";
@@ -9,9 +9,13 @@ import Avatar from "@/components/Avatar";
 import FollowButton from "@/components/follow/FollowButton";
 import FollowStats from "@/components/follow/FollowStats";
 import { t } from "i18next";
+import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
+import { useRouter } from "next/navigation";
 
 interface Props {
   userId: string;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  onOpenRoom: (roomId: string) => void; // 🔥 NEW
 }
 
 type ApiUser = {
@@ -19,7 +23,6 @@ type ApiUser = {
   uniqueId: string;
   name?: string;
   bio?: string;
-  picture?: string;
 };
 
 type UIUser = {
@@ -29,33 +32,12 @@ type UIUser = {
   bio: string;
 };
 
-async function upvotePost(id: string): Promise<void> {
-  const res = await fetch(`/api/posts/${id}/upvote`, {
-    method: "POST",
-    credentials: "include",
-  });
-
-  if (!res.ok) return;
-
-  const data = await res.json();
-
-  if (data.action === "added" && data.authorId) {
-    fetch("/api/notifications/emit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: data.authorId,
-        payload: {
-          type: "post_like",
-          postId: id,
-        },
-      }),
-    }).catch(() => {});
-  }
-}
-
-export default function ProfileUserClient({ userId }: Props) {
+export default function ProfileUserClient({
+  userId,
+  scrollContainerRef,
+}: Props) {
   const { user: currentUser } = useCurrentUser();
+  const router = useRouter();
 
   const [user, setUser] = useState<UIUser | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -63,13 +45,14 @@ export default function ProfileUserClient({ userId }: Props) {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [startingChat, setStartingChat] = useState(false);
 
-  /** ✅ THIS is the scroll container used by PostList */
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { upvote, vote, answer } = usePostInteractions({
+    setAnsweringPost: () => {},
+  });
 
-  /* ---------------------------------------------
-   * Initial load
-   * ------------------------------------------- */
+  /* ---------------- INITIAL LOAD ---------------- */
+
   useEffect(() => {
     if (!userId) return;
 
@@ -109,9 +92,46 @@ export default function ProfileUserClient({ userId }: Props) {
     })();
   }, [userId]);
 
-  /* ---------------------------------------------
-   * Load more (infinite scroll)
-   * ------------------------------------------- */
+  /* ---------------- START CHAT (OVERLAY) ---------------- */
+
+  async function startChat() {
+    if (!currentUser || currentUser.uid === userId) return;
+    if (startingChat) return;
+
+    setStartingChat(true);
+
+    try {
+      const res = await fetch("/api/chat/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetUserId: userId }),
+      });
+
+      if (!res.ok) {
+        console.error("Failed to create/open chat");
+        return;
+      }
+
+      const { roomId } = await res.json();
+
+      // 🔥 Close overlay FIRST
+      router.back();
+
+      // 🔥 Then open chat after small delay
+      setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent("chat:open", {
+            detail: { roomId },
+          })
+        );
+      }, 50);
+    } finally {
+      setStartingChat(false);
+    }
+  }
+
+  /* ---------------- LOAD MORE ---------------- */
+
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || !cursor) return;
 
@@ -133,9 +153,8 @@ export default function ProfileUserClient({ userId }: Props) {
     }
   }, [cursor, hasMore, loadingMore, userId]);
 
-  /* ---------------------------------------------
-   * UI
-   * ------------------------------------------- */
+  /* ---------------- UI ---------------- */
+
   if (loading) return <FullScreenLoader />;
 
   if (!user) {
@@ -150,7 +169,7 @@ export default function ProfileUserClient({ userId }: Props) {
     <div className="bg-white dark:bg-black min-h-screen pb-24">
       <div className="feed-container mt-10">
         {/* PROFILE HEADER */}
-        <div className="flex items-start gap-5 mb-8 relative">
+        <div className="flex items-start gap-5 mb-8">
           <Avatar id={userId} size={80} className="border" />
 
           <div className="flex-1">
@@ -158,6 +177,7 @@ export default function ProfileUserClient({ userId }: Props) {
             <p className="text-sm text-gray-500">@{user.uniqueId}</p>
 
             <FollowStats userId={userId} />
+
             {user.bio && (
               <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
                 {user.bio}
@@ -165,19 +185,35 @@ export default function ProfileUserClient({ userId }: Props) {
             )}
           </div>
 
-          <FollowButton targetUserId={userId} />
+          <div className="flex gap-2">
+            <FollowButton targetUserId={userId} />
+
+            {currentUser?.uid !== userId && (
+              <button
+                onClick={startChat}
+                disabled={startingChat}
+                className="
+                  px-4 py-2 rounded-md
+                  bg-blue-600 text-white
+                  text-sm font-medium
+                  disabled:opacity-50
+                "
+              >
+                {startingChat ? "Opening…" : "Chat"}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* POSTS — NO WRAPPER */}
+        {/* POSTS */}
         <PostList
           posts={posts}
           hasMore={hasMore}
           onLoadMore={loadMore}
-          onEdit={() => {}}
-          onDelete={async () => {}}
-          onUpvote={upvotePost}
-          onAnswer={() => {}}
-          scrollContainerRef={scrollRef}
+          onUpvote={upvote}
+          onVote={vote}
+          onAnswer={answer}
+          scrollContainerRef={scrollContainerRef}
         />
       </div>
     </div>

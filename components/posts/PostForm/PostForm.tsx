@@ -73,6 +73,16 @@ export interface PostFormProps {
   onSubmit: (data: PostFormData) => Promise<void>;
   initialTitle?: string;
   initialContent?: string;
+  initialPoll?: Poll;
+  initialVideo?: {
+    url: string;
+    thumbnailUrl?: string | null;
+    duration?: number | null;
+    aspectRatio?: number | null;
+  };
+
+  initialCommentDisabled?: boolean;
+
   initialSelectedCategories?: string[];
   initialAvailableCategories?: Category[];
   submitLabel?: string;
@@ -92,18 +102,23 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
     onSubmit,
     initialTitle = "",
     initialContent = "",
+    initialPoll,
+    initialVideo,
+    initialCommentDisabled,
     initialSelectedCategories = EMPTY_STRING_ARRAY,
     initialAvailableCategories = EMPTY_CATEGORIES,
     onSuccess,
     onCancel,
     isEdit = false,
   },
+
   ref
 ) {
   const [title, setTitle] = useState(initialTitle);
   useEffect(() => {
+    if (!isEdit) return;
     setTitle(initialTitle);
-  }, [mode, questionId]);
+  }, [initialTitle]);
 
   const editorRef = useRef<PostEditorWrapperRef>(null);
   const footerRef = useRef<HTMLDivElement>(null);
@@ -122,23 +137,17 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
     addOption,
     removeOption,
     updateOption,
-  } = usePollState(isPoll);
-
-  type GlobalSnapshot = {
-    title: string;
-    content: string;
-  };
-
-  type ClearSnapshot = {
-    title: string;
-    content: string;
-  };
+  } = usePollState(isPoll, initialPoll, isEdit);
 
   const [footerHeight, setFooterHeight] = useState(0);
   const pendingImagesRef = useRef<Map<string, File>>(new Map());
   const localBlobUrlsRef = useRef<Map<string, string>>(new Map());
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(false);
+
+  const [commentDisabled, setCommentDisabled] = useState(
+    initialCommentDisabled ?? false
+  );
 
   const {
     videoFileRef,
@@ -147,7 +156,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
     thumbnailPreviewUrl,
     selectVideo,
     selectThumbnail,
-  } = useVideoState();
+  } = useVideoState(initialVideo, isEdit);
 
   const {
     categories,
@@ -178,6 +187,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
 
   const authorId = user?._id || null;
   const lastTitleChangeAtRef = useRef<number>(0);
+  const editContentInitializedRef = useRef(false);
 
   const [linkPopup, setLinkPopup] = useState<{
     url: string;
@@ -254,6 +264,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
     restoreDraftIntoEditor,
     clearDraftForCurrentUser,
   } = usePostDraft({
+    enabled: !isEdit,
     userId: user?._id ?? null,
     mode,
     questionId,
@@ -277,6 +288,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
 
   // serialize + last-write-wins
   const saveDraftSafe = (nextTitle?: string) => {
+    if (isEdit) return Promise.resolve();
     const seq = ++saveSeqRef.current;
 
     const run = async () => {
@@ -306,14 +318,14 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
   };
 
   useEffect(() => {
+    if (isEdit) return; // BLOCK DRAFT IN EDIT MODE
     if (!draftLoaded) return;
     if (!editorRef.current?.editor) return;
 
-    // small delay ensures editor state is stable
     requestAnimationFrame(() => {
       restoreDraftIntoEditor(setTitle);
     });
-  }, [draftLoaded, mode]);
+  }, [draftLoaded, mode, isEdit]);
 
   const {
     handleUndo,
@@ -524,6 +536,7 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
     thumbnailFileRef,
     selectedCategories: selected,
     upload,
+    commentDisabled,
     onSubmit,
     clearDraft: clearDraftForCurrentUser,
     onSuccess,
@@ -646,9 +659,9 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
 
           {/* ------------------------------ Editor ------------------------------ */}
           <div ref={editorHostRef} className="overflow-visible rounded-md">
-            {draftLoaded && (
+            {(isEdit || draftLoaded) && (
               <PostEditorWrapper
-                key={editorKey}
+                key={isEdit ? "edit-static" : editorKey}
                 ref={editorRef}
                 onUpdate={handleEditorUpdate}
                 onFocus={() => {
@@ -662,13 +675,26 @@ const PostForm = forwardRef<PostFormHandle, PostFormProps>(function PostForm(
                 }}
                 onReady={() => {
                   editorReadyRef.current = true;
-
-                  if (draftLoaded) {
+                
+                  const editor = editorRef.current?.editor;
+                  if (!editor) return;
+                
+                  if (isEdit && !editContentInitializedRef.current) {
+                    editor.commands.setContent(
+                      removeZWSP(initialContent || ""),
+                      { emitUpdate: false }
+                    );
+                
+                    editContentInitializedRef.current = true;
+                  }
+                
+                  if (!isEdit && draftLoaded) {
                     requestAnimationFrame(() => {
                       restoreDraftIntoEditor(setTitle);
                     });
                   }
                 }}
+                
               />
             )}
           </div>

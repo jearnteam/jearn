@@ -26,16 +26,20 @@ import { useUpload } from "@/components/upload/UploadContext";
 import { PostList } from "@/components/posts";
 import { useFollowingPosts } from "@/features/posts/hooks/useFollowingPosts";
 import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext";
+import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
+import { useSession } from "next-auth/react";
+import AboutJearnPage from "@/components/about/AboutJearnPage";
+import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 
 /* ---------------------------------------------
  * VIEW TYPE
  * ------------------------------------------- */
-type HomeView = "home" | "notify" | "users" | "videos" | "chat";
+type HomeView = "home" | "notify" | "users" | "videos" | "chat" | "about";
 
 export default function HomePage() {
   const { t } = useTranslation();
   const { emitScroll } = useScrollBus();
-  const router = useRouter();
+  const { onlineUserIds, totalUnread } = useChatSocket();
 
   /* ---------------------------------------------
    * STATE
@@ -47,7 +51,7 @@ export default function HomePage() {
   //one modal active at a time (post, edit and answer)
   const [showPostBox, setShowPostBox] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
-  const [answeringPost, setAnsweringPost] = useState<Post | null>(null);
+
   //for deleting post(select post -> open delete modal -> cleanup after delete)
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -56,6 +60,8 @@ export default function HomePage() {
   const { uploading, progress } = useUpload();
   //storing latest chatroomId
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  //for upvote, vote answer
+  const [answeringPost, setAnsweringPost] = useState<Post | null>(null);
 
   /* ---------------------------------------------
    * DATA
@@ -82,9 +88,11 @@ export default function HomePage() {
     refresh: refreshFollowing,
   } = useFollowingPosts();
   //Global notification state
-  const { unreadCount, clearUnread,} =
-    useNotificationContext();
-
+  const { unreadCount, clearUnread } = useNotificationContext();
+  const { upvote, vote, answer } = usePostInteractions({
+    setPosts,
+    setAnsweringPost,
+  });
   /* ---------------------------------------------
    * SCROLL MANAGEMENT (🔥 FIX)
    * ------------------------------------------- */
@@ -98,6 +106,7 @@ export default function HomePage() {
     users: 0,
     videos: 0,
     chat: 0,
+    about: 0,
   });
 
   /**
@@ -147,6 +156,12 @@ export default function HomePage() {
   async function changeView(next: HomeView) {
     const el = scrollRef.current;
     if (!el) return;
+
+    // If already in chat and clicking chat again → go back to list
+    if (next === "chat" && activeView === "chat" && activeRoomId) {
+      setActiveRoomId(null);
+      return;
+    }
     // save the states of video page, if the current activeView is Video Page.
     if (activeView === "videos") {
       window.dispatchEvent(new Event("videos:save-state"));
@@ -158,10 +173,12 @@ export default function HomePage() {
     }
     // clear unread when opening notifications
     if (next === "notify") {
-      clearUnread(); // 先にUIを消す
+      clearUnread(); // instant UI feedback
 
-      await fetch("/api/notifications/read", {
+      fetch("/api/notifications/read", {
         method: "POST",
+      }).catch(() => {
+        // optional: handle silently
       });
     }
 
@@ -257,6 +274,22 @@ export default function HomePage() {
   }, []);
 
   /* ---------------------------------------------
+   * CHAT HANDLING
+   * ------------------------------------------- */
+  useEffect(() => {
+    function handleChatOpen(e: any) {
+      const roomId = e.detail?.roomId;
+      if (!roomId) return;
+
+      setActiveView("chat");
+      setActiveRoomId(roomId);
+    }
+
+    window.addEventListener("chat:open", handleChatOpen);
+    return () => window.removeEventListener("chat:open", handleChatOpen);
+  }, []);
+
+  /* ---------------------------------------------
    * SCROLL RESTORATION
    * ------------------------------------------- */
   const prevViewRef = useRef<HomeView>(activeView);
@@ -287,73 +320,6 @@ export default function HomePage() {
   }, [activeView]);
 
   /* ---------------------------------------------
-   * UPVOTE + NOTIFICATION EMIT
-   * ------------------------------------------- */
-  async function upvotePost(id: string) {
-    const res = await apiFetch(`/api/posts/${id}/upvote`, {
-      method: "POST",
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) return;
-
-    if (data.action === "added" && data.authorId) {
-      fetch("/api/notifications/emit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: data.authorId,
-          payload: {
-            type: "post_like",
-            postId: id,
-          },
-        }),
-      }).catch(() => {});
-    }
-  }
-  type VotePollResult = {
-    poll: Post["poll"];
-    votedOptionIds: string[];
-  };
-
-  async function votePoll(
-    postId: string,
-    optionId: string
-  ): Promise<VotePollResult | null> {
-    const res = await apiFetch("/api/posts/polls/vote", {
-      method: "POST",
-      body: JSON.stringify({ postId, optionId }),
-    });
-
-    if (!res.ok) return null;
-
-    const { poll, votedOptionIds } = await res.json();
-
-    setPosts((prev: Post[]) =>
-      prev.map((p) =>
-        p._id === postId
-          ? {
-              ...p,
-              poll: {
-                ...poll,
-                votedOptionIds: Array.isArray(votedOptionIds)
-                  ? votedOptionIds
-                  : [],
-              },
-            }
-          : p
-      )
-    );
-
-    // 🔥 RETURN SERVER TRUTH
-    return {
-      poll,
-      votedOptionIds: Array.isArray(votedOptionIds) ? votedOptionIds : [],
-    };
-  }
-
-  /* ---------------------------------------------
    * RENDER
    * ------------------------------------------- */
   if (loading) {
@@ -373,7 +339,14 @@ export default function HomePage() {
         <EditPostModal
           post={editingPost}
           onClose={() => setEditingPost(null)}
-          onSave={async (title, content, categories, tags, commentDisabled) => {
+          onSave={async (
+            title,
+            content,
+            categories,
+            tags,
+            poll,
+            commentDisabled
+          ) => {
             await editPost(
               editingPost._id,
               editingPost.content ?? "",
@@ -381,9 +354,11 @@ export default function HomePage() {
               content,
               categories,
               tags,
-              editingPost.references, // TODO: これは正しくない可能性があるので要検証
+              editingPost.references,
+              poll, // 🔥 NEW
               commentDisabled
             );
+
             setEditingPost(null);
           }}
         />
@@ -469,6 +444,23 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
+                  label={t("videos")}
+                  active={activeView === "videos"}
+                  onClick={() => changeView("videos")}
+                />
+              </div>
+
+              <div className="relative z-10">
+                <SidebarItem
+                  label={t("chat")}
+                  active={activeView === "chat"}
+                  onClick={() => changeView("chat")}
+                  badge={totalUnread}
+                />
+              </div>
+
+              <div className="relative z-10">
+                <SidebarItem
                   label={t("notifications")}
                   active={activeView === "notify"}
                   onClick={() => changeView("notify")}
@@ -478,17 +470,11 @@ export default function HomePage() {
 
               <div className="relative z-10">
                 <SidebarItem
-                  label={t("videos")}
-                  active={activeView === "videos"}
-                  onClick={() => changeView("videos")}
+                  label="About JEARN"
+                  active={activeView === "about"}
+                  onClick={() => changeView("about")}
                 />
               </div>
-
-              <SidebarItem
-                label={t("chat")}
-                active={activeView === "chat"}
-                onClick={() => changeView("chat")}
-              />
             </nav>
           </aside>
 
@@ -524,15 +510,18 @@ export default function HomePage() {
                 }
               >
                 <PostList
-                  viewId="home"
                   posts={posts}
                   hasMore={hasMore}
                   onLoadMore={fetchNext}
-                  onEdit={setEditingPost}
-                  onDelete={async (id) => requestDelete(id)}
-                  onUpvote={upvotePost}
-                  onVote={votePoll}
-                  onAnswer={setAnsweringPost}
+                  // REQUIRED
+                  onUpvote={upvote}
+                  onVote={vote}
+                  onAnswer={answer}
+                  // OPTIONAL
+                  capabilities={{
+                    edit: setEditingPost,
+                    delete: requestDelete,
+                  }}
                   scrollContainerRef={scrollRef}
                 />
               </div>
@@ -563,24 +552,11 @@ export default function HomePage() {
                   posts={followingPosts}
                   hasMore={followingHasMore}
                   onLoadMore={fetchFollowingNext}
-                  onEdit={setEditingPost}
-                  onDelete={async (id) => requestDelete(id)}
-                  onUpvote={upvotePost}
-                  onVote={votePoll}
-                  onAnswer={setAnsweringPost}
+                  onUpvote={upvote}
+                  onVote={vote}
+                  onAnswer={answer}
                   scrollContainerRef={scrollRef}
                 />
-              </div>
-
-              {/* NOTIFICATIONS */}
-              <div
-                className={
-                  activeView === "notify"
-                    ? "block"
-                    : "invisible h-0 overflow-hidden"
-                }
-              >
-                <NotificationPage />
               </div>
 
               {/* VIDEOS */}
@@ -601,12 +577,41 @@ export default function HomePage() {
                 {activeRoomId ? (
                   <ChatRoomClient
                     roomId={activeRoomId}
-                    onClose={() => setActiveRoomId(null)}
+                    onClose={() => {
+                      setActiveRoomId(null);
+                    }}
                   />
                 ) : (
-                  <ChatListClient onOpenRoom={setActiveRoomId} />
+                  <ChatListClient
+                    active={activeView === "chat"}
+                    onOpenRoom={setActiveRoomId}
+                  />
                 )}
               </div>
+
+              {/* NOTIFICATIONS */}
+              <div
+                className={
+                  activeView === "notify"
+                    ? "block"
+                    : "invisible h-0 overflow-hidden"
+                }
+              >
+                <NotificationPage />
+              </div>
+
+              {/* ABOUT */}
+              {activeView === "about" && (
+                <motion.div
+                  key="about"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <AboutJearnPage onlineCount={onlineUserIds.size} />
+                </motion.div>
+              )}
             </main>
           </VideoSettingsProvider>
 
@@ -618,33 +623,34 @@ export default function HomePage() {
           activeView={activeView}
           onChangeView={changeView}
           onCreatePost={() => setShowPostBox(true)}
-          unreadCount={unreadCount}
+          unreadCount={unreadCount} // notifications
+          chatUnread={totalUnread} // 🔥 chat unread
           visible={navbarVisible}
         />
       </div>
     </>
   );
 }
+
 /**
  * returns the positions of left sidebar tags of current view page
  * @param view
  * @returns
  */
+const SIDEBAR_ITEM_HEIGHT = 44;
+
 function getSidebarIndicatorTop(view: HomeView) {
-  switch (view) {
-    case "home":
-      return 0;
-    case "users":
-      return 44;
-    case "notify":
-      return 88;
-    case "videos":
-      return 132;
-    case "chat":
-      return 176;
-    default:
-      return 0;
-  }
+  const order: HomeView[] = [
+    "home",
+    "users",
+    "videos",
+    "chat",
+    "notify",
+    "about",
+  ];
+
+  const index = order.indexOf(view);
+  return index * SIDEBAR_ITEM_HEIGHT;
 }
 /**
  * api fetch function
@@ -678,8 +684,9 @@ function SidebarItem({
     <button
       onClick={onClick}
       className={[
-        "relative w-full px-4 py-2 rounded-lg", // ← w-full is the key
-        "flex items-center justify-between gap-3",
+        "relative w-full h-[40px]",
+        "px-4 py-1 rounded-lg",
+        "flex items-center justify-between",
         "transition-colors",
         !active && "hover:bg-neutral-100 dark:hover:bg-neutral-800",
         active && "text-white",

@@ -2,24 +2,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
+import { buildFeedResponse } from "@/lib/post/buildFeedResponse";
+import type { RawPost } from "@/types/post";
 
-
-const CDN = process.env.R2_PUBLIC_URL;
-
-function buildAuthorAvatar(
-  authorId: string,
-  avatarUpdatedAt?: Date | null
-) {
-  if (!authorId) {
-    return `${CDN}/avatars/default.webp`;
-  }
-
-  const ts = avatarUpdatedAt
-    ? `?t=${new Date(avatarUpdatedAt).getTime()}`
-    : "";
-
-  return `${CDN}/avatars/${authorId}.webp${ts}`;
-}
+type CategoryDoc = {
+  _id: ObjectId;
+  name?: string;
+  jname?: string;
+  myname?: string;
+};
 /* -------------------------------------------------------------
  * AUTHOR RESOLVER
  * ----------------------------------------------------------- */
@@ -130,9 +121,9 @@ export async function GET(
     const client = await clientPromise;
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
-    const postsColl = db.collection("posts");
-    const usersColl = db.collection("users");
-    const categoriesColl = db.collection("categories");
+    const postsColl = db.collection<RawPost>("posts");
+    const usersColl = db.collection("users"); // fine as Document
+    const categoriesColl = db.collection<CategoryDoc>("categories");
 
     /* -------- Resolve author once -------- */
     const author = await resolveAuthor(usersColl, authorId);
@@ -141,8 +132,7 @@ export async function GET(
     const adminEmails =
       process.env.ADMIN_EMAILS?.split(",").map((e) => e.trim()) || [];
 
-    const isAdminUser =
-      !!author.email && adminEmails.includes(author.email);
+    const isAdminUser = !!author.email && adminEmails.includes(author.email);
 
     /* -------- Build query -------- */
     const query: Record<string, unknown> = {
@@ -164,41 +154,16 @@ export async function GET(
     const hasMore = docs.length > limit;
     const page = hasMore ? docs.slice(0, limit) : docs;
 
-    const nextCursor = hasMore
-      ? page[page.length - 1]._id.toString()
-      : null;
+    const nextCursor = hasMore ? page[page.length - 1]._id.toString() : null;
 
     /* -------- Enrich posts -------- */
-    const enrichedPosts = await Promise.all(
-      page.map(async (post: WithId<Document>) => {
-        const categories = await enrichCategories(
-          Array.isArray(post.categories) ? post.categories : [],
-          categoriesColl
-        );
 
-        return {
-          _id: post._id.toString(),
-          title: post.title,
-          content: post.content,
-          createdAt: post.createdAt,
-          edited: post.edited ?? false,
-          editedAt: post.editedAt ?? null,
-
-          authorId,
-          authorName: author.name,
-          authorUniqueId: author.uniqueId,
-          authorAvatar: buildAuthorAvatar(authorId, author.avatarUpdatedAt),
-          authorAvatarUpdatedAt: author.avatarUpdatedAt,
-
-          categories,
-          tags: post.tags ?? [],
-          upvoteCount: post.upvoteCount ?? 0,
-          commentCount: post.commentCount ?? 0,
-
-          isAdmin: isAdminUser,
-        };
-      })
-    );
+    const enrichedPosts = await buildFeedResponse(page, {
+      usersColl,
+      categoriesColl,
+      viewerId: null,
+      postsColl,
+    });
 
     return NextResponse.json({
       ok: true,

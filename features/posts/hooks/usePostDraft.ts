@@ -10,6 +10,7 @@ import { PostTypes, PostType } from "@/types/post";
 import { PostEditorWrapperRef } from "@/components/posts/PostForm/PostEditorWrapper";
 
 type Params = {
+  enabled?: boolean;
   userId: string | null;
   mode: PostType;
   questionId?: string;
@@ -22,6 +23,7 @@ type Params = {
 };
 
 export function usePostDraft({
+  enabled = true,
   userId,
   mode,
   questionId,
@@ -58,6 +60,7 @@ export function usePostDraft({
   /* -------------------------------------------------- */
 
   const saveDraftNow = async (title: string, content: string) => {
+    if (!enabled) return;
     if (!userId) return;
 
     const { userId: uid, postType, questionId: qid } = getDraftScope();
@@ -89,6 +92,7 @@ export function usePostDraft({
   /* -------------------------------------------------- */
 
   useEffect(() => {
+    if (!enabled) return;
     if (!userId || !draftKey) return;
 
     let cancelled = false;
@@ -124,6 +128,7 @@ export function usePostDraft({
   /* -------------------------------------------------- */
 
   const restoreDraftIntoEditor = (setTitle: (v: string) => void) => {
+    if (!enabled) return;
     if (!draftLoaded || !pendingDraftRef.current) return;
 
     const draft = pendingDraftRef.current;
@@ -170,6 +175,7 @@ export function usePostDraft({
   /* -------------------------------------------------- */
 
   const clearDraftForCurrentUser = () => {
+    if (!enabled) return;
     if (!userId) return;
 
     clearDraft(

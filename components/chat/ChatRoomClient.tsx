@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowLeft, Send } from "lucide-react";
 import { resolveAvatar } from "@/lib/avatar";
+import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 
 /* ───────────────── TYPES ───────────────── */
 
@@ -99,6 +100,8 @@ function ChatInfoBlock({ partner }: { partner: Partner }) {
 export default function ChatRoomClient({ roomId, onClose }: Props) {
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const { joinRoom, leaveRoom, subscribeRoom, sendRoomMessage, status } =
+    useChatSocket();
   const [hasAnyMessages, setHasAnyMessages] = useState<boolean | null>(null);
   const [reachedBeginning, setReachedBeginning] = useState(false);
   const [activeMsgId, setActiveMsgId] = useState<string | null>(null);
@@ -112,9 +115,6 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const bottomMsgRef = useRef<HTMLDivElement | null>(null);
-
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<number | null>(null);
 
   const hasMoreRef = useRef(true);
   const loadingMoreRef = useRef(false);
@@ -223,64 +223,52 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
     };
   }, [roomId]);
 
+  useEffect(() => {
+    fetch("/api/chat/room/read", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomId }),
+    });
+  }, [roomId]);
+
+  const { setActiveRoom } = useChatSocket();
+
+  useEffect(() => {
+    setActiveRoom(roomId);
+    return () => setActiveRoom(null);
+  }, [roomId, setActiveRoom]);
+
   /* ───────── SCROLL MANAGEMENT ───────── */
 
   useLayoutEffect(() => {
-    if (!messages.length) return;
+    if (!initialLoaded) return;
+    if (!messages.length) return; // 🔥 wait until messages exist
+    if (didInitialScrollRef.current) return;
 
-    if (pendingRestoreRef.current && anchorRef.current) {
-      restoreAnchor();
-      pendingRestoreRef.current = false;
-    }
-  }, [messages]);
+    const el = listRef.current;
+    if (!el) return;
+
+    // force bottom
+    el.scrollTop = el.scrollHeight;
+
+    // double frame (mobile safe)
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+        didInitialScrollRef.current = true;
+      });
+    });
+  }, [initialLoaded, messages.length]);
 
   /* ───────── ANCHOR UTILS ───────── */
 
-  function captureAnchor() {
-    const container = listRef.current;
-    if (!container) return;
+  function scrollToBottom() {
+    const el = listRef.current;
+    if (!el) return;
 
-    const containerTop = container.getBoundingClientRect().top;
-    const nodes = container.querySelectorAll<HTMLElement>("[data-msg-id]");
-
-    for (const node of nodes) {
-      const rect = node.getBoundingClientRect();
-      if (rect.bottom > containerTop) {
-        anchorRef.current = {
-          id: node.dataset.msgId!,
-          top: rect.top,
-        };
-        return;
-      }
-    }
-  }
-
-  function restoreAnchor() {
-    const container = listRef.current;
-    const anchor = anchorRef.current;
-    if (!container || !anchor) return;
-
-    const node = container.querySelector<HTMLElement>(
-      `[data-msg-id="${anchor.id}"]`
-    );
-    if (!node) return;
-
-    const prevTop = anchor.top;
-
-    const firstTop = node.getBoundingClientRect().top;
-    container.scrollTop += firstTop - prevTop;
-
-    requestAnimationFrame(() => {
-      const secondTop = node.getBoundingClientRect().top;
-      container.scrollTop += secondTop - prevTop;
-    });
-  }
-
-  function scrollToBottom(force = false) {
-    bottomMsgRef.current?.scrollIntoView({
-      behavior: force ? "auto" : "smooth",
-      block: "end",
-    });
+    el.scrollTop = el.scrollHeight;
   }
 
   /* ───────── LOAD OLDER ───────── */
@@ -288,11 +276,15 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
   async function loadOlder() {
     if (!cursor || loadingMoreRef.current || !hasMoreRef.current) return;
 
+    const el = listRef.current;
+    if (!el) return;
+
     loadingMoreRef.current = true;
     setShowOlderLoading(true);
 
-    captureAnchor();
-    pendingRestoreRef.current = true;
+    // 🔥 1. Capture current scroll position
+    const prevScrollHeight = el.scrollHeight;
+    const prevScrollTop = el.scrollTop;
 
     try {
       const res = await fetch(
@@ -300,106 +292,63 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       );
       const data: MessagesResponse = await res.json();
 
-      setMessages((prev) => [
-        ...data.messages.slice().reverse().map(normalizeMessage),
-        ...prev,
-      ]);
+      const older = data.messages.slice().reverse().map(normalizeMessage);
+
+      // 🔥 2. Insert older messages
+      setMessages((prev) => [...older, ...prev]);
+
       setCursor(data.nextCursor);
       hasMoreRef.current = Boolean(data.nextCursor);
 
       if (data.isLastPage) {
-        setReachedBeginning(true); // 🔥 reached top
+        setReachedBeginning(true);
       }
+
+      // 🔥 3. Wait for DOM update then restore position
+      requestAnimationFrame(() => {
+        const newScrollHeight = el.scrollHeight;
+        const heightDiff = newScrollHeight - prevScrollHeight;
+
+        el.scrollTop = prevScrollTop + heightDiff;
+      });
     } finally {
       loadingMoreRef.current = false;
       setShowOlderLoading(false);
     }
   }
 
-  useEffect(() => {
-    if (!initialLoaded) return;
-    if (didInitialScrollRef.current) return;
-
-    // Force scroll AFTER paint
-    requestAnimationFrame(() => {
-      scrollToBottom(true);
-      didInitialScrollRef.current = true;
-    });
-  }, [initialLoaded]);
-
-  /* ───────── RESIZE HANDLING ───────── */
-
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-
-    const ro = new ResizeObserver(() => {
-      if (pendingRestoreRef.current && anchorRef.current) {
-        restoreAnchor();
-      }
-    });
-
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
   /* ───────── WEBSOCKET ───────── */
 
   useEffect(() => {
-    if (!me) return;
+    if (!roomId) return;
 
-    let closedManually = false;
+    const unsub = subscribeRoom(roomId, (payload) => {
+      const msg = payload as Message;
 
-    function connect() {
-      const ws = new WebSocket(WS_URL);
-      wsRef.current = ws;
+      const el = listRef.current;
+      const nearBottom =
+        !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 400;
 
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: "join", roomId }));
-      };
+      setMessages((prev) =>
+        prev.some((m) => m.id === msg.id)
+          ? prev
+          : [...prev, normalizeMessage(msg)]
+      );
 
-      ws.onmessage = (e) => {
-        const data = JSON.parse(e.data);
-        if (data?.type !== "chat:message") return;
-
-        const el = listRef.current;
-        const nearBottom =
-          !!el && el.scrollHeight - el.scrollTop - el.clientHeight < 400;
-
-        setMessages((prev) =>
-          prev.some((m) => m.id === data.payload.id)
-            ? prev
-            : [...prev, normalizeMessage(data.payload)]
-        );
-
-        if (nearBottom) {
-          requestAnimationFrame(() => {
-            scrollToBottom(true);
-            requestAnimationFrame(() => scrollToBottom(true));
-          });
-        } else {
-          setUnreadCount((c) => c + 1);
-        }
-      };
-
-      ws.onclose = () => {
-        if (!closedManually) {
-          reconnectTimerRef.current = window.setTimeout(connect, 1500);
-        }
-      };
-
-      ws.onerror = () => ws.close();
-    }
-
-    connect();
+      if (nearBottom) {
+        requestAnimationFrame(() => {
+          scrollToBottom();
+          requestAnimationFrame(() => scrollToBottom());
+        });
+      } else {
+        setUnreadCount((c) => c + 1);
+      }
+    });
 
     return () => {
-      closedManually = true;
-      wsRef.current?.close();
-      wsRef.current = null;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      unsub();
     };
-  }, [roomId, me]);
+  }, [roomId, subscribeRoom]);
 
   /* ───────── SEND ───────── */
 
@@ -424,15 +373,9 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       const msg: Message = await res.json();
       setMessages((prev) => [...prev, msg]);
 
-      wsRef.current?.send(
-        JSON.stringify({
-          type: "chat:message",
-          roomId,
-          payload: msg,
-        })
-      );
+      sendRoomMessage(roomId, msg);
 
-      requestAnimationFrame(() => scrollToBottom(true));
+      requestAnimationFrame(() => scrollToBottom());
     } finally {
       sendingRef.current = false;
     }
@@ -488,11 +431,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       {/* MESSAGE LIST */}
       <div
         ref={listRef}
-        className="
-    flex-1 flex flex-col
-    overflow-y-auto overflow-x-hidden
-    py-3 space-y-2 no-scrollbar
-  "
+        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden py-3 space-y-2 no-scrollbar"
         onScroll={(e) => {
           if (loadingMoreRef.current) return;
 
@@ -509,8 +448,6 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       >
         {/* CENTERED CHAT COLUMN */}
         <div className="mx-auto w-full max-w-[720px] py-3 space-y-1 flex flex-col flex-1">
-          {/* PUSH CONTENT DOWN */}
-          <div className="flex-1" />
           {/* BEGINNING OF CHAT (API CONFIRMED) */}
           {initialLoaded &&
             partner &&
@@ -609,7 +546,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
       {unreadCount > 0 && (
         <button
           onClick={() => {
-            scrollToBottom(true);
+            scrollToBottom();
             setUnreadCount(0);
           }}
           className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded-full"
@@ -627,17 +564,11 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-
-                // 📱 Mobile: Enter = newline (default behavior)
-                if (isMobile) {
-                  return; // allow <br>
-                }
-
-                // 🖥 Desktop
-                if (!e.shiftKey) {
-                  e.preventDefault();
-                  send();
+                if (e.key === "Enter" && !isMobile) {
+                  if (!e.shiftKey) {
+                    e.preventDefault();
+                    send();
+                  }
                 }
               }}
               rows={1}

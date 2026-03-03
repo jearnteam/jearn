@@ -11,11 +11,18 @@ const PAGE_SIZE = 30;
  * ------------------------------------------------- */
 export async function GET(req: Request) {
   const session = await getServerSession(authConfig);
+
   if (!session?.user?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const myUid = session.user.uid; // 🔥 STRING UID
+  const myUid = session.user.uid;
+
+  if (!ObjectId.isValid(myUid)) {
+    return NextResponse.json({ error: "Invalid session uid" }, { status: 400 });
+  }
+
+  const myObjectId = new ObjectId(myUid);
 
   const { searchParams } = new URL(req.url);
   const roomIdStr = searchParams.get("roomId");
@@ -33,10 +40,10 @@ export async function GET(req: Request) {
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
 
-  /* 1️⃣ Check room membership (🔥 STRING MATCH) */
+  /* 1️⃣ Check membership (FIXED) */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myUid,
+    members: myObjectId,
   });
 
   if (!room) {
@@ -50,7 +57,6 @@ export async function GET(req: Request) {
     match._id = { $lt: new ObjectId(cursor) };
   }
 
-  /* 3️⃣ Fetch messages */
   const docs = await messagesCol
     .aggregate([
       { $match: match },
@@ -73,7 +79,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     messages: pageDocs.map((m) => ({
       id: m._id.toString(),
-      senderId: m.senderId, // 🔥 STRING
+      senderId: m.senderId.toString(), // ensure string output
       text: m.text,
       createdAt: m.createdAt,
     })),
@@ -89,11 +95,18 @@ export async function GET(req: Request) {
  * ------------------------------------------------- */
 export async function POST(req: Request) {
   const session = await getServerSession(authConfig);
+
   if (!session?.user?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const myUid = session.user.uid; // 🔥 STRING UID
+  const myUid = session.user.uid;
+
+  if (!ObjectId.isValid(myUid)) {
+    return NextResponse.json({ error: "Invalid session uid" }, { status: 400 });
+  }
+
+  const myObjectId = new ObjectId(myUid);
 
   const body = await req.json().catch(() => null);
   const roomIdStr = body?.roomId;
@@ -116,10 +129,10 @@ export async function POST(req: Request) {
   const roomsCol = db.collection("chat_rooms");
   const messagesCol = db.collection("chat_messages");
 
-  /* 1️⃣ Check room membership (🔥 STRING MATCH) */
+  /* 1️⃣ Check membership (FIXED) */
   const room = await roomsCol.findOne({
     _id: roomId,
-    members: myUid,
+    members: myObjectId,
   });
 
   if (!room) {
@@ -131,10 +144,10 @@ export async function POST(req: Request) {
 
   const doc = {
     roomId,
-    senderId: myUid, // 🔥 STRING
+    senderId: myObjectId, // 🔥 store as ObjectId
     text: text.trim(),
     createdAt: now,
-    readBy: [myUid],
+    readBy: [myObjectId],
   };
 
   const result = await messagesCol.insertOne(doc);
@@ -146,7 +159,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     id: result.insertedId.toString(),
-    senderId: myUid,
+    senderId: myUid, // return string to frontend
     text: doc.text,
     createdAt: doc.createdAt,
   });

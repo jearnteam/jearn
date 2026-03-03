@@ -6,49 +6,95 @@ import { WebSocketServer, WebSocket } from "ws";
  * ------------------------------------------- */
 
 type WSClient = WebSocket & {
+  userId?: string;
   rooms: Set<string>;
 };
 
 /* ---------------------------------------------
- * HTTP SERVER (KEEP THIS)
+ * HTTP SERVER
  * ------------------------------------------- */
 
 const server = http.createServer((req, res) => {
-  console.log("HTTP:", req.method, req.url);
   res.writeHead(200);
   res.end("OK");
 });
 
 /* ---------------------------------------------
- * WS SERVER (UPGRADE MODE)
+ * WS SERVER
  * ------------------------------------------- */
 
 const wss = new WebSocketServer({ noServer: true });
+
 const clients = new Set<WSClient>();
 
+// 🔥 Track presence with connection count (multi-tab safe)
+const onlineUsers = new Map<string, number>();
+
 /* ---------------------------------------------
- * UPGRADE HANDLER (KEEP STRUCTURE)
+ * HELPERS
+ * ------------------------------------------- */
+
+function broadcast(data: any) {
+  const json = JSON.stringify(data);
+
+  for (const c of clients) {
+    if (c.readyState === WebSocket.OPEN) {
+      c.send(json);
+    }
+  }
+}
+
+function sendOnlineList(ws: WebSocket) {
+  ws.send(
+    JSON.stringify({
+      type: "presence:list",
+      users: Array.from(onlineUsers.keys()),
+    })
+  );
+}
+
+function handleUserOnline(userId: string) {
+  const count = onlineUsers.get(userId) ?? 0;
+  onlineUsers.set(userId, count + 1);
+
+  // Only broadcast if first connection
+  if (count === 0) {
+    broadcast({
+      type: "presence:online",
+      userId,
+    });
+  }
+}
+
+function broadcastPresence() {
+  const payload = JSON.stringify({
+    type: "presence:update",
+    onlineUserIds: Array.from(onlineUsers.keys()),
+  });
+
+  for (const c of clients) {
+    if (c.readyState === WebSocket.OPEN) {
+      c.send(payload);
+    }
+  }
+}
+
+/* ---------------------------------------------
+ * UPGRADE HANDLER
  * ------------------------------------------- */
 
 server.on("upgrade", (req, socket, head) => {
-  console.log("UPGRADE:", req.url);
-
   if (req.url !== "/chat") {
-    console.log("REJECTED PATH");
     socket.destroy();
     return;
   }
 
-  console.log("UPGRADE OK");
-
   wss.handleUpgrade(req, socket, head, (ws) => {
-    console.log("WS CONNECTED");
-
     const client = ws as WSClient;
     client.rooms = new Set();
     clients.add(client);
 
-    /* ---------------- MESSAGE ---------------- */
+    let userId: string | undefined;
 
     ws.on("message", (raw) => {
       let data: any;
@@ -58,41 +104,63 @@ server.on("upgrade", (req, socket, head) => {
         return;
       }
 
-      /* JOIN ROOM */
-      if (data.type === "join" && data.roomId) {
-        client.rooms.add(data.roomId);
-        console.log("JOIN ROOM:", data.roomId);
+      if (data.type === "presence:init" && data.userId) {
+        userId = String(data.userId);
+        const count = onlineUsers.get(userId) ?? 0;
+        onlineUsers.set(userId, count + 1);
+        broadcastPresence();
         return;
       }
 
-      /* CHAT MESSAGE SIGNAL */
-      if (
-        data.type === "chat:message" &&
-        data.roomId &&
-        data.payload
-      ) {
+      if (data.type === "join" && data.roomId) {
+        client.rooms.add(String(data.roomId));
+        console.log("JOIN:", data.roomId);
+        return;
+      }
+
+      if (data.type === "leave" && data.roomId) {
+        client.rooms.delete(String(data.roomId));
+        return;
+      }
+      if (data.type === "chat:message" && data.roomId && data.payload) {
+        const roomId = String(data.roomId);
+
+        console.log("ROOM MEMBERS:");
         for (const c of clients) {
-          if (
-            c !== client &&
-            c.readyState === WebSocket.OPEN &&
-            c.rooms.has(data.roomId)
-          ) {
+          console.log("Client rooms:", c.rooms);
+        }
+
+        for (const c of clients) {
+          if (c.readyState === WebSocket.OPEN && c.rooms.has(roomId)) {
+            console.log("SENDING TO CLIENT IN ROOM:", roomId);
             c.send(
               JSON.stringify({
                 type: "chat:message",
+                roomId,
                 payload: data.payload,
               })
             );
           }
         }
+
+        return;
       }
     });
 
-    /* ---------------- CLOSE ---------------- */
-
     ws.on("close", () => {
       clients.delete(client);
-      console.log("WS DISCONNECTED");
+
+      if (userId) {
+        const count = onlineUsers.get(userId) ?? 0;
+
+        if (count <= 1) {
+          onlineUsers.delete(userId);
+        } else {
+          onlineUsers.set(userId, count - 1);
+        }
+
+        broadcastPresence();
+      }
     });
   });
 });
@@ -102,5 +170,5 @@ server.on("upgrade", (req, socket, head) => {
  * ------------------------------------------- */
 
 server.listen(3535, "0.0.0.0", () => {
-  console.log("💬 Chat WS listening on 3535 /chat");
+  console.log("💬 WS listening on 3535 /chat");
 });

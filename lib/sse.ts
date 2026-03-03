@@ -1,57 +1,97 @@
-// /lib/sse.ts
+/* ============================================================
+   GLOBAL SSE STATE (App Router Safe Singleton)
+   ============================================================ */
 
 export type SSEClient = {
   write: (msg: string) => void;
+  userId?: string | null; // 🔥 NEW
 };
 
-let clients: SSEClient[] = [];
+type GlobalSSEState = {
+  clients: SSEClient[];
+};
 
-/* ---------------------------------------------
- * CLIENT MANAGEMENT
- * ------------------------------------------- */
+const globalForSSE = globalThis as unknown as {
+  __SSE_STATE__?: GlobalSSEState;
+};
+
+if (!globalForSSE.__SSE_STATE__) {
+  globalForSSE.__SSE_STATE__ = {
+    clients: [],
+  };
+}
+
+const clients = globalForSSE.__SSE_STATE__.clients;
+
+/* ============================================================
+     CLIENT MANAGEMENT
+     ============================================================ */
+
 export function addClient(client: SSEClient) {
   clients.push(client);
+  console.log("🟢 SSE client connected. Total:", clients.length);
 }
 
 export function removeClient(client: SSEClient) {
-  clients = clients.filter((c) => c !== client);
+  const index = clients.indexOf(client);
+  if (index !== -1) {
+    clients.splice(index, 1);
+  }
+  console.log("🔴 SSE client removed. Total:", clients.length);
 }
 
 export function getClientCount() {
   return clients.length;
 }
 
-/* ---------------------------------------------
- * SSE PAYLOAD
- * ------------------------------------------- */
-export type SSEPayload =
-  | {
-      type: string;
-      [key: string]: unknown;
-    }
-  | unknown;
+/* ============================================================
+     GLOBAL BROADCAST (POSTS, UPVOTES, ETC)
+     ============================================================ */
 
-/* ---------------------------------------------
- * BROADCAST
- * ------------------------------------------- */
-export function broadcastSSE(data: SSEPayload) {
+export function broadcastSSE(data: any) {
+  if (!clients.length) return;
+
   let json: string;
 
   try {
     json = JSON.stringify(data);
-  } catch (err) {
-    console.error("❌ SSE payload is not serializable:", data);
+  } catch {
     return;
   }
 
+  // 🔥 IMPORTANT: default event (no event: line)
   const payload = `data: ${json}\n\n`;
 
   for (const client of clients) {
     try {
       client.write(payload);
-    } catch (err) {
-      console.warn("⚠️ SSE write failed, removing client:", err);
+    } catch {
       removeClient(client);
     }
   }
+}
+
+/* ============================================================
+     USER-SCOPED NOTIFICATION
+     ============================================================ */
+
+export function notifyUser(userId: string, data: any) {
+  if (!clients.length) return;
+
+  const payload = `event: notification\ndata: ${JSON.stringify(data)}\n\n`;
+
+  let delivered = 0;
+
+  for (const client of clients) {
+    if (client.userId === userId) {
+      try {
+        client.write(payload);
+        delivered++;
+      } catch {
+        removeClient(client);
+      }
+    }
+  }
+
+  console.log(`🔔 Notification delivered to ${delivered} client(s)`);
 }

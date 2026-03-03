@@ -4,11 +4,12 @@ import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { emitGroupedNotification } from "@/lib/emitNotification";
+import { broadcastSSE } from "@/lib/sse";
+import { randomUUID } from "crypto";
 
 type PostDoc = {
   _id: ObjectId;
   authorId: ObjectId | string;
-
   upvoters?: ObjectId[];
   upvoteCount?: number;
 };
@@ -33,7 +34,9 @@ export async function POST(
   const postId = new ObjectId(id);
   const actorId = new ObjectId(userId);
 
-  /* ---------------- CHECK EXISTING ---------------- */
+  /* -------------------------------------------------- */
+  /* FIND POST                                          */
+  /* -------------------------------------------------- */
   const post = await posts.findOne(
     { _id: postId },
     { projection: { authorId: 1, upvoters: 1 } }
@@ -46,11 +49,15 @@ export async function POST(
     );
   }
 
-  const alreadyUpvoted = post.upvoters?.some((x: ObjectId) =>
-    x.equals(actorId)
-  );
+  const alreadyUpvoted =
+    post.upvoters?.some((x: ObjectId) => x.equals(actorId)) ?? false;
 
-  /* ---------------- TOGGLE ---------------- */
+  const txId = randomUUID();
+
+  /* -------------------------------------------------- */
+  /* TOGGLE LOGIC                                       */
+  /* -------------------------------------------------- */
+
   if (alreadyUpvoted) {
     await posts.updateOne(
       { _id: postId },
@@ -59,6 +66,16 @@ export async function POST(
         $inc: { upvoteCount: -1 },
       }
     );
+
+    // 🔥 Broadcast SSE (REMOVE)
+    broadcastSSE({
+      type: "upvote",
+      txId,
+      postId: id,
+      userId: actorId.toString(),
+      action: "removed",
+    });
+
   } else {
     await posts.updateOne(
       { _id: postId },
@@ -68,8 +85,20 @@ export async function POST(
       }
     );
 
-    // 🔔 GROUPED NOTIFICATION (only on add)
-    if (post.authorId && post.authorId.toString() !== actorId.toString()) {
+    // 🔥 Broadcast SSE (ADD)
+    broadcastSSE({
+      type: "upvote",
+      txId,
+      postId: id,
+      userId: actorId.toString(),
+      action: "added",
+    });
+
+    // 🔔 Notify author (not self)
+    if (
+      post.authorId &&
+      post.authorId.toString() !== actorId.toString()
+    ) {
       emitGroupedNotification({
         userId: post.authorId.toString(),
         type: "post_like",
@@ -82,5 +111,6 @@ export async function POST(
   return NextResponse.json({
     ok: true,
     action: alreadyUpvoted ? "removed" : "added",
+    txId,
   });
 }

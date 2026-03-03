@@ -223,9 +223,7 @@ export default function PostContent({
               <div
                 ref={contentRef}
                 onDoubleClick={handleContentDoubleClick}
-                className={`relative overflow-hidden mt-2 transition-[max-height] duration-300 ease-in-out ${
-                  expanded ? "cursor-zoom-out" : ""
-                }`}
+                className={`relative overflow-hidden mt-2 transition-[max-height] duration-300 ease-in-out `}
                 style={{
                   maxHeight: !needsCollapse
                     ? undefined

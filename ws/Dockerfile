@@ -9,4 +9,4 @@ COPY . .
 
 EXPOSE 3535
 
-CMD ["node", "src/server.js"]
+CMD ["node", "src/server.ts"]

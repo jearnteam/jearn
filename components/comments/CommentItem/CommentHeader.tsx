@@ -10,20 +10,9 @@ import type { Post } from "@/types/post";
 import { useState, useRef, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { avatarUrl } from "@/lib/avatarUrl";
 
 dayjs.extend(relativeTime);
-
-const CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
-
-function resolveAvatar(comment: Post) {
-  if (comment.authorAvatar) return comment.authorAvatar;
-  if (comment.authorId && comment.authorAvatarUpdatedAt) {
-    return `${CDN}/avatars/${comment.authorId}.webp?t=${new Date(
-      comment.authorAvatarUpdatedAt
-    ).getTime()}`;
-  }
-  return "/default-avatar.png";
-}
 
 export default function CommentHeader({
   comment,
@@ -40,7 +29,7 @@ export default function CommentHeader({
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const avatar = resolveAvatar(comment);
+  const avatar = avatarUrl(comment.authorId, comment.authorAvatarUpdatedAt);
   const authorName = comment.authorName || "Anonymous";
 
   // Close menu on outside click
