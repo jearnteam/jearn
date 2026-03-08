@@ -1,5 +1,5 @@
 // app/api/follow/status/[userId]/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
@@ -14,8 +14,7 @@ export async function GET(
   if (!session?.user?.uid) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const follows = db.collection("follow");

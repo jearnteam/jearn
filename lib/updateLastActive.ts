@@ -1,9 +1,10 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export async function updateLastActive(userId: string) {
   if (!ObjectId.isValid(userId)) return;
 
+  const clientPromise = await getMongoClient();
   const client = await clientPromise;
   const db = client.db(process.env.MONGODB_DB || "jearn");
 

@@ -1,6 +1,6 @@
 // app/api/ogp/post/[id]/route.ts
 
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { resolveAuthor } from "@/lib/post/resolveAuthor";
@@ -37,7 +37,7 @@ export async function GET(
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const posts = db.collection("posts");

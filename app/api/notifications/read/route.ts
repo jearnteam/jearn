@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { ObjectId } from "mongodb";
@@ -20,7 +20,7 @@ export async function POST() {
       return new Response("Invalid userId", { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     await db.collection("notifications").updateMany(

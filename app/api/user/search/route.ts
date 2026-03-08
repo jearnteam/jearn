@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -11,7 +11,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: true, users: [] });
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const safe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

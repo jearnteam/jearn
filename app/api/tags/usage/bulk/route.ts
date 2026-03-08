@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 export async function POST(req: Request) {
   try {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ usage: {} });
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const results = await db.collection("posts").aggregate([

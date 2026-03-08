@@ -1,5 +1,5 @@
 // app/api/posts/[id]/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb"; // WithId, Document 追加
 import { broadcastSSE } from "@/lib/sse";
@@ -95,8 +95,7 @@ export async function GET(
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json(null, { status: 400 });
     }
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const posts = db.collection("posts");
@@ -135,7 +134,7 @@ export async function GET(
     const commentCount = await posts.countDocuments({ parentId: id });
 
     // ✅ PARENT POST RESOLUTION (for Answers)
-    let parentPost = undefined;
+    let parentPost: Awaited<ReturnType<typeof enrichSinglePost>> | undefined;
     if (
       post.postType === PostTypes.ANSWER &&
       post.parentId &&
@@ -195,8 +194,8 @@ export async function PUT(
       commentDisabled,
     } = await req.json();
 
-    const client = await clientPromise;
-    const db = client.db(process.env.MONGODB_DB || "jearn");
+    const clientPromise = await getMongoClient();
+    const db = clientPromise.db(process.env.MONGODB_DB || "jearn");
 
     const posts = db.collection("posts");
     const users = db.collection("users");

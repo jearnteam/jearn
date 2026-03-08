@@ -33,12 +33,13 @@ type ChatSocketContextValue = {
 const ChatSocketContext = createContext<ChatSocketContextValue | null>(null);
 
 function getWsUrl() {
-  const base =
-    process.env.NEXT_PUBLIC_WS_URL ??
-    `${window.location.protocol === "https:" ? "wss" : "ws"}://${
-      window.location.host
-    }`;
-  return base.endsWith("/chat") ? base : `${base}/chat`;
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+  if (window.location.hostname === "localhost") {
+    return `${protocol}://localhost:3535/chat`;
+  }
+
+  return `${protocol}://ws.jearn.site/chat`;
 }
 
 export function ChatSocketProvider({

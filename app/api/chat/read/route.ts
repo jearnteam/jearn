@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
@@ -16,8 +16,7 @@ export async function POST(req: Request) {
   if (!ObjectId.isValid(roomId)) {
     return NextResponse.json({ error: "Invalid room" }, { status: 400 });
   }
-
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const myObjectId = new ObjectId(session.user.uid);

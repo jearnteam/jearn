@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { getMongoClient } from "@/lib/mongodb";
+import { ObjectId, WithId } from "mongodb";
 
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  bio?: string;
+  avatarUrl?: string;
+  avatarUpdatedAt?: Date | null;
+};
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ uniqueId: string }> }
@@ -17,10 +25,10 @@ export async function GET(
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
-    let user = null;
+    let user: WithId<UserDoc> | null = null;
 
     // 1) lookup by username
     user = await db.collection("users").findOne(

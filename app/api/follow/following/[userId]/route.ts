@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
@@ -19,7 +19,7 @@ export async function GET(
   const { searchParams } = new URL(req.url);
   const cursor = searchParams.get("cursor");
 
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const follows = db.collection("follow");

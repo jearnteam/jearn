@@ -1,6 +1,6 @@
 // app/api/user/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 export async function GET(
@@ -17,7 +17,7 @@ export async function GET(
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const users = db.collection("users");

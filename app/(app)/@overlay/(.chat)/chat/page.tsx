@@ -10,6 +10,7 @@ export default function ChatListOverlayPage() {
   return (
     <ChatOverlayShell onClose={() => router.back()}>
       <ChatListClient
+        active={true}
         onOpenRoom={(roomId) => {
           router.push(`/chat/${roomId}`, { scroll: false });
         }}

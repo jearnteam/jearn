@@ -169,6 +169,8 @@ server.on("upgrade", (req, socket, head) => {
  * LISTEN
  * ------------------------------------------- */
 
-server.listen(3535, "0.0.0.0", () => {
-  console.log("💬 WS listening on 3535 /chat");
+const PORT = Number(process.env.WS_PORT || 3535);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`💬 WS listening on ${PORT} /chat`);
 });

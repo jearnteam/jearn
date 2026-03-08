@@ -1,6 +1,6 @@
 // app/api/admin/update-post/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { requireAdmin } from "@/lib/admin";
 
@@ -11,7 +11,6 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   await requireAdmin();
-
   const { id } = await params;
 
   try {
@@ -25,7 +24,7 @@ export async function PUT(
 
     const body = (await req.json()) as Record<string, unknown>;
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     // 🧹 Accept everything, but never allow _id overwrite

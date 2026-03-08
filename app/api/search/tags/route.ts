@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { PostTypes, RawPost } from "@/types/post";
 import { makeSafeRegex, enrichPost } from "../_utils";
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ posts: [], nextCursor: null });
   }
 
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db("jearn");
 
   const postsColl = db.collection<RawPost>("posts");

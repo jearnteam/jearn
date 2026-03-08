@@ -1,4 +1,12 @@
-import { Collection, ObjectId } from "mongodb";
+import { Collection, ObjectId, WithId } from "mongodb";
+
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date | null;
+  email?: string | null;
+};
 
 /* ---------------------- AUTHOR RESOLVER ---------------------- */
 export async function resolveAuthor(
@@ -17,7 +25,7 @@ export async function resolveAuthor(
       };
     }
   
-    let user = null;
+    let user: WithId<UserDoc> | null = null;
   
     if (ObjectId.isValid(authorId)) {
       user = await users.findOne(

@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { PostTypes, RawPost } from "@/types/post";
@@ -35,7 +35,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     };
   }
 
-  let user = null;
+  let user: WithId<Document> | null = null;
 
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
@@ -110,8 +110,7 @@ export async function GET(
     if (!id || !ObjectId.isValid(id)) {
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
     const posts = db.collection("posts");
     const users = db.collection("users");

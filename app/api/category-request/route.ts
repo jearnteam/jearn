@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     await db.collection("categoryRequests").insertOne({

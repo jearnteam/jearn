@@ -2,6 +2,7 @@ import { Extension } from "@tiptap/core";
 import { Plugin } from "prosemirror-state";
 import { Slice } from "prosemirror-model";
 import type { EditorView } from "prosemirror-view";
+import type { Node as ProseMirrorNode } from "prosemirror-model";
 
 export const PreserveEmptyLinesOnPaste = Extension.create({
   name: "preserveEmptyLinesOnPaste",
@@ -40,7 +41,7 @@ export const PreserveEmptyLinesOnPaste = Extension.create({
           const { schema } = state;
           const lines = text.replace(/\r/g, "").split("\n");
 
-          const nodes = [];
+          const nodes: ProseMirrorNode[] = [];
 
           for (const line of lines) {
             if (line.trim() === "") {

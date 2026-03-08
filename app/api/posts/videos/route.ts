@@ -1,5 +1,5 @@
 // app/api/posts/videos/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { PostTypes, RawPost } from "@/types/post";
@@ -13,6 +13,14 @@ type CategoryDoc = {
   name?: string;
   jname?: string;
   myname?: string;
+};
+
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date | null;
+  email?: string | null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -33,7 +41,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     };
   }
 
-  let user = null;
+  let user: WithId<UserDoc> | null = null;
 
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
@@ -49,8 +57,9 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     ? `?t=${new Date(user.avatarUpdatedAt).getTime()}`
     : "";
 
-  const authorAvatar =
-    avatarId ? `${CDN}/avatars/${avatarId}.webp${timestamp}` : DEFAULT_AVATAR;
+  const authorAvatar = avatarId
+    ? `${CDN}/avatars/${avatarId}.webp${timestamp}`
+    : DEFAULT_AVATAR;
 
   return {
     ...post,
@@ -98,7 +107,7 @@ async function enrichCategories(
 
 export async function GET() {
   try {
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const postsColl = db.collection<RawPost>("posts");

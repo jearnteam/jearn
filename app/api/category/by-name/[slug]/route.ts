@@ -1,6 +1,6 @@
 // app/api/category/by-name/[slug]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 export async function GET(
   req: NextRequest,
@@ -9,7 +9,7 @@ export async function GET(
   const { slug } = await params;
 
   try {
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const category = await db.collection("categories").findOne({

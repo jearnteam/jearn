@@ -1,7 +1,5 @@
 // app/api/images/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
-import { GridFSBucket, ObjectId } from "mongodb";
 
 export const runtime = "nodejs";
 

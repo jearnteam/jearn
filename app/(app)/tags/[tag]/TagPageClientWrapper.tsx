@@ -17,7 +17,8 @@ export default function TagPageClientWrapper({
   scrollContainerRef,
 }: Props) {
   const params = useParams();
-  const tag = params.tag as string;
+  const rawTag = params.tag as string;
+  const tag = decodeURIComponent(rawTag);
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);

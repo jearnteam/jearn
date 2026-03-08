@@ -51,7 +51,7 @@ export default function TagPageClient({
             posts={posts}
             hasMore={hasMore}
             onLoadMore={onLoadMore}
-            scrollContainerRef={activeScrollRef} // ✅ NEVER undefined
+            scrollContainerRef={activeScrollRef}
           />
         </div>
       </main>

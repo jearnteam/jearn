@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "NEXT_DISABLE_HMR=1 nodemon --watch src --exec node --loader ts-node/esm src/server.ts"
+    "dev": "nodemon --watch src --exec node --loader ts-node/esm src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "ws": "^8.19.0"

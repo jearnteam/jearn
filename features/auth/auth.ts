@@ -1,5 +1,5 @@
 import GoogleProvider from "next-auth/providers/google";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { MongoDBAdapter } from "@auth/mongodb-adapter";
 import type { AuthOptions } from "next-auth";
 
@@ -8,8 +8,8 @@ const adminEmails = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
-
-export const authConfig: AuthOptions = {
+  const clientPromise = await getMongoClient();
+  export const authConfig: AuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
 
   providers: [

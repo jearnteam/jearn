@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { resolveAvatar } from "@/lib/avatar";
+import { avatarUrl } from "@/lib/avatarUrl";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 
 interface Partner {
@@ -185,11 +185,7 @@ export default function ChatListClient({
       {items.map((item) => {
         const partner = item.partner;
 
-        const avatarSrc = resolveAvatar({
-          avatar: partner.avatar,
-          userId: partner.uid,
-          avatarUpdatedAt: partner.avatarUpdatedAt,
-        });
+        const avatarSrc = avatarUrl(partner.uid ?? "", partner.avatarUpdatedAt);
 
         const unread = item.type === "room" ? getRoomUnread(item.roomId) : 0;
 

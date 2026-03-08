@@ -1,7 +1,7 @@
 // @/app/api/subscribe/route.ts
 import { NextRequest } from "next/server";
 import { ObjectId, ChangeStreamDocument, WithId, Document } from "mongodb";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
   const userObjId = new ObjectId(userId);
 
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
   const users = db.collection("users");
 

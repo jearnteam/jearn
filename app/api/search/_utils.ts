@@ -1,5 +1,5 @@
 // app/api/search/_utils.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId, Collection } from "mongodb";
 import { RawPost, PostTypes } from "@/types/post";
 
@@ -92,7 +92,7 @@ export async function searchByPostType(
   cursor?: string,
   limit = 15
 ) {
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db("jearn");
 
   const postsColl = db.collection<RawPost>("posts");

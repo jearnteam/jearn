@@ -1,5 +1,5 @@
 // app/api/posts/following/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { NextResponse } from "next/server";
@@ -142,7 +142,7 @@ export async function GET(req: Request) {
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const postsColl = db.collection<RawPost>("posts");
@@ -217,7 +217,7 @@ export async function GET(req: Request) {
       docs.map(async (p: RawPost) => {
         const post = await enrichPost(p, usersColl);
 
-        let parentPost = null;
+        let parentPost: { _id: string; title?: string } | null = null;
         let categories: any[] = [];
 
         // Answer の場合：親 Question を取得

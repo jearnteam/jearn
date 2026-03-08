@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
@@ -37,8 +37,7 @@ export async function POST(req: Request) {
     }
 
     const targetObjectId = new ObjectId(targetUid);
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const roomsCol = db.collection("chat_rooms");

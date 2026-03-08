@@ -1,5 +1,5 @@
 // app/api/user/update/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import sharp from "sharp";
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const uniqueId = typeof uniqueId_raw === "string" ? uniqueId_raw : "";
     const bio = typeof bio_raw === "string" ? bio_raw : "";
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     /* -------------------------------------------------

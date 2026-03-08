@@ -3,44 +3,67 @@ services:
     image: node:20
     container_name: jearn-dev
     restart: unless-stopped
+
     working_dir: /app
     command: sh -c "npm install && npx next dev -p 3001 -H 0.0.0.0"
+
     ports:
       - "3001:3001"
+
     volumes:
       - .:/app
+
     env_file:
       - .env.local
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
     depends_on:
       - ai
+      - ws
+
 
   ai:
     build: ./ai-service
-    container_name: jearn-ai
+    container_name: jearn-ai-dev
     restart: unless-stopped
+
     ports:
-      - "8000:8000"
+      - "8001:8000"
+
     environment:
       - MONGO_URI=mongodb://host.docker.internal:27018/test?directConnection=true
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+
     volumes:
       - ./ai-service:/app
+
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 
   ws:
     build: ./ws
-    container_name: jearn-ws
+    container_name: jearn-ws-dev
     restart: unless-stopped
+
     ports:
-      - "3535:3535"
+      - "3536:3536"
+
     env_file:
       - .env.local
+
     volumes:
       - ./ws:/app
       - /app/node_modules
+
     command: npm run dev
+
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+networks:
+  default:
+    name: jearn-dev-network

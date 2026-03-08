@@ -30,8 +30,53 @@ const shadowsIntoLight = Shadows_Into_Light({
 });
 
 export const metadata: Metadata = {
-  title: "JEARN",
-  description: "Knowledge Sharing Platform",
+  metadataBase: new URL("https://jearn.site"),
+
+  title: {
+    default: "JEARN",
+    template: "%s | JEARN",
+  },
+
+  description:
+    "JEARN is a knowledge sharing platform where students can share ideas, ask questions, and collaborate.",
+
+  keywords: [
+    "JEARN",
+    "knowledge sharing",
+    "student community",
+    "learning platform",
+    "education",
+    "collaboration",
+  ],
+
+  openGraph: {
+    title: "JEARN - Knowledge Sharing Platform",
+    description:
+      "JEARN is a platform where students share knowledge and collaborate.",
+    url: "https://jearn.site",
+    siteName: "JEARN",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+
+  twitter: {
+    card: "summary_large_image",
+    title: "JEARN",
+    description: "Knowledge sharing platform for students",
+    images: ["/og-image.png"],
+  },
+
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
@@ -51,12 +96,10 @@ export default function RootLayout({
       >
         <Providers>
           <LanguageInitializer />
-            <ClientLayout>
-              <UserThemeSync />
-              <I18nProvider>
-                {children}
-              </I18nProvider>
-            </ClientLayout>
+          <ClientLayout>
+            <UserThemeSync />
+            <I18nProvider>{children}</I18nProvider>
+          </ClientLayout>
         </Providers>
       </body>
     </html>

@@ -1,0 +1,56 @@
+services:
+  jearn:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        MONGODB_URI: ${MONGODB_URI}
+
+    container_name: jearn-prod
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env.production
+
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    depends_on:
+      - ai
+      - ws
+
+
+  ai:
+    build: ./ai-service
+    container_name: jearn-ai-prod
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    env_file:
+      - .env.production
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+
+  ws:
+    build: ./ws
+    container_name: jearn-ws-prod
+    restart: unless-stopped
+
+    ports:
+      - "3535:3535"
+
+    env_file:
+      - .env.production
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,5 +1,5 @@
 // lib/emitNotification.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { notifyUser } from "@/lib/sse";
 
@@ -14,6 +14,7 @@ export async function emitGroupedNotification({
   postId: string;
   actorId: string;
 }) {
+  const clientPromise = await getMongoClient();
   const client = await clientPromise;
   const db = client.db("jearn");
 
@@ -41,10 +42,7 @@ export async function emitGroupedNotification({
             $ifNull: ["$read", false],
           },
           actorIds: {
-            $setUnion: [
-              { $ifNull: ["$actorIds", []] },
-              [actorObjId],
-            ],
+            $setUnion: [{ $ifNull: ["$actorIds", []] }, [actorObjId]],
           },
         },
       },
@@ -73,10 +71,12 @@ export async function emitGroupedNotification({
   /* -------------------------------------------------- */
   /* ③ FETCH ACTOR INFO                                */
   /* -------------------------------------------------- */
-  const actor = await db.collection("users").findOne(
-    { _id: actorObjId },
-    { projection: { name: 1, avatarUrl: 1, image: 1 } }
-  );
+  const actor = await db
+    .collection("users")
+    .findOne(
+      { _id: actorObjId },
+      { projection: { name: 1, avatarUrl: 1, image: 1 } }
+    );
 
   /* -------------------------------------------------- */
   /* ④ BUILD SSE PAYLOAD                               */

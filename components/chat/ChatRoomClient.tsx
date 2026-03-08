@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import clsx from "clsx";
 import { ArrowLeft, Send } from "lucide-react";
-import { resolveAvatar } from "@/lib/avatar";
+import { avatarUrl } from "@/lib/avatarUrl";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 
 /* ───────────────── TYPES ───────────────── */
@@ -72,11 +72,7 @@ function copyText(text: string) {
 }
 
 function ChatInfoBlock({ partner }: { partner: Partner }) {
-  const avatarSrc = resolveAvatar({
-    avatar: partner.avatar,
-    userId: partner.uid,
-    avatarUpdatedAt: partner.avatarUpdatedAt,
-  });
+  const avatarSrc = avatarUrl(partner.uid ?? "", partner.avatarUpdatedAt);
 
   return (
     <div className="flex flex-col items-center py-8 text-center text-gray-500">
@@ -396,12 +392,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
     };
   }
 
-  const avatarSrc = resolveAvatar({
-    avatar: partner.avatar,
-    userId: partner.uid,
-    avatarUpdatedAt: partner.avatarUpdatedAt,
-  });
-
+  const avatarSrc = avatarUrl(partner.uid ?? "", partner.avatarUpdatedAt);
   /* ───────── RENDER ───────── */
 
   return (

@@ -1,5 +1,5 @@
 //@/app/api/follow/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 
@@ -8,16 +8,14 @@ export async function GET(
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId } = await params;
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const follows = db.collection("follow");
   const users = db.collection("users");
 
   // フォロワーの userId 一覧
-  const followerLinks = await follows
-    .find({ followingId: userId })
-    .toArray();
+  const followerLinks = await follows.find({ followingId: userId }).toArray();
 
   const followerIds = followerLinks.map((f) => new ObjectId(f.followerId));
 

@@ -10,6 +10,13 @@ type CategoryDoc = {
   myname?: string;
 };
 
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date | null;
+};
+
 export async function buildFeedResponse(
   docs: WithId<RawPost>[],
   {
@@ -18,7 +25,7 @@ export async function buildFeedResponse(
     viewerId,
     postsColl,
   }: {
-    usersColl: Collection;
+    usersColl: Collection<UserDoc>;
     categoriesColl: Collection<CategoryDoc>;
     viewerId?: string | null;
     postsColl: Collection<RawPost>; // ✅ FIX HERE

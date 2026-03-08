@@ -9,9 +9,10 @@ import { Search } from "lucide-react";
 import { useSearch } from "@/features/search/useSearch";
 import SearchResults from "@/components/search/SearchResults";
 import { useRouter } from "next/navigation";
-import { useNotificationContext } from "@/features/notifications/NotificationProvider";
 import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { useSearchHistory } from "@/features/search/useSearchHistory";
+import { SearchItem } from "@/types/search";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
@@ -26,6 +27,8 @@ export default function Navbar() {
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { history, save } = useSearchHistory();
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
 
   /* ---------------------------------------------
    * STATE
@@ -71,6 +74,51 @@ export default function Navbar() {
     el.addEventListener("touchmove", prevent, { passive: false });
     return () => el.removeEventListener("touchmove", prevent);
   }, []);
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [results]);
+
+  const filteredHistory = query.trim()
+    ? history.filter((h) => h.toLowerCase().includes(query.toLowerCase()))
+    : history.slice(0, 3);
+
+  type HistoryItem = {
+    type: "history";
+    data: {
+      id: string;
+      label: string;
+    };
+  };
+
+  type ExtendedItem = SearchItem | HistoryItem;
+
+  const historyItems: HistoryItem[] = filteredHistory.map((h) => ({
+    type: "history",
+    data: {
+      id: h,
+      label: h,
+    },
+  }));
+
+  const combinedList: ExtendedItem[] = [...historyItems, ...results];
+
+  const performSearch = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) return;
+
+    save(trimmed);
+    closeSearch();
+    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+  };
+
+  const closeSearch = () => {
+    setQuery("");
+    setSearchFocused(false);
+    setActiveIndex(-1);
+    // remove focus from input
+    inputRef.current?.blur();
+  };
 
   /* ---------------------------------------------
    * SSR SAFE SHELL
@@ -191,9 +239,60 @@ export default function Navbar() {
                 placeholder={t("search")}
                 onFocus={() => setSearchFocused(true)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && query.trim().length >= 2) {
-                    router.push(`/search?q=${encodeURIComponent(query)}`);
-                    setSearchFocused(false);
+                  const total = combinedList.length;
+
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    if (activeIndex < total - 1) {
+                      setActiveIndex(activeIndex + 1);
+                    }
+                  }
+
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (activeIndex > 0) {
+                      setActiveIndex(activeIndex - 1);
+                    } else {
+                      // leave the list (back to input)
+                      setActiveIndex(-1);
+                    }
+                  }
+
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (activeIndex >= 0 && combinedList[activeIndex]) {
+                      const item = combinedList[activeIndex];
+
+                      if (item.type === "history") {
+                        closeSearch();
+                        performSearch(item.data.label);
+                        return;
+                      }
+
+                      // Save searchable label before navigating
+                      if (item.type === "post") {
+                        save(item.data.title ?? "");
+                        closeSearch();
+                        router.push(`/posts/${item.data._id}`);
+                        return;
+                      }
+
+                      if (item.type === "user") {
+                        save(item.data.name);
+                        closeSearch();
+                        router.push(`/profile/${item.data._id}`);
+                        return;
+                      }
+
+                      if (item.type === "category") {
+                        save(item.data.name);
+                        closeSearch();
+                        router.push(`/category/${item.data.name}`);
+                        return;
+                      }
+                    } else {
+                      performSearch(query);
+                    }
                   }
                 }}
                 onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
@@ -210,7 +309,38 @@ export default function Navbar() {
             <SearchResults
               results={results}
               loading={searchLoading}
-              visible={searchFocused && query.trim().length >= 2}
+              visible={searchFocused}
+              query={query}
+              history={history}
+              activeIndex={activeIndex}
+              setActiveIndex={setActiveIndex}
+              onSelectItem={(item) => {
+                if (item.type === "history") {
+                  performSearch(item.data.label);
+                  return;
+                }
+
+                if (item.type === "post") {
+                  save(item.data.title ?? "");
+                  closeSearch();
+                  router.push(`/posts/${item.data._id}`);
+                  return;
+                }
+
+                if (item.type === "user") {
+                  save(item.data.name);
+                  closeSearch();
+                  router.push(`/profile/${item.data._id}`);
+                  return;
+                }
+
+                if (item.type === "category") {
+                  save(item.data.name);
+                  closeSearch();
+                  router.push(`/category/${item.data.name}`);
+                  return;
+                }
+              }}
             />
           </div>
         </div>

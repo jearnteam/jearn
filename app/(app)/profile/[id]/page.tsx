@@ -14,6 +14,9 @@ export default function ProfileUserOverlayPage() {
         <ProfileUserClient
           userId={params.id}
           scrollContainerRef={scrollRef}
+          onOpenRoom={(roomId) => {
+            router.push(`/chat/${roomId}`, { scroll: false });
+          }}
         />
       )}
     </PostOverlayShell>

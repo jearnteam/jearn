@@ -1,5 +1,5 @@
 // app/api/search/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection } from "mongodb";
 import { PostTypes, RawPost } from "@/types/post";
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
     }
 
     dbg("CONNECT MONGO");
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const postsColl = db.collection<RawPost>("posts");

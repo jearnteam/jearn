@@ -1,16 +1,13 @@
-import clientPromise from "@/lib/mongodb";
-import { getServerSession } from "next-auth";
-import { authConfig } from "@/features/auth/auth";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
-import { isAdminEmail, requireAdmin } from "@/lib/admin";
+import { requireAdmin } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     await requireAdmin();
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const requests = await db

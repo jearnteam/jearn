@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const cursor = searchParams.get("cursor");
 
-  const client = await clientPromise;
+const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const followsCol = db.collection("follow");

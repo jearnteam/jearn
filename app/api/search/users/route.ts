@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { makeSafeRegex } from "../_utils";
 
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ users: [] });
   }
 
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db("jearn");
   const usersColl = db.collection("users");
 

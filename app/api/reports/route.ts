@@ -1,5 +1,5 @@
 // app/api/reports/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId, WithId, Document } from "mongodb";
 import { requireAdmin } from "@/lib/admin";
@@ -28,6 +28,7 @@ type ReportDoc = {
 export async function GET() {
   await requireAdmin();
   try {
+    const clientPromise = await getMongoClient();
     const client = await clientPromise;
     const db = client.db("jearn");
     const reports = db.collection<ReportDoc>("reports");
@@ -82,8 +83,7 @@ export async function POST(req: Request) {
     if (!trimmedReason) {
       return NextResponse.json({ error: "Reason required" }, { status: 400 });
     }
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
     const reports = db.collection<ReportDoc>("reports");
 

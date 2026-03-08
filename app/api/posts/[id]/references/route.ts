@@ -1,4 +1,4 @@
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 
@@ -18,7 +18,7 @@ export async function GET(
       return NextResponse.json([], { status: 400 });
     }
 
-    const client = await clientPromise;
+const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const posts = db.collection<{

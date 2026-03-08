@@ -1,6 +1,6 @@
 // app/api/posts/byUser/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { buildFeedResponse } from "@/lib/post/buildFeedResponse";
 import type { RawPost } from "@/types/post";
@@ -11,11 +11,19 @@ type CategoryDoc = {
   jname?: string;
   myname?: string;
 };
+
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date | null;
+  email?: string | null;
+};
 /* -------------------------------------------------------------
  * AUTHOR RESOLVER
  * ----------------------------------------------------------- */
 async function resolveAuthor(
-  users: Collection,
+  users: Collection<UserDoc>,
   authorId?: string | null
 ): Promise<{
   name: string;
@@ -32,7 +40,7 @@ async function resolveAuthor(
     };
   }
 
-  let user: WithId<Document> | null = null;
+  let user: WithId<UserDoc> | null = null;
 
   if (ObjectId.isValid(authorId)) {
     user = await users.findOne(
@@ -118,11 +126,11 @@ export async function GET(
     const limit = Math.min(Number(searchParams.get("limit") ?? 10), 20);
     const cursor = searchParams.get("cursor");
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db(process.env.MONGODB_DB || "jearn");
 
     const postsColl = db.collection<RawPost>("posts");
-    const usersColl = db.collection("users"); // fine as Document
+    const usersColl = db.collection<UserDoc>("users"); // fine as Document
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     /* -------- Resolve author once -------- */

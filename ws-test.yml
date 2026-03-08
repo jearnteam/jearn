@@ -1,0 +1,18 @@
+config:
+  target: "wss://ws.jearn.site/chat"
+  phases:
+    - duration: 30
+      arrivalRate: 20
+  engines:
+    ws: {}
+
+scenarios:
+  - engine: ws
+    flow:
+      - connect: "wss://ws.jearn.site/chat"
+      - think: 1
+      - send:
+          text: '{"type":"ping"}'
+      - think: 1
+      - send:
+          text: '{"type":"ping"}'

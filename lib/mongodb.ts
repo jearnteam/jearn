@@ -1,11 +1,6 @@
-// lib/mongodb.ts
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI!;
-if (!uri) throw new Error("Missing MONGODB_URI");
-
 declare global {
-  var _mongoClient: MongoClient | undefined;
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
@@ -17,10 +12,22 @@ const options = {
   retryReads: true,
 };
 
-if (!global._mongoClient) {
-  const client = new MongoClient(uri, options);
-  global._mongoClient = client;
-  global._mongoClientPromise = client.connect();
-}
+export async function getMongoClient(): Promise<MongoClient> {
+  const uri = process.env.MONGODB_URI;
 
-export default global._mongoClientPromise!;
+  if (!uri) {
+    throw new Error("MONGODB_URI missing");
+  }
+
+  // 🔥 Skip DB connection during Next.js build
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return {} as MongoClient;
+  }
+
+  if (!global._mongoClientPromise) {
+    const client = new MongoClient(uri, options);
+    global._mongoClientPromise = client.connect();
+  }
+
+  return global._mongoClientPromise;
+}

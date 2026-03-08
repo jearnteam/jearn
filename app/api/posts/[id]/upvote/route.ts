@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
@@ -27,7 +27,7 @@ export async function POST(
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db("jearn");
   const posts = db.collection<PostDoc>("posts");
 

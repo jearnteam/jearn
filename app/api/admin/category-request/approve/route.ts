@@ -1,6 +1,4 @@
-import clientPromise from "@/lib/mongodb";
-import { getServerSession } from "next-auth";
-import { authConfig } from "@/features/auth/auth";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { requireAdmin } from "@/lib/admin";
@@ -12,10 +10,13 @@ export async function POST(req: Request) {
     const { requestId, name, jname, myname } = await req.json();
 
     if (!requestId || !name) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        { status: 400 }
+      );
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
     const sessionMongo = client.startSession();
 
@@ -25,18 +26,28 @@ export async function POST(req: Request) {
         const newCategory = {
           name, // 必須 (英語ID的な役割)
           jname: jname || name,
-          myname: myname || name
+          myname: myname || name,
         };
 
         // 重複チェックなどは省略していますが、必要に応じて追加してください
-        await db.collection("categories").insertOne(newCategory, { session: sessionMongo });
+        await db
+          .collection("categories")
+          .insertOne(newCategory, { session: sessionMongo });
 
         // 2. リクエストのステータスを更新
-        await db.collection("categoryRequests").updateOne(
-          { _id: new ObjectId(requestId) },
-          { $set: { status: "approved", approvedAt: new Date(), approverId: session.user.uid } },
-          { session: sessionMongo }
-        );
+        await db
+          .collection("categoryRequests")
+          .updateOne(
+            { _id: new ObjectId(requestId) },
+            {
+              $set: {
+                status: "approved",
+                approvedAt: new Date(),
+                approverId: session.user.uid,
+              },
+            },
+            { session: sessionMongo }
+          );
       });
     } finally {
       await sessionMongo.endSession();

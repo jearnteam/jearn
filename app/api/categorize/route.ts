@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { categorize } from "@/features/categorize/services/categorize";
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 
 /* Clean invisible chars */
 function cleanInput(text: string): string {
@@ -46,12 +46,13 @@ export async function POST(req: Request) {
     }
 
     const cleaned = cleanInput(body.content);
-    const textOnly = stripHTML(cleaned);   // ✅ critical fix
+    const textOnly = stripHTML(cleaned); // ✅ critical fix
 
     /* load DB categories for fallback only */
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
-    const allCategories = (await db.collection("categories")
+    const allCategories = (await db
+      .collection("categories")
       .find()
       .project({ _id: 1, name: 1, jname: 1, myname: 1 })
       .toArray()) as DbCategory[];

@@ -1,5 +1,5 @@
 // app/api/chat/room/[roomId]/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
@@ -36,7 +36,7 @@ export async function GET(
   /* ──────────────────────────────
    * 3️⃣ DB
    * ────────────────────────────── */
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   const roomsCol = db.collection("chat_rooms");

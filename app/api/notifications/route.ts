@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
 import { ObjectId } from "mongodb";
@@ -10,8 +10,7 @@ export async function GET() {
   if (!session?.user?.uid) {
     return new Response("Unauthorized", { status: 401 });
   }
-
-  const client = await clientPromise;
+  const client = await getMongoClient();
   const db = client.db("jearn");
 
   const userId = new ObjectId(session.user.uid);

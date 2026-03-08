@@ -1,5 +1,5 @@
 // app/api/posts/route.ts
-import clientPromise from "@/lib/mongodb";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId, Collection, WithId, Document } from "mongodb";
 import { broadcastSSE } from "@/lib/sse";
@@ -33,7 +33,14 @@ type PostReferenceDoc = {
   createdAt: Date;
 };
 
-async function enrichPost(post: RawPost, usersColl: Collection) {
+type UserDoc = {
+  _id: ObjectId;
+  name?: string;
+  uniqueId?: string;
+  avatarUpdatedAt?: Date | null;
+};
+
+async function enrichPost(post: RawPost, usersColl: Collection<UserDoc>) {
   const CDN = process.env.R2_PUBLIC_URL || "https://cdn.jearn.site";
   const DEFAULT_AVATAR = "/default-avatar.png";
 
@@ -48,7 +55,7 @@ async function enrichPost(post: RawPost, usersColl: Collection) {
     };
   }
 
-  let user = null;
+  let user: WithId<UserDoc> | null = null;
 
   if (typeof post.authorId === "string" && ObjectId.isValid(post.authorId)) {
     user = await usersColl.findOne(
@@ -128,11 +135,11 @@ export async function GET(req: Request) {
     const cursor = searchParams.get("cursor");
     const categoryId = searchParams.get("categoryId");
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const posts = db.collection<RawPost>("posts");
-    const users = db.collection("users");
+    const users = db.collection<UserDoc>("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     // コメントを表示しない
@@ -438,12 +445,11 @@ export async function POST(req: Request) {
     /* ------------------------------------------------------------------ */
     /* DB                                                                 */
     /* ------------------------------------------------------------------ */
-
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
     const posts = db.collection("posts");
-    const users = db.collection("users");
+    const users = db.collection<UserDoc>("users");
     const categoriesColl = db.collection<CategoryDoc>("categories");
 
     let safeParentId = parentId;
@@ -784,7 +790,7 @@ export async function DELETE(req: Request) {
       return new Response("Invalid post id", { status: 400 });
     }
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
     const posts = db.collection("posts");
 

@@ -1,6 +1,4 @@
-import clientPromise from "@/lib/mongodb";
-import { getServerSession } from "next-auth";
-import { authConfig } from "@/features/auth/auth";
+import { getMongoClient } from "@/lib/mongodb";
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { requireAdmin } from "@/lib/admin";
@@ -11,13 +9,15 @@ export async function POST(req: Request) {
 
     const { requestId } = await req.json();
 
-    const client = await clientPromise;
+    const client = await getMongoClient();
     const db = client.db("jearn");
 
-    await db.collection("categoryRequests").updateOne(
-      { _id: new ObjectId(requestId) },
-      { $set: { status: "rejected", rejectedAt: new Date() } }
-    );
+    await db
+      .collection("categoryRequests")
+      .updateOne(
+        { _id: new ObjectId(requestId) },
+        { $set: { status: "rejected", rejectedAt: new Date() } }
+      );
 
     return NextResponse.json({ ok: true });
   } catch (error) {
