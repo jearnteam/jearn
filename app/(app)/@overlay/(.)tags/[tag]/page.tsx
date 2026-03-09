@@ -11,7 +11,7 @@ export default function TagOverlayPage() {
     <PostOverlayShell onClose={() => router.back()}>
       {(scrollRef) => (
         <TagPageClientWrapper
-          scrollContainerRef={scrollRef} // ✅ NOW WIRED
+          scrollContainerRef={scrollRef}
         />
       )}
     </PostOverlayShell>

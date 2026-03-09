@@ -1,3 +1,4 @@
+import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import tippy from "tippy.js";
 import "tippy.js/dist/tippy.css";
 
@@ -13,7 +14,10 @@ type UserData = {
 
 const userCache = new Map<string, UserData>();
 
-export function setupMentionHoverPopups(el: HTMLElement) {
+export function setupMentionHoverPopups(
+  el: HTMLElement,
+  router: AppRouterInstance
+) {
   const mentions = el.querySelectorAll(
     "span[data-mention='true']"
   ) as NodeListOf<HTMLElement>;
@@ -25,11 +29,13 @@ export function setupMentionHoverPopups(el: HTMLElement) {
     tippy(mentionEl as Element, {
       content: buildSkeletonCard(),
       allowHTML: true,
-      interactive: false,
+      interactive: true,
       placement: "top",
       delay: [200, 0],
       animation: "shift-away-subtle",
       theme: "jearn-mention",
+      appendTo: () => document.body,
+      zIndex: 9999,
       onShow(inst) {
         if (userCache.has(uid)) {
           inst.setContent(buildPokemonCard(userCache.get(uid)!));
@@ -57,7 +63,7 @@ export function setupMentionHoverPopups(el: HTMLElement) {
             };
 
             userCache.set(uid, user);
-            inst.setContent(buildPokemonCard(user));
+            inst.setContent(buildPokemonCard(user, uid, router));
           })
           .catch(() => {
             inst.setContent(buildErrorCard());
@@ -102,7 +108,11 @@ function buildSkeletonCard() {
   return card;
 }
 
-function buildPokemonCard(user: UserData) {
+function buildPokemonCard(
+  user: UserData,
+  uid?: string,
+  router?: AppRouterInstance
+) {
   const dark = isDarkMode();
 
   const card = document.createElement("div");
@@ -115,7 +125,14 @@ function buildPokemonCard(user: UserData) {
           : "bg-white text-black border-gray-200 shadow-xl"
       }
     `;
+  card.style.cursor = "pointer";
 
+  if (uid && router) {
+    card.addEventListener("click", (e) => {
+      e.stopPropagation();
+      router.push(`/profile/${uid}`);
+    });
+  }
   // Soft glow (subtle for both modes)
   const glow = document.createElement("div");
   glow.className = "absolute inset-0 rounded-2xl pointer-events-none";

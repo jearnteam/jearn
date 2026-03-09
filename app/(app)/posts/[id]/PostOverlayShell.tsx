@@ -88,7 +88,7 @@ export default function PostOverlayShell({ children, onClose }: Props) {
         "
       >
         {/* Content wrapper for consistent feed spacing */}
-        <div className="feed-container py-6 space-y-10">
+        <div className="feed-container space-y-10">
           {children(scrollRef)}
         </div>
       </div>

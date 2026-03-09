@@ -39,7 +39,7 @@ export default function TagPageClient({
           pb-[calc(env(safe-area-inset-bottom,0px)+72px)]
         "
       >
-        <div className="feed-container py-6 space-y-10">
+        <div className="feed-container py-2 space-y-4">
           <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 px-4">
             #{tag}
             <span className="opacity-70 ml-2 text-lg">

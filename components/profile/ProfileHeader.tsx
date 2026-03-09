@@ -17,16 +17,16 @@ export default function ProfileHeader({
 }: any) {
   const { t } = useTranslation();
   return (
-    <section className="space-y-10">
+    <section className="space-y-5">
       {/* ───────── Title ───────── */}
       <header className="flex justify-center">
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
           {t("profileSetting.settings")}
         </h1>
       </header>
 
       {/* ───────── Avatar + Stats ───────── */}
-      <div className="flex items-center justify-center gap-8">
+      <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-8">
         {/* Avatar */}
         <div
           className="relative group cursor-pointer shrink-0"
@@ -34,12 +34,12 @@ export default function ProfileHeader({
         >
           <div
             className="
-              relative
-              w-24 h-24
-              rounded-full
-              overflow-hidden
-              border border-neutral-300 dark:border-neutral-700
-            "
+      relative
+      w-20 h-20 sm:w-24 sm:h-24
+      rounded-full
+      overflow-hidden
+      border border-neutral-300 dark:border-neutral-700
+    "
           >
             <Image
               src={preview}
@@ -54,21 +54,25 @@ export default function ProfileHeader({
           {/* Hover overlay */}
           <div
             className="
-              absolute inset-0 rounded-full
-              bg-black/40 text-white
-              opacity-0 group-hover:opacity-100
-              flex items-center justify-center
-              text-xs font-medium
-              transition
-              pointer-events-none
-            "
+      absolute inset-0 rounded-full
+      bg-black/40 text-white
+      opacity-0 group-hover:opacity-100
+      flex items-center justify-center
+      text-xs font-medium
+      transition
+      pointer-events-none
+    "
           >
             {t("profileSetting.change")}
           </div>
         </div>
 
-        {/* Followers / Following (stacked) */}
-        {user?._id && <FollowStats userId={user._id} direction="column" />}
+        {/* Followers / Following */}
+        {user?._id && (
+          <div className="text-center sm:text-left">
+            <FollowStats userId={user._id} direction="column" />
+          </div>
+        )}
 
         <input
           id="avatarInput"
@@ -80,7 +84,7 @@ export default function ProfileHeader({
       </div>
 
       {/* ───────── Form (centered) ───────── */}
-      <div className="space-y-5 max-w-xl mx-auto">
+      <div className="space-y-5 max-w-xl mx-auto px-4 sm:px-0">
         {/* Name */}
         <div className="space-y-1">
           <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
@@ -134,7 +138,7 @@ export default function ProfileHeader({
               w-full px-3 py-2 rounded-md
               border border-neutral-300 dark:border-neutral-700
               bg-white dark:bg-neutral-900
-              text-sm resize-none
+              text-sm resize-y
               focus:outline-none focus:ring-2 focus:ring-blue-500
             "
           />
@@ -145,8 +149,7 @@ export default function ProfileHeader({
           <button
             disabled={saving}
             onClick={save}
-            className="
-              inline-flex items-center justify-center
+            className="w-full sm:w-auto inline-flex items-center justify-center
               px-5 py-2.5 rounded-md
               bg-blue-600 text-white
               text-sm font-medium

@@ -11,6 +11,7 @@ import FollowStats from "@/components/follow/FollowStats";
 import { t } from "i18next";
 import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
 import { useRouter } from "next/navigation";
+import { MessageCircle } from "lucide-react";
 
 interface Props {
   userId: string;
@@ -166,42 +167,80 @@ export default function ProfileUserClient({
   }
 
   return (
-    <div className="bg-white dark:bg-black min-h-screen pb-24">
-      <div className="feed-container mt-10">
+    <div className="bg-white dark:bg-black min-h-screen">
+      <div className="feed-container">
         {/* PROFILE HEADER */}
-        <div className="flex items-start gap-5 mb-8">
-          <Avatar id={userId} size={80} className="border" />
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mt-4">
+            {/* Left side */}
+            <div className="flex flex-col items-center sm:items-start gap-4 flex-1">
+              {/* Avatar + Name */}
+              <div className="flex items-center gap-4">
+                <Avatar id={userId} size={72} className="border shrink-0" />
 
-          <div className="flex-1">
-            <h1 className="text-xl font-bold">{user.name}</h1>
-            <p className="text-sm text-gray-500">@{user.uniqueId}</p>
+                <div className="text-left">
+                  <h1 className="text-xl font-bold break-words">{user.name}</h1>
+                  <p className="text-sm text-gray-500 break-all">
+                    @{user.uniqueId}
+                  </p>
+                </div>
+              </div>
 
-            <FollowStats userId={userId} />
+              {/* Mobile Buttons */}
+              <div className="flex gap-2 sm:hidden justify-center">
+                <FollowButton targetUserId={userId} />
 
-            {user.bio && (
-              <p className="text-sm text-gray-700 dark:text-gray-300 mt-2">
-                {user.bio}
-              </p>
-            )}
-          </div>
+                {currentUser?.uid !== userId && (
+                  <button
+                    onClick={startChat}
+                    disabled={startingChat}
+                    className="
+              px-4 py-2 rounded-full
+              bg-blue-600 text-white
+              text-sm font-medium
+              disabled:opacity-50 gap-2
+            "
+                  >
+                    <div className="flex items-center gap-2">
+                      <MessageCircle size={16} />
+                      {startingChat ? "Opening…" : "Chat"}
+                    </div>
+                  </button>
+                )}
+              </div>
 
-          <div className="flex gap-2">
-            <FollowButton targetUserId={userId} />
+              {/* Stats */}
+              <div className="mt-1">
+                <FollowStats userId={userId} />
+              </div>
 
-            {currentUser?.uid !== userId && (
-              <button
-                onClick={startChat}
-                disabled={startingChat}
-                className="
-                  px-4 py-2 rounded-md
-                  bg-blue-600 text-white
-                  text-sm font-medium
-                  disabled:opacity-50
-                "
-              >
-                {startingChat ? "Opening…" : "Chat"}
-              </button>
-            )}
+              {/* Bio */}
+              {user.bio && (
+                <p className="text-sm text-gray-700 dark:text-gray-300 mt-1 max-w-md text-center sm:text-left">
+                  {user.bio}
+                </p>
+              )}
+            </div>
+
+            {/* Desktop Buttons */}
+            <div className="hidden sm:flex gap-2">
+              <FollowButton targetUserId={userId} />
+
+              {currentUser?.uid !== userId && (
+                <button
+                  onClick={startChat}
+                  disabled={startingChat}
+                  className="
+            px-4 py-2 rounded-full
+            bg-blue-600 text-white
+            text-sm font-medium
+            disabled:opacity-50
+          "
+                >
+                  {startingChat ? "Opening…" : "Chat"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 

@@ -28,7 +28,7 @@ export default function ProfilePage({ scrollContainerRef }: ProfilePageProps) {
 
   return (
     <ProfileLayout scrollRef={scrollContainerRef}>
-      <div className="feed-container mt-10 space-y-16">
+      <div className="feed-container mt-5 space-y-8">
         <ProfileHeader {...profile} />
         <ProfilePostsSection
           posts={posts.posts}

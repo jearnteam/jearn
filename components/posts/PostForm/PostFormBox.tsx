@@ -106,16 +106,15 @@ export default function PostFormBox({
 
   useEffect(() => {
     if (!openTypeMenu) return;
-  
+
     function handleClickOutside(e: MouseEvent) {
       if (!typeMenuRef.current?.contains(e.target as Node)) {
         setOpenTypeMenu(false);
       }
     }
-  
+
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openTypeMenu]);
 
   return (
@@ -162,15 +161,16 @@ export default function PostFormBox({
                 `}
               >
                 {/* ================= Header ================= */}
-                <header className="relative p-4 border-b border-gray-200 dark:border-gray-700">
+                <header className="p-4 border-b border-gray-200 dark:border-gray-700">
+                  {/* Top row */}
                   <div className="flex items-center gap-2">
                     {mode !== PostTypes.ANSWER && (
                       <div className="relative" ref={typeMenuRef}>
                         <button
                           onClick={() => setOpenTypeMenu((v) => !v)}
                           className="flex items-center gap-2 px-3 py-1.5
-                                     text-sm font-medium rounded-md border
-                                     hover:bg-gray-100 dark:hover:bg-neutral-800"
+                     text-sm font-medium rounded-md border
+                     hover:bg-gray-100 dark:hover:bg-neutral-800"
                         >
                           {(() => {
                             const Icon = POST_TYPE_OPTIONS.find(
@@ -194,8 +194,8 @@ export default function PostFormBox({
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -6 }}
                               className="absolute left-0 mt-2 w-40
-                                         bg-white dark:bg-neutral-900
-                                         border rounded-md shadow-lg z-50"
+                         bg-white dark:bg-neutral-900
+                         border rounded-md shadow-lg z-50"
                             >
                               {POST_TYPE_OPTIONS.map((opt) => (
                                 <button
@@ -205,8 +205,8 @@ export default function PostFormBox({
                                     setOpenTypeMenu(false);
                                   }}
                                   className="w-full px-3 py-2 text-sm
-                                             flex gap-2 hover:bg-gray-100
-                                             dark:hover:bg-neutral-800"
+                             flex gap-2 hover:bg-gray-100
+                             dark:hover:bg-neutral-800"
                                 >
                                   <opt.Icon size={16} />
                                   <span>{opt.label}</span>
@@ -223,8 +223,8 @@ export default function PostFormBox({
                         type="button"
                         onClick={() => postFormRef.current?.insertImage()}
                         className="w-9 h-9 flex items-center justify-center
-                          rounded-md border
-                          hover:bg-gray-100 dark:hover:bg-neutral-800"
+                   rounded-md border
+                   hover:bg-gray-100 dark:hover:bg-neutral-800"
                         title="Insert image"
                       >
                         <ImagePlus size={16} />
@@ -236,17 +236,12 @@ export default function PostFormBox({
                         type="button"
                         onClick={() => setCommentDisabled((prev) => !prev)}
                         className={`w-9 h-9 flex items-center justify-center
-                                   rounded-md border transition-colors
-                                   ${
-                                     commentDisabled
-                                       ? "border-red-500/50 text-red-500 bg-red-50 dark:bg-red-500/10"
-                                       : "hover:bg-gray-100 dark:hover:bg-neutral-800 border-gray-200 dark:border-neutral-700"
-                                   }`}
-                        title={
-                          commentDisabled
-                            ? "Enable comments"
-                            : "Disable comments"
-                        }
+                    rounded-md border transition-colors
+                    ${
+                      commentDisabled
+                        ? "border-red-500/50 text-red-500 bg-red-50 dark:bg-red-500/10"
+                        : "hover:bg-gray-100 dark:hover:bg-neutral-800 border-gray-200 dark:border-neutral-700"
+                    }`}
                       >
                         {commentDisabled ? (
                           <MessageCircleOff size={16} />
@@ -256,12 +251,8 @@ export default function PostFormBox({
                       </button>
                     )}
 
-                    {/* Center title */}
-                    <h2
-                      className="absolute left-1/2 top-1/2
-                                   -translate-x-1/2 -translate-y-1/2
-                                   text-lg font-semibold pointer-events-none"
-                    >
+                    {/* Desktop title */}
+                    <h2 className="hidden sm:block text-lg font-semibold ml-3">
                       {mode === PostTypes.POST
                         ? t("createPost")
                         : mode === PostTypes.QUESTION
@@ -280,8 +271,20 @@ export default function PostFormBox({
                       ✕
                     </button>
                   </div>
-                </header>
 
+                  {/* Mobile title */}
+                  <h2 className="mt-2 text-lg font-semibold sm:hidden">
+                    {mode === PostTypes.POST
+                      ? t("createPost")
+                      : mode === PostTypes.QUESTION
+                      ? "Ask Question"
+                      : mode === PostTypes.VIDEO
+                      ? "Upload Video"
+                      : mode === PostTypes.POLL
+                      ? "Create Poll"
+                      : ""}
+                  </h2>
+                </header>
                 {/* ================= Content ================= */}
                 <section className="flex-1 min-h-0 flex flex-col">
                   <PostForm

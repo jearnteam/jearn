@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import "katex/dist/katex.min.css";
 
 import { stripEditorUI } from "./dom/editor";
@@ -22,6 +23,7 @@ function MathRendererBase({
   openLinksInNewTab?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const el = ref.current;
@@ -31,8 +33,8 @@ function MathRendererBase({
     renderEmbeds(el, { openInNewTab: openLinksInNewTab });
     renderMath(el);
     styleMentions(el);
-    setupMentions(el);
-    setupMentionHoverPopups(el);
+    setupMentions(el, router);
+    setupMentionHoverPopups(el, router);
     setupTags(el);
     setupLegacyImages(el);
     renderPrism(el);

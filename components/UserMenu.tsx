@@ -50,7 +50,7 @@ export default function UserMenu({ user }: { user: User }) {
 
     // 🔵 start animated overlay
     window.dispatchEvent(
-      new CustomEvent("theme-transition", { detail: { to: nextTheme } }),
+      new CustomEvent("theme-transition", { detail: { to: nextTheme } })
     );
 
     // 🔁 flip theme during peak cover
@@ -126,7 +126,10 @@ export default function UserMenu({ user }: { user: User }) {
 
             {/* THEME */}
             <button
-              onClick={toggleTheme}
+              onClick={() => {
+                setOpen(false);
+                toggleTheme();
+              }}
               className="px-3 py-2 flex items-center gap-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700 text-left"
             >
               {currentTheme === "dark" ? (
