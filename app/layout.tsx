@@ -41,8 +41,8 @@ export const metadata: Metadata = {
     "JEARN is a knowledge sharing platform where students can share ideas, ask questions, and collaborate.",
 
     icons: {
-      icon: "/icons/icon-192.png",
-      apple: "/icons/icon-192.png",
+      icon: "/icons/icon-512.png",
+      apple: "/icons/icon-512.png",
     },
     manifest: "/manifest.webmanifest",
 
