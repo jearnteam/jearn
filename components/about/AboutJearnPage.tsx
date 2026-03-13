@@ -73,6 +73,30 @@ export default function AboutJearnPage({
           value={stats.totalPosts}
         />
       </div>
+      {/* ROADMAP */}
+<div className="mt-16">
+  <h2 className="text-2xl font-semibold mb-6">JEARN Roadmap</h2>
+
+  <div className="space-y-6">
+    <Milestone
+      title="Community Shop"
+      description="A system where users can purchase coins to support JEARN and unlock visual customization features. Coins can be used to buy decorations, profile styles, post themes, and other cosmetic elements that personalize the user experience."
+      status="Planned"
+    />
+
+    <Milestone
+      title="User Billboard"
+      description="Personalizable pages where users can promote their projects, portfolios, or learning journeys. These billboards allow creators to showcase their work directly to the JEARN community."
+      status="Planned"
+    />
+
+    <Milestone
+      title="AI Learning Assistant"
+      description="AI-powered tools that help categorize posts, recommend learning resources, and assist users in discovering relevant knowledge across the platform."
+      status="Research"
+    />
+  </div>
+</div>
     </div>
   );
 }
@@ -113,5 +137,29 @@ function StatCard({
         {label}
       </div>
     </motion.div>
+  );
+}
+
+function Milestone({
+  title,
+  description,
+  status,
+}: {
+  title: string;
+  description: string;
+  status: "Planned" | "Research" | "In Progress";
+}) {
+  return (
+    <div className="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100 dark:bg-neutral-900">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-semibold">{title}</div>
+
+        <span className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500">
+          {status}
+        </span>
+      </div>
+
+      <p className="text-sm text-gray-600 dark:text-gray-400">{description}</p>
+    </div>
   );
 }

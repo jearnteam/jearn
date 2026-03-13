@@ -40,6 +40,8 @@ export const metadata: Metadata = {
   description:
     "JEARN is a knowledge sharing platform where students can share ideas, ask questions, and collaborate.",
 
+  manifest: "/manifest.webmanifest",
+  
   keywords: [
     "JEARN",
     "knowledge sharing",
