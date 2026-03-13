@@ -38,9 +38,7 @@ export default function PostOverlayShell({ children, onClose }: Props) {
   // Scroll container ref shared with child content
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  /* --------------------------------------------------
-   * Lock body scroll while overlay is open
-   * ------------------------------------------------ */
+  /* Lock body scroll while overlay is open */
   useEffect(() => {
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -49,6 +47,19 @@ export default function PostOverlayShell({ children, onClose }: Props) {
       document.body.style.overflow = original;
     };
   }, []);
+
+  /* GLOBAL CLOSE LISTENER */
+  useEffect(() => {
+    const handler = () => {
+      onClose();
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, [onClose]);
 
   return (
     /**
@@ -88,9 +99,7 @@ export default function PostOverlayShell({ children, onClose }: Props) {
         "
       >
         {/* Content wrapper for consistent feed spacing */}
-        <div className="feed-container space-y-10">
-          {children(scrollRef)}
-        </div>
+        <div className="feed-container space-y-10">{children(scrollRef)}</div>
       </div>
     </div>
   );

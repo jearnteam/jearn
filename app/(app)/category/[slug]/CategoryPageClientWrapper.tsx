@@ -123,6 +123,27 @@ export default function CategoryPageClientWrapper({
   }, [slug]);
 
   /* --------------------------------------------------
+   * GLOBAL OVERLAY CLOSE LISTENER
+   * ------------------------------------------------ */
+  useEffect(() => {
+    const handler = () => {
+      // If this page ever owns overlays in the future,
+      // they should be closed here.
+
+      setLoadingMore(false);
+
+      // Optional: cancel pending pagination state
+      // (helps avoid loading after overlay close)
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, []);
+
+  /* --------------------------------------------------
    * Load more (infinite scroll)
    * - Cursor-based pagination
    * - Guarded against double requests

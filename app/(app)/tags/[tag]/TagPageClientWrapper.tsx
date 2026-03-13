@@ -13,9 +13,7 @@ interface Props {
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export default function TagPageClientWrapper({
-  scrollContainerRef,
-}: Props) {
+export default function TagPageClientWrapper({ scrollContainerRef }: Props) {
   const params = useParams();
   const rawTag = params.tag as string;
   const tag = decodeURIComponent(rawTag);
@@ -66,13 +64,30 @@ export default function TagPageClientWrapper({
     };
   }, [tag]);
 
+  /* ---------------------------
+   GLOBAL OVERLAY CLOSE
+  --------------------------- */
+  useEffect(() => {
+    const handler = () => {
+      setLoadingMore(false);
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, []);
+
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore || !cursor) return;
 
     setLoadingMore(true);
     try {
       const res = await fetch(
-        `/api/tags/${encodeURIComponent(tag)}?limit=${PAGE_SIZE}&cursor=${cursor}`,
+        `/api/tags/${encodeURIComponent(
+          tag
+        )}?limit=${PAGE_SIZE}&cursor=${cursor}`,
         { cache: "no-store" }
       );
 
@@ -99,7 +114,7 @@ export default function TagPageClientWrapper({
       posts={posts}
       hasMore={hasMore}
       onLoadMore={loadMore}
-      scrollContainerRef={scrollContainerRef} // ✅ optional
+      scrollContainerRef={scrollContainerRef}
     />
   );
 }

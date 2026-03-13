@@ -23,6 +23,9 @@ const MemoUserMenu = memo(UserMenu);
 
 export default function Navbar() {
   const pathname = usePathname();
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("ui:close-all"));
+  }, [pathname]);
   const isHome = pathname === "/";
   const { user, loading } = useCurrentUser();
   const { t } = useTranslation();
@@ -121,11 +124,38 @@ export default function Navbar() {
   };
 
   const goHome = () => {
-    closeSearch();            // close search overlay
+    closeSearch(); // close search overlay
     document.activeElement instanceof HTMLElement &&
       document.activeElement.blur(); // remove any focus
     router.push("/");
   };
+
+  useEffect(() => {
+    const handler = () => {
+      closeSearch();
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, []);
+
+  function closeAllOverlays() {
+    let count = 0;
+
+    const fire = () => {
+      window.dispatchEvent(new CustomEvent("ui:close-all"));
+      count++;
+
+      if (count < 6) {
+        requestAnimationFrame(fire);
+      }
+    };
+
+    fire();
+  }
 
   /* ---------------------------------------------
    * SSR SAFE SHELL
@@ -153,10 +183,18 @@ export default function Navbar() {
             ${searchActive ? "opacity-0 pointer-events-none" : ""}
           `}
           onClick={() => {
+            closeAllOverlays();
+
             if (isHome) {
-              window.location.reload();
+              // already on home → refresh
+              setTimeout(() => {
+                window.location.reload();
+              }, 120);
             } else {
-              goHome();
+              // navigate home
+              setTimeout(() => {
+                router.push("/");
+              }, 80);
             }
           }}
         >
@@ -165,7 +203,10 @@ export default function Navbar() {
               <ThreeBall />
             ) : (
               <button
-                onClick={() => router.back()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.back();
+                }}
                 aria-label="Go back"
                 className="
                   flex items-center justify-center

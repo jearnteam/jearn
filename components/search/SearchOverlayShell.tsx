@@ -14,10 +14,24 @@ export default function SearchOverlayShell({ children, onClose }: Props) {
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
     return () => {
       document.body.style.overflow = prev;
     };
   }, []);
+
+  /* 🔥 GLOBAL CLOSE LISTENER */
+  useEffect(() => {
+    const handler = () => {
+      onClose();
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-40 bg-white dark:bg-black">

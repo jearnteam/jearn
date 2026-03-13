@@ -1,6 +1,8 @@
 "use client";
 
 import { useTranslation } from "react-i18next";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import FullScreenLoader from "@/components/common/FullScreenLoader";
 import ProfileLayout from "@/components/profile/ProfileLayout";
@@ -17,10 +19,25 @@ interface ProfilePageProps {
 
 export default function ProfilePage({ scrollContainerRef }: ProfilePageProps) {
   const { t } = useTranslation();
+  const router = useRouter();
 
   const { loading: authLoading } = useProfileAuth();
   const profile = useProfileForm();
   const posts = useUserPosts(profile.user?._id);
+
+  useEffect(() => {
+    const handler = () => {
+      if (window.history.length > 1) {
+        router.back();
+      }
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, [router]);
 
   if (authLoading || profile.loading || posts.loading) {
     return <FullScreenLoader text={t("loadingPosts")} />;

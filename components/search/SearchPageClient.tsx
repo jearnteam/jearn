@@ -245,7 +245,7 @@ export default function SearchPageClient({
 function UserCard({ user }: { user: any }) {
   return (
     <Link
-      href={`/users/${user._id}`}
+      href={`/profile/${user._id}`}
       className="block p-4 border rounded-xl hover:bg-gray-50 dark:hover:bg-neutral-900"
     >
       <div className="flex items-center gap-3">

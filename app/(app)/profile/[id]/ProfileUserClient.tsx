@@ -93,6 +93,18 @@ export default function ProfileUserClient({
     })();
   }, [userId]);
 
+  useEffect(() => {
+    const handler = () => {
+      router.back(); // close profile overlay
+    };
+
+    window.addEventListener("ui:close-all", handler);
+
+    return () => {
+      window.removeEventListener("ui:close-all", handler);
+    };
+  }, [router]);
+
   /* ---------------- START CHAT (OVERLAY) ---------------- */
 
   async function startChat() {
