@@ -168,10 +168,9 @@ export function renderEmbeds(
       const wrapper = document.createElement("div");
       wrapper.style.position = "relative";
       wrapper.style.width = "100%";
-      wrapper.style.maxWidth = "560px";
+      wrapper.style.maxWidth = "720px";
       wrapper.style.margin = "16px auto";
-      wrapper.style.paddingBottom = "56.25%";
-      wrapper.style.height = "0";
+      wrapper.style.aspectRatio = "16 / 9";
       wrapper.style.borderRadius = "12px";
       wrapper.style.overflow = "hidden";
       wrapper.style.background = "#000";
@@ -231,8 +230,7 @@ export function renderEmbeds(
         iframe.allowFullscreen = true;
         iframe.loading = "lazy";
         iframe.style.position = "absolute";
-        iframe.style.top = "0";
-        iframe.style.left = "0";
+        iframe.style.inset = "0";
         iframe.style.width = "100%";
         iframe.style.height = "100%";
         iframe.style.border = "0";

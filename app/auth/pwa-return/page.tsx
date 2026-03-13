@@ -24,15 +24,7 @@ export default function PWAReturnPage() {
     <div className="flex items-center justify-center h-screen">
       <div className="text-center">
         <p className="text-lg font-semibold mb-4">Login successful</p>
-
-        <p className="text-sm text-gray-500 mb-6">Returning to JEARN app...</p>
-
-        <a
-          href="https://jearn.site/"
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          Open JEARN App
-        </a>
+        <p className="text-sm text-gray-500 mb-6">Returning to JEARN...</p>
       </div>
     </div>
   );

@@ -9,12 +9,7 @@ import { useVideoSettings } from "./VideoSettingsContext";
 export default function VideosPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const {
-    savedState,
-    saveVideoState,
-    videos,
-    setVideos,
-  } = useVideoSettings();
+  const { savedState, saveVideoState, videos, setVideos } = useVideoSettings();
 
   /* -------------------------------------------------
    * 💾 SAVE CURRENT VIDEO STATE (EVENT-BASED)
@@ -105,7 +100,10 @@ export default function VideosPage() {
 
   return (
     <VideoPlaybackProvider>
-      <div ref={containerRef} className="w-full h-full">
+      <div
+        ref={containerRef}
+        className="w-full h-full overflow-y-scroll snap-y snap-mandatory"
+      >
         {videos.map((post: Post) => (
           <VideosItem key={post._id} post={post} />
         ))}
