@@ -28,6 +28,13 @@ const ADMIN_EMAILS =
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // 🌐 Redirect www → non-www
+  if (req.headers.get("host")?.startsWith("www.")) {
+    const url = req.nextUrl.clone();
+    url.host = url.host.replace("www.", "");
+    return NextResponse.redirect(url, 301);
+  }
+
   // Allow API routes
   if (pathname.startsWith("/api")) {
     return NextResponse.next();
