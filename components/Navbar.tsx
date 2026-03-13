@@ -120,6 +120,13 @@ export default function Navbar() {
     inputRef.current?.blur();
   };
 
+  const goHome = () => {
+    closeSearch();            // close search overlay
+    document.activeElement instanceof HTMLElement &&
+      document.activeElement.blur(); // remove any focus
+    router.push("/");
+  };
+
   /* ---------------------------------------------
    * SSR SAFE SHELL
    * ------------------------------------------- */
@@ -149,7 +156,7 @@ export default function Navbar() {
             if (isHome) {
               window.location.reload();
             } else {
-              router.push("/");
+              goHome();
             }
           }}
         >

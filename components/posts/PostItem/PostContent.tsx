@@ -144,13 +144,6 @@ export default function PostContent({
     setExpanded(false);
 
     requestAnimationFrame(() => {
-      const el = wrapperRef.current;
-      if (!el) return;
-
-      const rect = el.getBoundingClientRect();
-
-      if (rect.top >= 0) return;
-
       virtuosoRef.current?.scrollToIndex({
         index,
         align: "start",
