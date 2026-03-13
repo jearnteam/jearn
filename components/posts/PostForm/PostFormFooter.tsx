@@ -39,10 +39,10 @@ export default function PostFormFooter({
   handleCheckCategories,
 }: Props) {
   return (
-    <div className="sticky bottom-0 p-3">
+    <div className="border-t border-gray-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         {/* Left side */}
-        <div className="flex items-center gap-2 text-sm min-w-0">
+        <div className="flex items-center gap-2 text-sm min-w-0 flex-1">
           {user ? (
             <img
               src={avatarUrl!}
@@ -63,7 +63,7 @@ export default function PostFormFooter({
           </span>
         </div>
         {/* Right side */}
-        <div className="flex flex-wrap gap-2 sm:gap-3 items-center justify-end">
+        <div className="flex flex-wrap gap-2 sm:gap-3 items-center sm:justify-end">
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}

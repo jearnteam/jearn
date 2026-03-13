@@ -1,5 +1,5 @@
 import { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
-import tippy from "tippy.js";
+import tippy, { Instance } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 
 type UserData = {
@@ -34,8 +34,9 @@ export function setupMentionHoverPopups(
       delay: [200, 0],
       animation: "shift-away-subtle",
       theme: "jearn-mention",
-      appendTo: () => document.body,
+      trigger: isTouchDevice() ? "click" : "mouseenter focus",
       zIndex: 9999,
+      appendTo: () => document.body,
       onShow(inst) {
         if (userCache.has(uid)) {
           inst.setContent(buildPokemonCard(userCache.get(uid)!));
@@ -63,7 +64,7 @@ export function setupMentionHoverPopups(
             };
 
             userCache.set(uid, user);
-            inst.setContent(buildPokemonCard(user, uid, router));
+            inst.setContent(buildPokemonCard(user, uid, router, inst));
           })
           .catch(() => {
             inst.setContent(buildErrorCard());
@@ -71,6 +72,14 @@ export function setupMentionHoverPopups(
       },
     });
   });
+}
+
+function isTouchDevice() {
+  return (
+    "ontouchstart" in window ||
+    navigator.maxTouchPoints > 0 ||
+    navigator.maxTouchPoints > 0
+  );
 }
 
 function isDarkMode() {
@@ -111,7 +120,8 @@ function buildSkeletonCard() {
 function buildPokemonCard(
   user: UserData,
   uid?: string,
-  router?: AppRouterInstance
+  router?: AppRouterInstance,
+  inst?: Instance
 ) {
   const dark = isDarkMode();
 
@@ -130,6 +140,7 @@ function buildPokemonCard(
   if (uid && router) {
     card.addEventListener("click", (e) => {
       e.stopPropagation();
+      inst?.hide();
       router.push(`/profile/${uid}`);
     });
   }
