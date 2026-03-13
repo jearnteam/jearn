@@ -20,8 +20,7 @@ export default function LoginPage() {
       (window.navigator as any).standalone === true;
 
     if (isPWA) {
-      // Open Google login in Chrome instead of PWA
-      window.open("/api/auth/signin/google", "_blank");
+      window.open("/api/auth/signin/google?callbackUrl=/pwa-login", "_blank");
     } else {
       signIn("google", {
         callbackUrl: "/",
