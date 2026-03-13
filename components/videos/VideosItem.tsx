@@ -258,7 +258,7 @@ export default function VideosItem({ post }: { post: Post }) {
   return (
     <div
       ref={wrapperRef}
-      className="snap-start w-full h-full flex justify-center items-center"
+      className="snap-start snap-always w-full h-full flex justify-center items-center"
     >
       <div
         className="relative w-full h-full max-w-[500px] bg-black overflow-hidden"
