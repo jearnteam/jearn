@@ -11,20 +11,17 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 dayjs.extend(relativeTime);
 
-const CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+const CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
 
 function resolveAvatar(post: Post) {
-  // ① APIが完成URLを渡してきた場合
   if (post.authorAvatar) return post.authorAvatar;
 
-  // ② authorId + avatarUpdatedAt から組み立て
-  if (post.authorId && post.authorAvatarUpdatedAt) {
+  if (post.authorId && post.authorAvatarUpdatedAt && CDN) {
     return `${CDN}/avatars/${post.authorId}.webp?t=${new Date(
       post.authorAvatarUpdatedAt
     ).getTime()}`;
   }
 
-  // ③ 最終フォールバック
   return "/default-avatar.png";
 }
 

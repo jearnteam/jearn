@@ -6,8 +6,184 @@ export function renderEmbeds(
   el: HTMLElement,
   options?: { openInNewTab?: boolean }
 ) {
+  /* ---------------- LINK CARDS ---------------- */
+
+  const linkCards = Array.from(
+    el.querySelectorAll("div[data-link-card='true']")
+  ) as HTMLElement[];
+
+  linkCards.forEach((cardEl) => {
+    if (cardEl.dataset.rendered === "true") return;
+
+    const rawUrl =
+      cardEl.getAttribute("data-url") || cardEl.getAttribute("url");
+    if (!rawUrl) return;
+
+    let parsed: URL;
+    try {
+      parsed = new URL(
+        rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`
+      );
+    } catch {
+      return;
+    }
+
+    cardEl.dataset.rendered = "true";
+
+    /* JEARN POST PREVIEW */
+
+    if (parsed.hostname.endsWith("jearn.site")) {
+      const match = parsed.pathname.match(/\/posts\/([a-f0-9]{24})/);
+      if (!match) return;
+
+      const postId = match[1];
+
+      const wrapper = document.createElement("div");
+      wrapper.className =
+        "my-4 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-neutral-900 shadow-sm hover:shadow-lg transition cursor-pointer overflow-hidden";
+
+      wrapper.innerHTML = `
+        <div class="p-4 animate-pulse space-y-3">
+          <div class="h-4 w-24 bg-gray-300 dark:bg-gray-700 rounded"></div>
+          <div class="h-6 w-3/4 bg-gray-300 dark:bg-gray-700 rounded"></div>
+          <div class="h-4 w-full bg-gray-300 dark:bg-gray-700 rounded"></div>
+        </div>
+      `;
+
+      cardEl.replaceWith(wrapper);
+
+      fetch(`/api/ogp/post/${postId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.ok) throw new Error();
+
+          const post = data.data;
+
+          wrapper.innerHTML = `
+      ${
+        post.image
+          ? `<div class="w-full h-52 bg-black overflow-hidden">
+               <img src="${post.image}" class="w-full h-full object-cover"/>
+             </div>`
+          : ""
+      }
+
+      <div class="p-4 space-y-2">
+        <div class="text-xs opacity-60">JEARN Post</div>
+        <div class="font-semibold text-lg">
+          ${post.title ?? "Untitled"}
+        </div>
+        ${
+          post.description
+            ? `<div class="text-sm opacity-80">${post.description}</div>`
+            : ""
+        }
+      </div>
+    `;
+
+          /* 🔹 INTERNAL NAVIGATION */
+
+          wrapper.onclick = () => {
+            const href = `/posts/${postId}`;
+
+            if (options?.openInNewTab) {
+              window.open(href, "_blank", "noopener,noreferrer");
+            } else {
+              window.dispatchEvent(
+                new CustomEvent("app:navigate", {
+                  detail: { href },
+                })
+              );
+            }
+          };
+        });
+
+      return;
+    }
+
+    /* ---------------- EXTERNAL LINK PREVIEW ---------------- */
+
+    const wrapper = document.createElement("div");
+
+    wrapper.className =
+      "my-4 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-neutral-900 shadow-sm hover:shadow-md transition cursor-pointer overflow-hidden";
+
+    wrapper.innerHTML = `
+  <div class="p-4 text-sm opacity-70">
+    Loading preview...
+  </div>
+`;
+
+    cardEl.replaceWith(wrapper);
+
+    fetch("/api/ogp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: parsed.href }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        const title = data.title || parsed.hostname;
+        const description = data.description || "";
+        const image = data.image || null;
+        const siteName = (data.siteName || parsed.hostname).toUpperCase();
+
+        wrapper.innerHTML = `
+      <div class="flex items-center gap-4 p-4">
+        
+        ${
+          image
+            ? `<div class="w-20 h-20 flex-shrink-0 overflow-hidden rounded-md bg-black">
+                 <img src="${image}" class="w-full h-full object-cover"/>
+               </div>`
+            : `<div class="w-20 h-20 flex-shrink-0 rounded-md bg-gray-200 dark:bg-gray-800"></div>`
+        }
+
+        <div class="flex-1 min-w-0">
+          <div class="text-xs uppercase tracking-wide opacity-60 mb-1">
+            ${siteName} ↗
+          </div>
+
+          <div class="font-semibold text-sm leading-snug line-clamp-2">
+            ${title}
+          </div>
+
+          ${
+            description
+              ? `<div class="text-xs opacity-70 mt-1 line-clamp-2">
+                   ${description}
+                 </div>`
+              : ""
+          }
+        </div>
+
+      </div>
+    `;
+      })
+      .catch(() => {
+        wrapper.innerHTML = `
+      <div class="p-4">
+        <div class="font-semibold break-words">${parsed.hostname}</div>
+        <div class="text-sm opacity-70 break-words">${parsed.href}</div>
+      </div>
+    `;
+      });
+
+    wrapper.onclick = () => {
+      if (options?.openInNewTab) {
+        window.open(parsed.href, "_blank", "noopener,noreferrer");
+      } else {
+        window.open(parsed.href, "_blank");
+      }
+    };
+
+    cardEl.replaceWith(wrapper);
+  });
+
+  /* ---------------- NORMAL EMBEDS ---------------- */
+
   const embeds = Array.from(
-    el.querySelectorAll("div[data-embed='true'], div[data-link-card='true']")
+    el.querySelectorAll("div[data-embed='true']")
   ) as HTMLElement[];
 
   embeds.forEach((embedEl) => {
@@ -26,125 +202,6 @@ export function renderEmbeds(
     const normalized = decoded.startsWith("http")
       ? decoded
       : "https://" + decoded;
-
-    /* ---------------- JEARN LINK CARD ---------------- */
-
-    const linkCards = Array.from(
-      el.querySelectorAll("div[data-link-card='true']")
-    ) as HTMLElement[];
-
-    linkCards.forEach((cardEl) => {
-      if (cardEl.dataset.rendered === "true") return;
-
-      const rawUrl =
-        cardEl.getAttribute("data-url") || cardEl.getAttribute("url");
-      if (!rawUrl) return;
-
-      let parsed: URL;
-      try {
-        parsed = new URL(rawUrl);
-      } catch {
-        return;
-      }
-
-      // Detect JEARN domain
-      if (!parsed.hostname.endsWith("jearn.site")) return;
-
-      // Detect /posts/:id
-      const match = parsed.pathname.match(/\/posts\/([a-f0-9]{24})/);
-      if (!match) return;
-
-      const postId = match[1];
-
-      cardEl.dataset.rendered = "true";
-
-      const wrapper = document.createElement("div");
-      wrapper.className =
-        "my-4 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-neutral-900 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden";
-
-      wrapper.innerHTML = `
-    <div class="p-4 animate-pulse space-y-3">
-      <div class="h-4 w-24 bg-gray-300 dark:bg-gray-700 rounded"></div>
-      <div class="h-6 w-3/4 bg-gray-300 dark:bg-gray-700 rounded"></div>
-      <div class="h-4 w-full bg-gray-300 dark:bg-gray-700 rounded"></div>
-      <div class="h-4 w-1/2 bg-gray-300 dark:bg-gray-700 rounded"></div>
-    </div>
-  `;
-
-      cardEl.replaceWith(wrapper);
-
-      fetch(`/api/ogp/post/${postId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (!data.ok) throw new Error();
-
-          const post = data.data;
-
-          const createdAt = post.createdAt
-            ? new Date(post.createdAt).toLocaleDateString()
-            : "";
-
-          wrapper.innerHTML = `
-        ${
-          post.image
-            ? `<div class="w-full h-52 bg-black overflow-hidden">
-                 <img 
-                   src="${post.image}" 
-                   class="w-full h-full object-cover transition-transform duration-300 hover:scale-105" 
-                 />
-               </div>`
-            : ""
-        }
-
-        <div class="p-4 space-y-3">
-          <div class="flex items-center justify-between text-xs opacity-60">
-            <span>JEARN Post</span>
-            <span>${createdAt}</span>
-          </div>
-
-          <div class="font-semibold text-lg leading-snug line-clamp-2">
-            ${post.title ?? "Untitled"}
-          </div>
-
-          ${
-            post.description
-              ? `<div class="text-sm opacity-80 line-clamp-3">
-                   ${post.description}
-                 </div>`
-              : ""
-          }
-
-          <div class="flex items-center justify-between text-xs opacity-60 pt-1">
-            <span>by ${post.authorName}</span>
-            <span>${post.referenceCount} references</span>
-          </div>
-        </div>
-      `;
-
-          wrapper.onclick = () => {
-            const href = `/posts/${post.id}`;
-
-            if (options?.openInNewTab) {
-              window.open(href, "_blank", "noopener,noreferrer");
-            } else {
-              window.dispatchEvent(
-                new CustomEvent("app:navigate", {
-                  detail: { href },
-                })
-              );
-            }
-          };
-        })
-        .catch(() => {
-          wrapper.innerHTML = `
-        <div class="p-4">
-          <div class="font-semibold break-words">
-            ${rawUrl}
-          </div>
-        </div>
-      `;
-        });
-    });
 
     /* ---------------- YOUTUBE ---------------- */
 

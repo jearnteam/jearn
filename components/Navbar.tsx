@@ -24,7 +24,7 @@ const MemoUserMenu = memo(UserMenu);
 export default function Navbar() {
   const pathname = usePathname();
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("ui:close-all"));
+    window.dispatchEvent(new CustomEvent("ui:close-all"))
   }, [pathname]);
   const isHome = pathname === "/";
   const { user, loading } = useCurrentUser();

@@ -208,6 +208,11 @@ export default function HomePage() {
       return;
     }
 
+    if (next === "videos" && activeView === "videos") {
+      window.dispatchEvent(new Event("videos:reload"));
+      return;
+    }
+
     scrollPositions.current[activeView] = el.scrollTop;
     restoringScrollRef.current = true;
     setNavbarVisible(true);
@@ -229,7 +234,7 @@ export default function HomePage() {
       }
     },
     80,
-    activeView !== "chat"
+    activeView !== "chat" && activeView !== "videos"
   );
 
   /* ---------------------------------------------

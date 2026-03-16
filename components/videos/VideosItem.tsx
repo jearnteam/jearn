@@ -193,6 +193,21 @@ export default function VideosItem({ post }: { post: Post }) {
     };
   }, [post.video?.url, isScrubbing]);
 
+  useEffect(() => {
+    const container = wrapperRef.current?.parentElement;
+    if (!container) return;
+
+    if (isScrubbing) {
+      container.style.overflowY = "hidden";
+    } else {
+      container.style.overflowY = "scroll";
+    }
+
+    return () => {
+      container.style.overflowY = "scroll";
+    };
+  }, [isScrubbing]);
+
   /* --------------------------------------------------
    * TAP HANDLER (VIDEO ONLY)
    * -------------------------------------------------- */
@@ -318,7 +333,7 @@ export default function VideosItem({ post }: { post: Post }) {
         <div className="absolute bottom-0 left-0 right-0 z-40">
           {/* 👆 HIT AREA (BIG, INVISIBLE) */}
           <div
-            className="absolute left-0 right-0 -top-6 h-10 touch-none"
+            className="absolute left-0 right-0 -top-6 h-10 touch-pan-x"
             onPointerDown={(e) => {
               e.preventDefault();
               e.stopPropagation();

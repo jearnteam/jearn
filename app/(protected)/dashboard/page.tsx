@@ -102,7 +102,7 @@ export default function Dashboard() {
     );
 
   return (
-    <div className="fixed inset-0 pt-[4.3rem] bg-white dark:bg-black flex">
+    <div className="min-h-screen pt-[4.3rem] bg-white dark:bg-black flex">
       {/* ---------- Sidebar ---------- */}
       <motion.aside
         animate={{ width: sidebarOpen ? 175 : 50 }}

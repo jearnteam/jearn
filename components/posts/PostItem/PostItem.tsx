@@ -200,7 +200,9 @@ export default function PostItem({
 
       <SharePostModal
         open={shareOpen}
-        postUrl={`${process.env.NEXT_PUBLIC_APP_URL}/posts/${post._id}`}
+        postUrl={`${
+          process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+        }/posts/${post._id}`}
         onCancel={() => setShareOpen(false)}
       />
 
