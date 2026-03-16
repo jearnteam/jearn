@@ -30,39 +30,21 @@ const clients = new Set<WSClient>();
 // 🔥 Track presence with connection count (multi-tab safe)
 const onlineUsers = new Map<string, number>();
 
+const userSockets = new Map<string, Set<WSClient>>();
 /* ---------------------------------------------
  * HELPERS
  * ------------------------------------------- */
 
-function broadcast(data: any) {
-  const json = JSON.stringify(data);
+function sendToUser(userId: string, payload: any) {
+  const sockets = userSockets.get(userId);
+  if (!sockets) return;
 
-  for (const c of clients) {
-    if (c.readyState === WebSocket.OPEN) {
-      c.send(json);
+  const json = JSON.stringify(payload);
+
+  for (const socket of sockets) {
+    if (socket.readyState === WebSocket.OPEN) {
+      socket.send(json);
     }
-  }
-}
-
-function sendOnlineList(ws: WebSocket) {
-  ws.send(
-    JSON.stringify({
-      type: "presence:list",
-      users: Array.from(onlineUsers.keys()),
-    })
-  );
-}
-
-function handleUserOnline(userId: string) {
-  const count = onlineUsers.get(userId) ?? 0;
-  onlineUsers.set(userId, count + 1);
-
-  // Only broadcast if first connection
-  if (count === 0) {
-    broadcast({
-      type: "presence:online",
-      userId,
-    });
   }
 }
 
@@ -106,8 +88,17 @@ server.on("upgrade", (req, socket, head) => {
 
       if (data.type === "presence:init" && data.userId) {
         userId = String(data.userId);
+        client.userId = userId;
+
         const count = onlineUsers.get(userId) ?? 0;
         onlineUsers.set(userId, count + 1);
+
+        // track sockets
+        if (!userSockets.has(userId)) {
+          userSockets.set(userId, new Set());
+        }
+        userSockets.get(userId)!.add(client);
+
         broadcastPresence();
         return;
       }
@@ -145,10 +136,68 @@ server.on("upgrade", (req, socket, head) => {
 
         return;
       }
+      //calls
+      if (data.type === "call:start" && data.targetUserId && client.userId) {
+        const callId = crypto.randomUUID();
+      
+        sendToUser(data.targetUserId, {
+          type: "call:incoming",
+          callId,
+          fromUserId: client.userId,
+          mode: data.mode || "audio",
+        });
+      
+        return;
+      }
+      if (data.type === "call:accept" && data.callId && data.fromUserId && client.userId) {
+        const roomName = `call_${data.callId}`;
+      
+        sendToUser(data.fromUserId, {
+          type: "call:accepted",
+          callId: data.callId,
+          roomName,
+          by: client.userId,
+        });
+      
+        sendToUser(client.userId, {
+          type: "call:accepted",
+          callId: data.callId,
+          roomName,
+          by: client.userId,
+        });
+      
+        return;
+      }
+      if (data.type === "call:reject" && data.callId && data.fromUserId) {
+        sendToUser(data.fromUserId, {
+          type: "call:rejected",
+          callId: data.callId,
+        });
+      
+        return;
+      }
+      if (data.type === "call:end" && data.callId && data.targetUserId) {
+        sendToUser(data.targetUserId, {
+          type: "call:ended",
+          callId: data.callId,
+        });
+      
+        return;
+      }
     });
 
     ws.on("close", () => {
       clients.delete(client);
+
+      if (client.userId) {
+        const sockets = userSockets.get(client.userId);
+
+        sockets?.delete(client);
+
+        if (sockets && sockets.size === 0) {
+          userSockets.delete(client.userId);
+        }
+      }
 
       if (userId) {
         const count = onlineUsers.get(userId) ?? 0;

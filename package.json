@@ -33,6 +33,8 @@
     "i18next": "^25.6.0",
     "jose": "^6.1.0",
     "katex": "^0.16.25",
+    "livekit-client": "^2.17.3",
+    "livekit-server-sdk": "^2.15.0",
     "lottie-web": "^5.13.0",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.545.0",

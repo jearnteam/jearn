@@ -22,6 +22,7 @@ services:
     depends_on:
       - ai
       - ws
+      - livekit
 
 
   ai:
@@ -43,7 +44,6 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-
   ws:
     build: ./ws
     container_name: jearn-ws-dev
@@ -63,6 +63,20 @@ services:
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: jearn-livekit-dev
+    restart: unless-stopped
+
+    command: --config /etc/livekit.yaml
+
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+
+    ports:
+      - "7880:7880"
+      - "7881:7881"
 
 networks:
   default:

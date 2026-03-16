@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { ArrowLeft, Send } from "lucide-react";
 import { avatarUrl } from "@/lib/avatarUrl";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
+import DirectCallButton from "@/components/call/DirectCallButton";
 
 /* ───────────────── TYPES ───────────────── */
 
@@ -398,16 +399,24 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
   return (
     <div className="flex flex-col h-full relative">
       {/* TOP BAR */}
-      <div className="h-14 flex items-center gap-3 px-4 border-b shrink-0">
-        <button onClick={onClose}>
-          <ArrowLeft size={18} />
-        </button>
-        <img
-          src={avatarSrc}
-          className="w-9 h-9 rounded-full"
-          alt={partner.name}
-        />
-        <div className="truncate">{partner.name}</div>
+      <div className="h-14 flex items-center px-4 border-b shrink-0">
+        {/* LEFT SIDE */}
+        <div className="flex items-center gap-3 flex-1">
+          <button onClick={onClose}>
+            <ArrowLeft size={18} />
+          </button>
+
+          <img
+            src={avatarSrc}
+            className="w-9 h-9 rounded-full"
+            alt={partner.name}
+          />
+
+          <div className="truncate">{partner.name}</div>
+        </div>
+
+        {/* RIGHT SIDE */}
+        <DirectCallButton partnerId={partner.uid} />
       </div>
 
       {/* LOADING OLDER */}

@@ -1,0 +1,10 @@
+livekit.yaml
+port: 7880
+
+rtc:
+  tcp_port: 7881
+
+keys:
+  devkey: aCyrUEoHlhDr5vnAVElhHGfbvqlleWOSocJqqiNh0Ep
+
+log_level: info

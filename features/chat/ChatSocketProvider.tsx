@@ -17,7 +17,6 @@ type ChatSocketContextValue = {
   onlineUserIds: Set<string>;
   currentUserId: string;
 
-  // 🔥 unread
   totalUnread: number;
   clearRoomUnread: (roomId: string) => void;
   getRoomUnread: (roomId: string) => number;
@@ -27,6 +26,9 @@ type ChatSocketContextValue = {
   joinRoom: (roomId: string) => void;
   leaveRoom: (roomId: string) => void;
   sendRoomMessage: (roomId: string, payload: any) => void;
+
+  send: (payload: any) => void;
+
   subscribeRoom: (roomId: string, cb: (payload: any) => void) => () => void;
 };
 
@@ -99,6 +101,18 @@ export function ChatSocketProvider({
       if (!roomId) return;
       joinedRoomsRef.current.add(roomId);
       sendRaw({ type: "join", roomId });
+    },
+    [sendRaw]
+  );
+
+  const send = useCallback(
+    (payload: any) => {
+      const ok = sendRaw(payload);
+
+      // optional: queue if socket not ready
+      if (!ok) {
+        pendingChatRef.current.push(payload);
+      }
     },
     [sendRaw]
   );
@@ -330,13 +344,11 @@ export function ChatSocketProvider({
       totalUnread,
       clearRoomUnread,
       getRoomUnread,
+
       setActiveRoom: (roomId: string | null) => {
         setActiveRoomId(roomId);
-
-        // immediately sync ref
         activeRoomRef.current = roomId;
 
-        // clear unread if opening a room
         if (roomId) {
           setRoomUnreadMap((prev) => {
             const next = new Map(prev);
@@ -345,9 +357,14 @@ export function ChatSocketProvider({
           });
         }
       },
+
       joinRoom,
       leaveRoom,
       sendRoomMessage,
+
+      // ✅ ADD THIS
+      send,
+
       subscribeRoom,
     }),
     [
@@ -359,6 +376,7 @@ export function ChatSocketProvider({
       joinRoom,
       leaveRoom,
       sendRoomMessage,
+      send,
       subscribeRoom,
     ]
   );
