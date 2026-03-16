@@ -30,6 +30,7 @@ import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions"
 import { useSession } from "next-auth/react";
 import AboutJearnPage from "@/components/about/AboutJearnPage";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
+import IncomingCallModal from "@/components/call/IncomingCallModal";
 
 /* ---------------------------------------------
  * VIEW TYPE
@@ -39,7 +40,7 @@ type HomeView = "home" | "notify" | "users" | "videos" | "chat" | "about";
 export default function HomePage() {
   const { t } = useTranslation();
   const { emitScroll } = useScrollBus();
-  const { onlineUserIds, totalUnread } = useChatSocket();
+  const { onlineUserIds, totalUnread, send } = useChatSocket();
 
   /* ---------------------------------------------
    * STATE
@@ -60,6 +61,8 @@ export default function HomePage() {
   const { uploading, progress } = useUpload();
   //storing latest chatroomId
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  //calls
+  const [incomingCall, setIncomingCall] = useState<any | null>(null);
   //for upvote, vote answer
   const [answeringPost, setAnsweringPost] = useState<Post | null>(null);
 
@@ -324,6 +327,19 @@ export default function HomePage() {
     });
   }, [activeView]);
 
+  //calls listener
+  useEffect(() => {
+    function handleIncomingCall(e: any) {
+      setIncomingCall(e.detail);
+    }
+  
+    window.addEventListener("call:incoming", handleIncomingCall);
+  
+    return () => {
+      window.removeEventListener("call:incoming", handleIncomingCall);
+    };
+  }, []);
+
   /* ---------------------------------------------
    * RENDER
    * ------------------------------------------- */
@@ -387,6 +403,31 @@ export default function HomePage() {
         }}
         onConfirm={confirmDelete}
       />
+
+{incomingCall && (
+  <IncomingCallModal
+    call={incomingCall}
+    onReject={() => {
+      send({
+        type: "call:reject",
+        callId: incomingCall.callId,
+        fromUserId: incomingCall.fromUserId,
+      });
+
+      setIncomingCall(null);
+    }}
+    onAccept={() => {
+      send({
+        type: "call:accept",
+        callId: incomingCall.callId,
+        fromUserId: incomingCall.fromUserId,
+        roomName: incomingCall.roomName,
+      });
+
+      setIncomingCall(null);
+    }}
+  />
+)}
 
       {/* ───── LAYOUT ───── */}
       <div

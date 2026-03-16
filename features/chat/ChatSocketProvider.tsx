@@ -91,7 +91,14 @@ export function ChatSocketProvider({
 
   const sendRaw = useCallback((obj: any) => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+
+    console.log("WS SEND:", obj);
+
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      console.log("WS NOT OPEN");
+      return false;
+    }
+
     ws.send(JSON.stringify(obj));
     return true;
   }, []);
@@ -307,6 +314,18 @@ export function ChatSocketProvider({
           if (!subs) return;
 
           for (const cb of subs) cb(payload);
+        }
+
+        if (data?.type === "call:incoming") {
+          window.dispatchEvent(
+            new CustomEvent("call:incoming", { detail: data })
+          );
+        }
+
+        if (data?.type === "call:accepted") {
+          window.dispatchEvent(
+            new CustomEvent("call:accepted", { detail: data })
+          );
         }
       };
 

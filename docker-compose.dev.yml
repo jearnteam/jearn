@@ -21,7 +21,6 @@ services:
 
     depends_on:
       - ai
-      - ws
       - livekit
 
 
@@ -40,26 +39,6 @@ services:
       - ./ai-service:/app
 
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  ws:
-    build: ./ws
-    container_name: jearn-ws-dev
-    restart: unless-stopped
-
-    ports:
-      - "3536:3536"
-
-    env_file:
-      - .env.local
-
-    volumes:
-      - ./ws:/app
-      - /app/node_modules
-
-    command: npm run dev
 
     extra_hosts:
       - "host.docker.internal:host-gateway"

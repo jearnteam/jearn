@@ -12,33 +12,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-
-  const roomName = body?.roomName;
-
-  if (!roomName) {
-    return NextResponse.json({ error: "Missing roomName" }, { status: 400 });
-  }
+  const { roomName } = await req.json();
 
   const at = new AccessToken(
-    process.env.LIVEKIT_API_KEY!,
-    process.env.LIVEKIT_API_SECRET!,
+    process.env.LIVEKIT_API_KEY,
+    process.env.LIVEKIT_API_SECRET,
     {
       identity: session.user.uid,
     }
   );
 
   at.addGrant({
-    room: roomName,
     roomJoin: true,
-    canPublish: true,
-    canSubscribe: true,
+    room: roomName,
   });
 
-  const token = await at.toJwt();
-
   return NextResponse.json({
-    token,
-    url: process.env.LIVEKIT_URL,
+    token: await at.toJwt(),
   });
 }

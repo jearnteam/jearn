@@ -10,6 +10,18 @@ type WSClient = WebSocket & {
   rooms: Set<string>;
 };
 
+type WSMessage = {
+  type: string;
+  callId?: string;
+  roomName?: string;
+  targetUserId?: string;
+  fromUserId?: string;
+  mode?: "audio" | "video";
+  roomId?: string;
+  payload?: any;
+  userId?: string;
+};
+
 /* ---------------------------------------------
  * HTTP SERVER
  * ------------------------------------------- */
@@ -37,7 +49,14 @@ const userSockets = new Map<string, Set<WSClient>>();
 
 function sendToUser(userId: string, payload: any) {
   const sockets = userSockets.get(userId);
-  if (!sockets) return;
+
+  console.log("SEND TO USER:", userId);
+  console.log("AVAILABLE USERS:", Array.from(userSockets.keys()));
+
+  if (!sockets) {
+    console.log("NO SOCKET FOUND FOR USER");
+    return;
+  }
 
   const json = JSON.stringify(payload);
 
@@ -72,6 +91,7 @@ server.on("upgrade", (req, socket, head) => {
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {
+    console.log("WS CLIENT CONNECTED");
     const client = ws as WSClient;
     client.rooms = new Set();
     clients.add(client);
@@ -79,7 +99,9 @@ server.on("upgrade", (req, socket, head) => {
     let userId: string | undefined;
 
     ws.on("message", (raw) => {
-      let data: any;
+      const text = raw.toString();
+      console.log("WS RAW MESSAGE:", text);
+      let data: WSMessage;
       try {
         data = JSON.parse(raw.toString());
       } catch {
@@ -88,7 +110,7 @@ server.on("upgrade", (req, socket, head) => {
 
       if (data.type === "presence:init" && data.userId) {
         userId = String(data.userId);
-        client.userId = userId;
+        client.userId = String(userId);
 
         const count = onlineUsers.get(userId) ?? 0;
         onlineUsers.set(userId, count + 1);
@@ -137,35 +159,42 @@ server.on("upgrade", (req, socket, head) => {
         return;
       }
       //calls
-      if (data.type === "call:start" && data.targetUserId && client.userId) {
-        const callId = crypto.randomUUID();
+      if (data.type === "call:start") {
+        console.log("CALL START RECEIVED:", data, "from:", client.userId);
       
-        sendToUser(data.targetUserId, {
+        if (!data.targetUserId || !data.callId || !client.userId) return;
+      
+        sendToUser(String(data.targetUserId), {
           type: "call:incoming",
-          callId,
+          callId: data.callId,
           fromUserId: client.userId,
+          roomName: data.roomName,
           mode: data.mode || "audio",
         });
       
         return;
       }
-      if (data.type === "call:accept" && data.callId && data.fromUserId && client.userId) {
-        const roomName = `call_${data.callId}`;
-      
+      if (
+        data.type === "call:accept" &&
+        data.callId &&
+        data.fromUserId &&
+        data.roomName &&
+        client.userId
+      ) {
         sendToUser(data.fromUserId, {
           type: "call:accepted",
           callId: data.callId,
-          roomName,
+          roomName: data.roomName,
           by: client.userId,
         });
-      
+
         sendToUser(client.userId, {
           type: "call:accepted",
           callId: data.callId,
-          roomName,
+          roomName: data.roomName,
           by: client.userId,
         });
-      
+
         return;
       }
       if (data.type === "call:reject" && data.callId && data.fromUserId) {
@@ -173,15 +202,15 @@ server.on("upgrade", (req, socket, head) => {
           type: "call:rejected",
           callId: data.callId,
         });
-      
+
         return;
       }
       if (data.type === "call:end" && data.callId && data.targetUserId) {
-        sendToUser(data.targetUserId, {
+        sendToUser(String(data.targetUserId), {
           type: "call:ended",
           callId: data.callId,
         });
-      
+
         return;
       }
     });

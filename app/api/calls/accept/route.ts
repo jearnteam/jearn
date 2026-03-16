@@ -13,8 +13,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const callId = body?.callId;
+  const { callId } = await req.json();
 
   if (!callId || !ObjectId.isValid(callId)) {
     return NextResponse.json({ error: "Invalid callId" }, { status: 400 });

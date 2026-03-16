@@ -416,7 +416,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
         </div>
 
         {/* RIGHT SIDE */}
-        <DirectCallButton partnerId={partner.uid} />
+        <DirectCallButton roomId={roomId} />
       </div>
 
       {/* LOADING OLDER */}
