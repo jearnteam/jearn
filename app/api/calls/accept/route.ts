@@ -13,7 +13,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { callId } = await req.json();
+  const body = await req.json();
+  const callId = body?.callId;
 
   if (!callId || !ObjectId.isValid(callId)) {
     return NextResponse.json({ error: "Invalid callId" }, { status: 400 });
@@ -32,6 +33,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Call not found" }, { status: 404 });
   }
 
+  const userId = new ObjectId(session.user.uid);
+
+  // only callee can accept
+  if (!call.calleeId.equals(userId)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   await callsCol.updateOne(
     { _id: call._id },
     {
@@ -42,8 +50,5 @@ export async function POST(req: Request) {
     }
   );
 
-  return NextResponse.json({
-    roomName: call.livekitRoom,
-    mode: call.mode,
-  });
+  return NextResponse.json({ ok: true });
 }

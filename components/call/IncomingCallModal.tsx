@@ -1,81 +1,41 @@
 "use client";
 
 import { Phone, PhoneOff, Video } from "lucide-react";
-import { motion } from "framer-motion";
+import { useCall } from "@/features/call/CallProvider";
 
-interface Props {
-  call: {
-    callId: string;
-    fromUserId: string;
-    roomName: string;
-    mode: "audio" | "video";
-  };
-  onAccept: () => void;
-  onReject: () => void;
-}
+export default function IncomingCallModal() {
+  const { incomingCall, callStatus, acceptIncomingCall, rejectIncomingCall } = useCall();
 
-export default function IncomingCallModal({ call, onAccept, onReject }: Props) {
+  if (!incomingCall || callStatus !== "incoming") return null;
+
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        className="
-          w-[320px]
-          rounded-2xl
-          bg-white dark:bg-neutral-900
-          shadow-2xl
-          p-6
-          flex flex-col items-center
-          gap-4
-        "
-      >
-        {/* ICON */}
-        <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center text-white">
-          {call.mode === "video" ? <Video size={28} /> : <Phone size={28} />}
+    <div className="fixed inset-0 z-[120] bg-black/50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-zinc-900 shadow-2xl p-6 text-center">
+        <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+          {incomingCall.mode === "video" ? <Video size={28} /> : <Phone size={28} />}
         </div>
 
-        {/* TITLE */}
-        <div className="text-center">
-          <p className="text-lg font-semibold">
-            Incoming {call.mode === "video" ? "Video" : "Voice"} Call
-          </p>
+        <h2 className="text-lg font-semibold">Incoming {incomingCall.mode} call</h2>
+        <p className="mt-2 text-sm text-gray-500 break-all">
+          From user: {incomingCall.fromUserId}
+        </p>
 
-          <p className="text-sm text-gray-500 mt-1">
-            From user {call.fromUserId}
-          </p>
-        </div>
-
-        {/* BUTTONS */}
-        <div className="flex gap-6 mt-4">
+        <div className="mt-6 flex items-center justify-center gap-4">
           <button
-            onClick={onReject}
-            className="
-              w-14 h-14 rounded-full
-              bg-red-500 text-white
-              flex items-center justify-center
-              hover:bg-red-600
-              transition
-            "
+            onClick={rejectIncomingCall}
+            className="h-14 w-14 rounded-full bg-red-600 text-white flex items-center justify-center"
           >
             <PhoneOff size={22} />
           </button>
 
           <button
-            onClick={onAccept}
-            className="
-              w-14 h-14 rounded-full
-              bg-green-500 text-white
-              flex items-center justify-center
-              hover:bg-green-600
-              transition
-            "
+            onClick={acceptIncomingCall}
+            className="h-14 w-14 rounded-full bg-emerald-600 text-white flex items-center justify-center"
           >
             <Phone size={22} />
           </button>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

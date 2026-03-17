@@ -1,10 +1,6 @@
 import http from "http";
 import { WebSocketServer, WebSocket } from "ws";
 
-/* ---------------------------------------------
- * TYPES
- * ------------------------------------------- */
-
 type WSClient = WebSocket & {
   userId?: string;
   rooms: Set<string>;
@@ -20,32 +16,21 @@ type WSMessage = {
   roomId?: string;
   payload?: any;
   userId?: string;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
 };
-
-/* ---------------------------------------------
- * HTTP SERVER
- * ------------------------------------------- */
 
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("OK");
 });
 
-/* ---------------------------------------------
- * WS SERVER
- * ------------------------------------------- */
-
 const wss = new WebSocketServer({ noServer: true });
 
 const clients = new Set<WSClient>();
-
-// 🔥 Track presence with connection count (multi-tab safe)
 const onlineUsers = new Map<string, number>();
-
 const userSockets = new Map<string, Set<WSClient>>();
-/* ---------------------------------------------
- * HELPERS
- * ------------------------------------------- */
 
 function sendToUser(userId: string, payload: any) {
   const sockets = userSockets.get(userId);
@@ -53,7 +38,7 @@ function sendToUser(userId: string, payload: any) {
   console.log("SEND TO USER:", userId);
   console.log("AVAILABLE USERS:", Array.from(userSockets.keys()));
 
-  if (!sockets) {
+  if (!sockets || sockets.size === 0) {
     console.log("NO SOCKET FOUND FOR USER");
     return;
   }
@@ -80,10 +65,6 @@ function broadcastPresence() {
   }
 }
 
-/* ---------------------------------------------
- * UPGRADE HANDLER
- * ------------------------------------------- */
-
 server.on("upgrade", (req, socket, head) => {
   if (req.url !== "/chat") {
     socket.destroy();
@@ -92,6 +73,7 @@ server.on("upgrade", (req, socket, head) => {
 
   wss.handleUpgrade(req, socket, head, (ws) => {
     console.log("WS CLIENT CONNECTED");
+
     const client = ws as WSClient;
     client.rooms = new Set();
     clients.add(client);
@@ -101,21 +83,21 @@ server.on("upgrade", (req, socket, head) => {
     ws.on("message", (raw) => {
       const text = raw.toString();
       console.log("WS RAW MESSAGE:", text);
+
       let data: WSMessage;
       try {
-        data = JSON.parse(raw.toString());
+        data = JSON.parse(text);
       } catch {
         return;
       }
 
       if (data.type === "presence:init" && data.userId) {
         userId = String(data.userId);
-        client.userId = String(userId);
+        client.userId = userId;
 
         const count = onlineUsers.get(userId) ?? 0;
         onlineUsers.set(userId, count + 1);
 
-        // track sockets
         if (!userSockets.has(userId)) {
           userSockets.set(userId, new Set());
         }
@@ -127,7 +109,6 @@ server.on("upgrade", (req, socket, head) => {
 
       if (data.type === "join" && data.roomId) {
         client.rooms.add(String(data.roomId));
-        console.log("JOIN:", data.roomId);
         return;
       }
 
@@ -135,17 +116,12 @@ server.on("upgrade", (req, socket, head) => {
         client.rooms.delete(String(data.roomId));
         return;
       }
+
       if (data.type === "chat:message" && data.roomId && data.payload) {
         const roomId = String(data.roomId);
 
-        console.log("ROOM MEMBERS:");
-        for (const c of clients) {
-          console.log("Client rooms:", c.rooms);
-        }
-
         for (const c of clients) {
           if (c.readyState === WebSocket.OPEN && c.rooms.has(roomId)) {
-            console.log("SENDING TO CLIENT IN ROOM:", roomId);
             c.send(
               JSON.stringify({
                 type: "chat:message",
@@ -155,25 +131,24 @@ server.on("upgrade", (req, socket, head) => {
             );
           }
         }
-
         return;
       }
-      //calls
+
       if (data.type === "call:start") {
-        console.log("CALL START RECEIVED:", data, "from:", client.userId);
-      
-        if (!data.targetUserId || !data.callId || !client.userId) return;
-      
+        if (!data.targetUserId || !data.callId) return;
+
+        const fromUserId = client.userId ?? data.fromUserId ?? "unknown";
+
         sendToUser(String(data.targetUserId), {
           type: "call:incoming",
           callId: data.callId,
-          fromUserId: client.userId,
+          fromUserId,
           roomName: data.roomName,
           mode: data.mode || "audio",
         });
-      
         return;
       }
+
       if (
         data.type === "call:accept" &&
         data.callId &&
@@ -197,20 +172,51 @@ server.on("upgrade", (req, socket, head) => {
 
         return;
       }
+
       if (data.type === "call:reject" && data.callId && data.fromUserId) {
         sendToUser(data.fromUserId, {
           type: "call:rejected",
           callId: data.callId,
         });
-
         return;
       }
+
       if (data.type === "call:end" && data.callId && data.targetUserId) {
         sendToUser(String(data.targetUserId), {
           type: "call:ended",
           callId: data.callId,
         });
+        return;
+      }
 
+      // NEW: WebRTC forwarding
+      if (data.type === "call:offer" && data.targetUserId && data.callId && data.offer) {
+        sendToUser(String(data.targetUserId), {
+          type: "call:offer",
+          callId: data.callId,
+          fromUserId: client.userId ?? data.fromUserId,
+          offer: data.offer,
+        });
+        return;
+      }
+
+      if (data.type === "call:answer" && data.targetUserId && data.callId && data.answer) {
+        sendToUser(String(data.targetUserId), {
+          type: "call:answer",
+          callId: data.callId,
+          fromUserId: client.userId ?? data.fromUserId,
+          answer: data.answer,
+        });
+        return;
+      }
+
+      if (data.type === "call:ice" && data.targetUserId && data.callId && data.candidate) {
+        sendToUser(String(data.targetUserId), {
+          type: "call:ice",
+          callId: data.callId,
+          fromUserId: client.userId ?? data.fromUserId,
+          candidate: data.candidate,
+        });
         return;
       }
     });
@@ -220,7 +226,6 @@ server.on("upgrade", (req, socket, head) => {
 
       if (client.userId) {
         const sockets = userSockets.get(client.userId);
-
         sockets?.delete(client);
 
         if (sockets && sockets.size === 0) {
@@ -230,22 +235,16 @@ server.on("upgrade", (req, socket, head) => {
 
       if (userId) {
         const count = onlineUsers.get(userId) ?? 0;
-
         if (count <= 1) {
           onlineUsers.delete(userId);
         } else {
           onlineUsers.set(userId, count - 1);
         }
-
         broadcastPresence();
       }
     });
   });
 });
-
-/* ---------------------------------------------
- * LISTEN
- * ------------------------------------------- */
 
 const PORT = Number(process.env.WS_PORT || 3535);
 
