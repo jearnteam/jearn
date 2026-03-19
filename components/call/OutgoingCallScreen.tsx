@@ -1,12 +1,12 @@
 "use client";
 
-import { Phone, PhoneOff, Minus } from "lucide-react";
+import { PhoneOff, Minus } from "lucide-react";
 import { useCall } from "@/features/call/CallProvider";
 import { useEffect, useRef, useState } from "react";
 import { avatarUrl } from "@/lib/avatarUrl";
 
-export default function IncomingCallModal() {
-  const { incomingCall, acceptIncomingCall, rejectIncomingCall } = useCall();
+export default function OutgoingCallScreen() {
+  const { activeCall, callStatus, endCall } = useCall();
   const [minimized, setMinimized] = useState(false);
 
   const PREVIEW_W = 128;
@@ -91,7 +91,7 @@ export default function IncomingCallModal() {
     };
   }, []);
 
-  if (!incomingCall) return null;
+  if (callStatus !== "calling" || !activeCall) return null;
 
   if (minimized) {
     return (
@@ -111,10 +111,10 @@ export default function IncomingCallModal() {
         `}
       >
         <div className="flex h-full flex-col items-center justify-center gap-2">
-          <div className="animate-[pulse_1.8s_ease-in-out_infinite]">
+          <div className="animate-[pulse_1.5s_ease-in-out_infinite]">
             <div className="w-14 h-14 rounded-full overflow-hidden">
               <img
-                src={avatarUrl(incomingCall.fromUserId)}
+                src={avatarUrl(activeCall.peerUserId)}
                 alt="avatar"
                 className="w-full h-full object-cover"
               />
@@ -122,7 +122,7 @@ export default function IncomingCallModal() {
           </div>
 
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Incoming
+            Calling...
           </span>
         </div>
       </div>
@@ -145,42 +145,27 @@ export default function IncomingCallModal() {
           <div className="absolute inset-0 rounded-full bg-green-400/20 animate-ping" />
           <div className="relative z-10 w-28 h-28 rounded-full overflow-hidden bg-zinc-200 dark:bg-zinc-700">
             <img
-              src={avatarUrl(incomingCall.fromUserId)}
+              src={avatarUrl(activeCall.peerUserId)}
               alt="avatar"
               className="w-full h-full object-cover"
             />
           </div>
         </div>
 
-        <h2 className="text-2xl font-semibold">{incomingCall.fromUserName}</h2>
+        <h2 className="text-2xl font-semibold">{activeCall.peerUserName}</h2>
 
-        <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm">
-          Incoming {incomingCall.mode} call...
+        <p className="text-zinc-500 dark:text-zinc-400 mt-2 text-sm animate-pulse">
+          Calling...
         </p>
       </div>
 
-      <div className="pb-12 flex justify-center items-center gap-16">
-        <button
-          onClick={rejectIncomingCall}
-          className="flex flex-col items-center gap-2"
-        >
+      <div className="pb-12 flex justify-center">
+        <button onClick={endCall} className="flex flex-col items-center gap-2">
           <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-xl active:scale-95 transition">
             <PhoneOff size={28} />
           </div>
           <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Decline
-          </span>
-        </button>
-
-        <button
-          onClick={acceptIncomingCall}
-          className="flex flex-col items-center gap-2"
-        >
-          <div className="w-16 h-16 rounded-full bg-green-500 flex items-center justify-center shadow-xl active:scale-95 transition">
-            <Phone size={28} />
-          </div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Accept
+            Cancel
           </span>
         </button>
       </div>

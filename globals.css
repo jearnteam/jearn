@@ -4,6 +4,9 @@
 @tailwind utilities;
 
 /* ✅ Global Reset & Font Settings */
+html, body {
+  touch-action: manipulation;
+}
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;

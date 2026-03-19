@@ -18,37 +18,73 @@ export default function AppLayout({
   children: React.ReactNode;
   overlay: React.ReactNode;
 }) {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [me, setMe] = useState<{
+    uid: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/me")
       .then((r) => r.json())
       .then((data) => {
         if (data?.uid) {
-          setCurrentUserId(data.uid);
+          setMe({
+            uid: data.uid,
+            name: data.name ?? "User",
+          });
         }
       })
-      .catch(() => setCurrentUserId(null));
+      .catch(() => setMe(null));
+  }, []);
+
+  useEffect(() => {
+    const resetZoom = () => {
+      // force layout recalculation
+      document.body.style.transform = "scale(1)";
+      document.body.style.width = "100%";
+    };
+
+    window.addEventListener("orientationchange", resetZoom);
+    window.addEventListener("resize", resetZoom);
+
+    return () => {
+      window.removeEventListener("orientationchange", resetZoom);
+      window.removeEventListener("resize", resetZoom);
+    };
+  }, []);
+
+  useEffect(() => {
+    const preventDoubleTapZoom = (e: TouchEvent) => {
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener("touchstart", preventDoubleTapZoom, {
+      passive: false,
+    });
+
+    return () => {
+      document.removeEventListener("touchstart", preventDoubleTapZoom);
+    };
   }, []);
 
   // Prevent rendering until we know user
-  if (!currentUserId) {
-    return null; // or loading spinner
-  }
+  if (!me) return null;
 
   return (
     <SSEProvider>
-      <ChatSocketProvider currentUserId={currentUserId}>
+      <ChatSocketProvider currentUserId={me.uid} currentUserName={me.name}>
         <CallProvider>
-        <NotificationProvider>
-          <Navbar />
-          <AppNavigationBridge />
-          <UploadProvider>
-            {children}
-            {overlay}
-            <CallRoot />
-          </UploadProvider>
-        </NotificationProvider>
+          <NotificationProvider>
+            <Navbar />
+            <AppNavigationBridge />
+            <UploadProvider>
+              {children}
+              {overlay}
+              <CallRoot />
+            </UploadProvider>
+          </NotificationProvider>
         </CallProvider>
       </ChatSocketProvider>
     </SSEProvider>

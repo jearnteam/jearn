@@ -12,13 +12,17 @@ type WSMessage = {
   roomName?: string;
   targetUserId?: string;
   fromUserId?: string;
+  fromUserName?: string;
   mode?: "audio" | "video";
   roomId?: string;
   payload?: any;
   userId?: string;
-  offer?: RTCSessionDescriptionInit;
-  answer?: RTCSessionDescriptionInit;
-  candidate?: RTCIceCandidateInit;
+  sessionId?: string;
+  tracks?: {
+    trackName: string;
+    kind?: "audio" | "video";
+    userId?: string;
+  }[];
 };
 
 const server = http.createServer((req, res) => {
@@ -140,83 +144,55 @@ server.on("upgrade", (req, socket, head) => {
         const fromUserId = client.userId ?? data.fromUserId ?? "unknown";
 
         sendToUser(String(data.targetUserId), {
-          type: "call:incoming",
+          type: "call:start",
           callId: data.callId,
           fromUserId,
+          fromUserName: data.fromUserName,
           roomName: data.roomName,
           mode: data.mode || "audio",
         });
         return;
       }
 
-      if (
-        data.type === "call:accept" &&
-        data.callId &&
-        data.fromUserId &&
-        data.roomName &&
-        client.userId
-      ) {
-        sendToUser(data.fromUserId, {
-          type: "call:accepted",
+      if (data.type === "call:accept" && data.callId && data.targetUserId && client.userId) {
+        sendToUser(String(data.targetUserId), {
+          type: "call:accept",
           callId: data.callId,
-          roomName: data.roomName,
-          by: client.userId,
+          fromUserId: client.userId,
         });
-
-        sendToUser(client.userId, {
-          type: "call:accepted",
-          callId: data.callId,
-          roomName: data.roomName,
-          by: client.userId,
-        });
-
         return;
       }
-
-      if (data.type === "call:reject" && data.callId && data.fromUserId) {
-        sendToUser(data.fromUserId, {
-          type: "call:rejected",
+      
+      if (data.type === "call:reject" && data.callId && data.targetUserId && client.userId) {
+        sendToUser(String(data.targetUserId), {
+          type: "call:reject",
           callId: data.callId,
+          fromUserId: client.userId,
         });
         return;
       }
 
       if (data.type === "call:end" && data.callId && data.targetUserId) {
         sendToUser(String(data.targetUserId), {
-          type: "call:ended",
+          type: "call:end",
           callId: data.callId,
         });
         return;
       }
 
-      // NEW: WebRTC forwarding
-      if (data.type === "call:offer" && data.targetUserId && data.callId && data.offer) {
+      if (
+        data.type === "call:sfu-ready" &&
+        data.targetUserId &&
+        data.sessionId &&
+        data.tracks
+      ) {
         sendToUser(String(data.targetUserId), {
-          type: "call:offer",
-          callId: data.callId,
-          fromUserId: client.userId ?? data.fromUserId,
-          offer: data.offer,
+          type: "call:sfu-ready",
+          fromUserId: client.userId,
+          sessionId: data.sessionId,
+          tracks: data.tracks,
         });
-        return;
-      }
-
-      if (data.type === "call:answer" && data.targetUserId && data.callId && data.answer) {
-        sendToUser(String(data.targetUserId), {
-          type: "call:answer",
-          callId: data.callId,
-          fromUserId: client.userId ?? data.fromUserId,
-          answer: data.answer,
-        });
-        return;
-      }
-
-      if (data.type === "call:ice" && data.targetUserId && data.callId && data.candidate) {
-        sendToUser(String(data.targetUserId), {
-          type: "call:ice",
-          callId: data.callId,
-          fromUserId: client.userId ?? data.fromUserId,
-          candidate: data.candidate,
-        });
+      
         return;
       }
     });

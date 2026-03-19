@@ -35,31 +35,79 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Room not found" }, { status: 404 });
   }
 
+  /* ================= SAFE MEMBER EXTRACTION ================= */
+
   const callerId = new ObjectId(session.user.uid);
 
-  const callee = room.members.find(
-    (m: ObjectId) => !m.equals(callerId)
+  // normalize members → string[]
+  const members: string[] = (room.members || []).map((m: any) =>
+    typeof m === "string" ? m : m.toString()
   );
 
-  if (!callee) {
-    return NextResponse.json({ error: "Invalid room" }, { status: 400 });
+  const callerIdStr = callerId.toString();
+
+  /* 🔥 CRITICAL CHECK */
+  if (!members.includes(callerIdStr)) {
+    return NextResponse.json(
+      { error: "User not in this room" },
+      { status: 403 }
+    );
   }
 
-  const livekitRoom = `call_${new ObjectId().toString()}`;
+  /* ================= FIND CALLEE ================= */
+
+  const otherMembers = members.filter((id) => id !== callerIdStr);
+
+  if (otherMembers.length === 0) {
+    return NextResponse.json(
+      { error: "No callee found (self room?)" },
+      { status: 400 }
+    );
+  }
+
+  if (otherMembers.length > 1) {
+    console.warn("⚠️ Group room call detected. Using first member as callee.");
+  }
+
+  const calleeIdStr = otherMembers[0];
+  const calleeId = new ObjectId(calleeIdStr);
+
+  /* 🔥 FINAL SAFETY (prevents your exact bug) */
+  if (calleeIdStr === callerIdStr) {
+    return NextResponse.json(
+      { error: "Callee equals caller (BUG PREVENTED)" },
+      { status: 500 }
+    );
+  }
+
+  /* ================= CREATE CALL ================= */
+
+  const roomName = `call_${new ObjectId().toString()}`;
 
   const insert = await callsCol.insertOne({
     roomId: room._id,
     callerId,
-    calleeId: callee,
+    calleeId,
     mode,
     status: "ringing",
-    livekitRoom,
+    roomName, // renamed from livekitRoom (more generic)
     createdAt: new Date(),
   });
 
+  /* ================= DEBUG LOG ================= */
+
+  console.log("📞 CALL CREATED:", {
+    callId: insert.insertedId.toString(),
+    callerId: callerIdStr,
+    calleeId: calleeIdStr,
+    members,
+  });
+
+  /* ================= RESPONSE ================= */
+
   return NextResponse.json({
     callId: insert.insertedId.toString(),
-    calleeId: callee.toString(),
-    roomName: livekitRoom,
+    calleeId: calleeIdStr,
+    roomName,
   });
 }

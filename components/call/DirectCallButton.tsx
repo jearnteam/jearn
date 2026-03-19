@@ -2,24 +2,25 @@
 
 import { Phone, Video } from "lucide-react";
 import { useState } from "react";
-import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 import { useCall } from "@/features/call/CallProvider";
+import type { Partner } from "@/components/chat/ChatRoomClient";
 
 interface Props {
   roomId: string;
+  partner: Partner;
 }
 
-export default function DirectCallButton({ roomId }: Props) {
+export default function DirectCallButton({ roomId, partner }: Props) {
   const [loading, setLoading] = useState<"audio" | "video" | null>(null);
-  const { send, currentUserId } = useChatSocket();
-  const { startOutgoingCall } = useCall();
+  const { startCall } = useCall();
 
-  async function startCall(mode: "audio" | "video") {
+  async function start(mode: "audio" | "video") {
     if (loading) return;
 
     try {
       setLoading(mode);
 
+      // ✅ Create call record (backend)
       const res = await fetch("/api/calls/start", {
         method: "POST",
         headers: {
@@ -35,23 +36,15 @@ export default function DirectCallButton({ roomId }: Props) {
 
       const data = await res.json();
 
-      console.log("Call started:", data);
-
-      startOutgoingCall({
+      // 🔥 IMPORTANT: use NEW SFU flow
+      startCall({
         callId: data.callId,
         peerUserId: data.calleeId,
-        roomName: data.roomName,
+        peerUserName: partner.name,
         mode,
       });
-      
-      send({
-        type: "call:start",
-        targetUserId: data.calleeId,
-        callId: data.callId,
-        roomName: data.roomName,
-        mode,
-        fromUserId: currentUserId,
-      });
+    } catch (err) {
+      console.error("Start call error:", err);
     } finally {
       setLoading(null);
     }
@@ -61,7 +54,7 @@ export default function DirectCallButton({ roomId }: Props) {
     <div className="flex items-center gap-2">
       <button
         disabled={loading !== null}
-        onClick={() => startCall("audio")}
+        onClick={() => start("audio")}
         className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <Phone size={18} />
@@ -69,7 +62,7 @@ export default function DirectCallButton({ roomId }: Props) {
 
       <button
         disabled={loading !== null}
-        onClick={() => startCall("video")}
+        onClick={() => start("video")}
         className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
       >
         <Video size={18} />

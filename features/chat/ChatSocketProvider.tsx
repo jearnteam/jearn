@@ -18,6 +18,7 @@ type ChatSocketContextValue = {
   status: WSStatus;
   onlineUserIds: Set<string>;
   currentUserId: string;
+  currentUserName: string;
 
   totalUnread: number;
   clearRoomUnread: (roomId: string) => void;
@@ -48,9 +49,11 @@ function getWsUrl() {
 
 export function ChatSocketProvider({
   currentUserId,
+  currentUserName,
   children,
 }: {
   currentUserId: string;
+  currentUserName: string;
   children: React.ReactNode;
 }) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -355,6 +358,7 @@ export function ChatSocketProvider({
       status,
       onlineUserIds: onlineUserIdsState,
       currentUserId,
+      currentUserName,
       totalUnread,
       clearRoomUnread,
       getRoomUnread,

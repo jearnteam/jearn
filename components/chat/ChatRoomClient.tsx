@@ -19,7 +19,7 @@ interface MeResponse {
   name: string;
 }
 
-interface Partner {
+export interface Partner {
   uid: string;
   name: string;
   bio?: string;
@@ -416,7 +416,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
         </div>
 
         {/* RIGHT SIDE */}
-        <DirectCallButton roomId={roomId} />
+        <DirectCallButton roomId={roomId} partner={partner} />
       </div>
 
       {/* LOADING OLDER */}
