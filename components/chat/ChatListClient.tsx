@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { avatarUrl } from "@/lib/avatarUrl";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
+import Avatar from "../Avatar";
 
 interface Partner {
   uid: string;
@@ -185,13 +186,9 @@ export default function ChatListClient({
       {items.map((item) => {
         const partner = item.partner;
 
-        const avatarSrc = avatarUrl(partner.uid ?? "", partner.avatarUpdatedAt);
-
         const unread = item.type === "room" ? getRoomUnread(item.roomId) : 0;
 
         const hasUnread = unread > 0;
-
-        const isOnline = onlineUserIds.has(partner.uid);
 
         return (
           <div className="relative mx-2">
@@ -236,14 +233,12 @@ export default function ChatListClient({
               `}
             >
               <div className="relative shrink-0">
-                <img
-                  src={avatarSrc}
-                  className="w-11 h-11 rounded-full object-cover"
-                  alt={partner.name}
+                <Avatar
+                  id={partner.uid}
+                  url={partner.avatar ?? undefined}
+                  updatedAt={partner.avatarUpdatedAt ?? undefined}
+                  size={44}
                 />
-                {isOnline && (
-                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-black" />
-                )}
               </div>
 
               <div className="flex-1 min-w-0 flex">

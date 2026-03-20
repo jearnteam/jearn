@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useChatSocket } from "@/features/chat/ChatSocketProvider";
+import { avatarUrl } from "@/lib/avatarUrl";
+import { useState } from "react";
 
 interface AvatarProps {
-  id: string;
-  url?: string;
-  updatedAt?: string | Date;
+  id?: string | null;
+  url?: string; // optional override
+  updatedAt?: string | Date | null;
   size?: number;
   className?: string;
 }
@@ -17,29 +19,37 @@ export default function Avatar({
   size = 40,
   className = "",
 }: AvatarProps) {
-  const [src, setSrc] = useState("/default-avatar.png");
+  const { onlineUserIds } = useChatSocket();
 
-  useEffect(() => {
-    if (!id && !url) return;
+  const isOnline = id ? onlineUserIds.has(id) : false;
+  const dotSize = Math.max(8, size * 0.25);
 
-    const ts = updatedAt ? `?t=${new Date(updatedAt).getTime()}` : "";
+  // ✅ Single source of truth for avatar URL
+  const initialSrc = url ?? avatarUrl(id, updatedAt);
 
-    if (url) {
-      setSrc(`${url}${ts}`);
-    } else {
-      setSrc(`https://cdn.jearn.site/avatars/${id}.webp${ts}`);
-    }
-  }, [id, url, updatedAt]);
+  const [src, setSrc] = useState(initialSrc);
 
   return (
-    <img
-      src={src}
-      onError={() => setSrc("/default-avatar.png")}
-      width={size}
-      height={size}
-      alt="avatar"
-      className={`rounded-full object-cover ${className}`}
+    <div
+      className={`relative inline-block ${className}`}
       style={{ width: size, height: size }}
-    />
+    >
+      <img
+        src={src}
+        onError={() =>
+          setSrc("https://cdn.jearn.site/avatars/default.webp")
+        }
+        alt="avatar"
+        className="rounded-full object-cover w-full h-full"
+      />
+
+      {/* ONLINE DOT */}
+      {isOnline && (
+        <span
+          style={{ width: dotSize, height: dotSize }}
+          className="absolute bottom-0 right-0 bg-green-500 rounded-full ring-2 ring-white dark:ring-black"
+        />
+      )}
+    </div>
   );
 }

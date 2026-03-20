@@ -6,6 +6,7 @@ import { ArrowLeft, Send } from "lucide-react";
 import { avatarUrl } from "@/lib/avatarUrl";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
 import DirectCallButton from "@/components/call/DirectCallButton";
+import Avatar from "../Avatar";
 
 /* ───────────────── TYPES ───────────────── */
 
@@ -77,11 +78,8 @@ function ChatInfoBlock({ partner }: { partner: Partner }) {
 
   return (
     <div className="flex flex-col items-center py-8 text-center text-gray-500">
-      <img
-        src={avatarSrc}
-        className="w-16 h-16 rounded-full mb-3"
-        alt={partner.name}
-      />
+      <Avatar id={partner.uid} size={36} url={avatarSrc} />
+
       <div className="font-medium text-gray-800 dark:text-gray-200">
         {partner.name}
       </div>
@@ -406,11 +404,7 @@ export default function ChatRoomClient({ roomId, onClose }: Props) {
             <ArrowLeft size={18} />
           </button>
 
-          <img
-            src={avatarSrc}
-            className="w-9 h-9 rounded-full"
-            alt={partner.name}
-          />
+          <Avatar id={partner.uid} size={36} url={avatarSrc} />
 
           <div className="truncate">{partner.name}</div>
         </div>

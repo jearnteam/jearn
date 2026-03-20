@@ -8,22 +8,9 @@ import PostMenu from "./PostMenu";
 import { Network } from "lucide-react";
 import type { Post } from "@/types/post";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import Avatar from "@/components/Avatar";
 
 dayjs.extend(relativeTime);
-
-const CDN = process.env.NEXT_PUBLIC_R2_PUBLIC_URL || "";
-
-function resolveAvatar(post: Post) {
-  if (post.authorAvatar) return post.authorAvatar;
-
-  if (post.authorId && post.authorAvatarUpdatedAt && CDN) {
-    return `${CDN}/avatars/${post.authorId}.webp?t=${new Date(
-      post.authorAvatarUpdatedAt
-    ).getTime()}`;
-  }
-
-  return "/default-avatar.png";
-}
 
 export default function PostHeader({
   post,
@@ -42,11 +29,8 @@ export default function PostHeader({
     user?._id && post.authorId && user._id === post.authorId
   );
 
-  // ✅ NEVER force logout
+  // NEVER force logout
   const profileHref = isSelf ? "/profile" : `/profile/${post.authorId}`;
-
-  // ✅ Always safe avatar
-  const avatar = resolveAvatar(post);
 
   const authorName = post.authorName || "Unknown";
 
@@ -54,16 +38,7 @@ export default function PostHeader({
     <div className="flex justify-between mb-3">
       <Link href={profileHref} scroll={false}>
         <div className="flex items-center gap-3">
-          <img
-            src={avatar}
-            onError={(e) => {
-              e.currentTarget.src = "/default-avatar.png";
-            }}
-            className="w-8 h-8 rounded-full object-cover"
-            loading="lazy"
-            decoding="async"
-            alt={`${authorName} avatar`}
-          />
+          <Avatar id={post.authorId} size={36} />
           <div>
             <div className="flex gap-1.5">
               <p className="font-semibold">{authorName}</p>
