@@ -38,22 +38,6 @@ export default function AppLayout({
   }, []);
 
   useEffect(() => {
-    const resetZoom = () => {
-      // force layout recalculation
-      document.body.style.transform = "scale(1)";
-      document.body.style.width = "100%";
-    };
-
-    window.addEventListener("orientationchange", resetZoom);
-    window.addEventListener("resize", resetZoom);
-
-    return () => {
-      window.removeEventListener("orientationchange", resetZoom);
-      window.removeEventListener("resize", resetZoom);
-    };
-  }, []);
-
-  useEffect(() => {
     const preventDoubleTapZoom = (e: TouchEvent) => {
       if (e.touches.length > 1) {
         e.preventDefault();

@@ -31,6 +31,13 @@ const shadowsIntoLight = Shadows_Into_Light({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://jearn.site"),
+  
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+  },
 
   title: {
     default: "JEARN",

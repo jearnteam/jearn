@@ -36,6 +36,8 @@ const clients = new Set<WSClient>();
 const onlineUsers = new Map<string, number>();
 const userSockets = new Map<string, Set<WSClient>>();
 
+const activeCalls = new Map<string, { participants: Set<string> }>();
+
 function sendToUser(userId: string, payload: any) {
   const sockets = userSockets.get(userId);
 
@@ -143,6 +145,10 @@ server.on("upgrade", (req, socket, head) => {
 
         const fromUserId = client.userId ?? data.fromUserId ?? "unknown";
 
+        activeCalls.set(data.callId, {
+          participants: new Set([fromUserId, String(data.targetUserId)]),
+        });
+
         sendToUser(String(data.targetUserId), {
           type: "call:start",
           callId: data.callId,
@@ -151,10 +157,16 @@ server.on("upgrade", (req, socket, head) => {
           roomName: data.roomName,
           mode: data.mode || "audio",
         });
+
         return;
       }
 
-      if (data.type === "call:accept" && data.callId && data.targetUserId && client.userId) {
+      if (
+        data.type === "call:accept" &&
+        data.callId &&
+        data.targetUserId &&
+        client.userId
+      ) {
         sendToUser(String(data.targetUserId), {
           type: "call:accept",
           callId: data.callId,
@@ -162,8 +174,13 @@ server.on("upgrade", (req, socket, head) => {
         });
         return;
       }
-      
-      if (data.type === "call:reject" && data.callId && data.targetUserId && client.userId) {
+
+      if (
+        data.type === "call:reject" &&
+        data.callId &&
+        data.targetUserId &&
+        client.userId
+      ) {
         sendToUser(String(data.targetUserId), {
           type: "call:reject",
           callId: data.callId,
@@ -177,6 +194,9 @@ server.on("upgrade", (req, socket, head) => {
           type: "call:end",
           callId: data.callId,
         });
+
+        activeCalls.delete(data.callId);
+
         return;
       }
 
@@ -192,7 +212,7 @@ server.on("upgrade", (req, socket, head) => {
           sessionId: data.sessionId,
           tracks: data.tracks,
         });
-      
+
         return;
       }
     });
@@ -200,6 +220,32 @@ server.on("upgrade", (req, socket, head) => {
     ws.on("close", () => {
       clients.delete(client);
 
+      // ================= CALL CLEANUP =================
+      if (client.userId) {
+        for (const [callId, call] of activeCalls.entries()) {
+          if (call.participants.has(client.userId)) {
+            console.log(
+              "USER DISCONNECTED DURING CALL:",
+              client.userId,
+              callId
+            );
+
+            // notify other participants
+            for (const userId of call.participants) {
+              if (userId !== client.userId) {
+                sendToUser(userId, {
+                  type: "call:end",
+                  callId,
+                });
+              }
+            }
+
+            activeCalls.delete(callId);
+          }
+        }
+      }
+
+      // ================= EXISTING CLEANUP =================
       if (client.userId) {
         const sockets = userSockets.get(client.userId);
         sockets?.delete(client);

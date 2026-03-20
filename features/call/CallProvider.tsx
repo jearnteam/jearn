@@ -44,6 +44,9 @@ type CallContextValue = {
     mode: CallMode;
   }) => void;
 
+  minimized,
+  setMinimized,
+
   acceptIncomingCall: () => Promise<void>;
   rejectIncomingCall: () => void;
   endCall: () => void;
@@ -95,6 +98,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [callStatus, setCallStatus] = useState<
     "idle" | "calling" | "incoming" | "connecting" | "in-call"
   >("idle");
+  const [minimized, setMinimized] = useState(false);
 
   const syncLocalStream = (stream: MediaStream | null) => {
     localStreamRef.current = stream;
@@ -635,6 +639,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       localStream,
       remoteStreams,
       callStatus,
+      minimized,
+      setMinimized,
       startCall,
       acceptIncomingCall,
       rejectIncomingCall,
@@ -643,7 +649,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       toggleMute,
       switchCamera,
     }),
-    [incomingCall, activeCall, localStream, remoteStreams, callStatus]
+    [incomingCall, activeCall, localStream, remoteStreams, callStatus, minimized]
   );
 
   return <CallContext.Provider value={value}>{children}</CallContext.Provider>;

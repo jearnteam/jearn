@@ -122,7 +122,13 @@ export default function HomePage() {
     emitScroll(delta);
 
     if (activeView === "chat") {
-      setNavbarVisible(true);
+      // 🔥 Hide navbar ONLY when inside chat room
+      if (activeRoomId) {
+        setNavbarVisible(false);
+      } else {
+        setNavbarVisible(true);
+      }
+
       lastScrollTop.current = cur;
       return;
     }
@@ -294,6 +300,12 @@ export default function HomePage() {
     return () => window.removeEventListener("chat:open", handleChatOpen);
   }, []);
 
+  useEffect(() => {
+    if (activeView === "chat") {
+      setNavbarVisible(!activeRoomId);
+    }
+  }, [activeView, activeRoomId]);
+
   /* ---------------------------------------------
    * SCROLL RESTORATION
    * ------------------------------------------- */
@@ -329,9 +341,9 @@ export default function HomePage() {
     function handleIncomingCall(e: any) {
       setIncomingCall(e.detail);
     }
-  
+
     window.addEventListener("call:incoming", handleIncomingCall);
-  
+
     return () => {
       window.removeEventListener("call:incoming", handleIncomingCall);
     };
@@ -506,6 +518,8 @@ export default function HomePage() {
               ${
                 activeView === "videos"
                   ? "snap-y snap-mandatory"
+                  : activeView === "chat" && activeRoomId
+                  ? ""
                   : "pb-[72px] lg:pb-0"
               }
             `}

@@ -18,6 +18,8 @@ export default function CallScreen() {
     remoteStreams,
     callStatus,
     activeCall,
+    minimized,
+    setMinimized,
     endCall,
     toggleMute,
     toggleCamera,
@@ -31,7 +33,8 @@ export default function CallScreen() {
   const remotePipRef = useRef<HTMLVideoElement | null>(null);
 
   const [mainView, setMainView] = useState<"local" | "remote">("remote");
-  const [snapping, setSnapping] = useState(false);
+
+  const isActiveCall = callStatus === "connecting" || callStatus === "in-call";
 
   /* ===== Streams ===== */
   const participant = useMemo(() => {
@@ -43,16 +46,13 @@ export default function CallScreen() {
   const remoteUserId = participant?.[0] ?? "";
 
   /* ===== Track state ===== */
-  const videoTrack = localStream?.getVideoTracks()[0];
-
-  const hasLocalVideo =
-    !!videoTrack &&
-    videoTrack.readyState === "live" &&
-    videoTrack.enabled !== false;
+  const hasLocalVideo = !!localStream
+    ?.getVideoTracks()
+    .some((t) => t.readyState === "live");
 
   const hasRemoteVideo = !!remoteStream
     ?.getVideoTracks()
-    .some((t) => t.readyState === "live" && t.enabled !== false);
+    .some((t) => t.readyState === "live");
 
   const isMuted =
     !localStream?.getAudioTracks()[0] ||
@@ -60,8 +60,6 @@ export default function CallScreen() {
 
   const canShowLocal = !!localStream;
   const canShowRemote = !!remoteStream;
-
-  const isAudioOnly = !hasLocalVideo && !hasRemoteVideo;
 
   /* ===== Views ===== */
   const effectiveMain = useMemo(() => {
@@ -75,36 +73,25 @@ export default function CallScreen() {
     return null;
   }, [mainView, canShowLocal, canShowRemote]);
 
+  const isMainVideoAvailable =
+    effectiveMain === "local" ? hasLocalVideo : hasRemoteVideo;
+
+  const isAudioOnly = !isMainVideoAvailable;
+
   const pipView = useMemo(() => {
     if (effectiveMain === "local" && hasRemoteVideo) return "remote";
     if (effectiveMain === "remote" && hasLocalVideo) return "local";
     return null;
   }, [effectiveMain, hasLocalVideo, hasRemoteVideo]);
 
-  const canSwitch =
-    hasLocalVideo &&
-    hasRemoteVideo &&
-    localMainRef.current &&
-    remoteMainRef.current;
+  const canSwitch = hasLocalVideo && hasRemoteVideo;
 
   const swapMain = () => {
     if (!canSwitch) return;
     setMainView((p) => (p === "local" ? "remote" : "local"));
   };
 
-  /* ===== Tap ===== */
-  const lastTapRef = useRef(0);
-  const movedRef = useRef(false);
-
-  const handleTap = (cb: () => void) => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300 && !movedRef.current) {
-      cb();
-    }
-    lastTapRef.current = now;
-  };
-
-  /* ===== STREAM ATTACH (CRITICAL FIX) ===== */
+  /* ===== STREAM ATTACH ===== */
   useEffect(() => {
     const attach = (
       el: HTMLMediaElement | null,
@@ -123,7 +110,6 @@ export default function CallScreen() {
       if (el.srcObject) el.srcObject = null;
     };
 
-    /* LOCAL */
     if (effectiveMain === "local") {
       attach(localMainRef.current, localStream, true);
       detach(localPipRef.current);
@@ -132,7 +118,6 @@ export default function CallScreen() {
       detach(localMainRef.current);
     }
 
-    /* REMOTE VIDEO */
     if (effectiveMain === "remote") {
       attach(remoteMainRef.current, remoteStream, false);
       detach(remotePipRef.current);
@@ -141,90 +126,57 @@ export default function CallScreen() {
       detach(remoteMainRef.current);
     }
 
-    /* 🔥 ALWAYS ATTACH AUDIO */
     attach(remoteAudioRef.current, remoteStream, false);
   }, [localStream, remoteStream, effectiveMain]);
 
-  /* ===== PiP DRAG ===== */
-  const PREVIEW_W = 128;
-  const PREVIEW_H = 176;
-  const SAFE = 16;
-  const BOTTOM_UI = 80;
+  useEffect(() => {
+    if (minimized) {
+      localMainRef.current?.pause?.();
+      remoteMainRef.current?.pause?.();
+    }
+  }, [minimized]);
 
-  const [pos, setPos] = useState({ x: SAFE, y: SAFE });
-  const draggingRef = useRef(false);
-  const offsetRef = useRef({ x: 0, y: 0 });
-  const pointerStartRef = useRef({ x: 0, y: 0 });
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    draggingRef.current = true;
-    movedRef.current = false;
-    pointerStartRef.current = { x: e.clientX, y: e.clientY };
-    offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!draggingRef.current) return;
-
-    const dx = Math.abs(e.clientX - pointerStartRef.current.x);
-    const dy = Math.abs(e.clientY - pointerStartRef.current.y);
-    if (dx > 6 || dy > 6) movedRef.current = true;
-
-    setPos({
-      x: Math.max(
-        SAFE,
-        Math.min(
-          window.innerWidth - PREVIEW_W - SAFE,
-          e.clientX - offsetRef.current.x
-        )
-      ),
-      y: Math.max(
-        SAFE,
-        Math.min(
-          window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI,
-          e.clientY - offsetRef.current.y
-        )
-      ),
-    });
-  };
-
-  const onPointerUp = () => {
-    if (!draggingRef.current) return;
-
-    draggingRef.current = false;
-
-    const centerX = pos.x + PREVIEW_W / 2;
-    const snapLeft = centerX < window.innerWidth / 2;
-
-    const newX = snapLeft ? SAFE : window.innerWidth - PREVIEW_W - SAFE;
-    const newY = Math.max(
-      SAFE,
-      Math.min(window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI, pos.y)
-    );
-
-    setSnapping(true);
-    setPos({ x: newX, y: newY });
-
-    setTimeout(() => setSnapping(false), 200);
-  };
+  useEffect(() => {
+    if (callStatus === "connecting" || callStatus === "in-call") {
+      setMinimized(false);
+    }
+  }, [callStatus]);
 
   if (!(callStatus === "connecting" || callStatus === "in-call")) return null;
+  if (!isActiveCall || minimized) return null;
 
   return (
     <div className="fixed inset-0 z-[200] bg-black text-white">
       {/* CLICK LAYER */}
       <div
-        className="absolute inset-0 z-20"
+        className="absolute inset-0 z-20 pointer-events-none"
         onClick={() => {
           if (!canSwitch) return;
-          handleTap(swapMain);
+          swapMain();
         }}
       />
+
+      {/* MINIMIZE BUTTON */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setMinimized(true);
+        }}
+        className="
+          absolute top-4 right-4 z-50
+          h-10 w-10
+          rounded-full
+          bg-black/40 backdrop-blur
+          flex items-center justify-center
+        "
+      >
+        —
+      </button>
 
       {/* MAIN */}
       <div className="absolute inset-0">
         <audio ref={remoteAudioRef} />
-        {/* ===== AUDIO ONLY ===== */}
+
         {isAudioOnly ? (
           <VoiceCallUI
             name={activeCall?.peerUserName}
@@ -233,27 +185,39 @@ export default function CallScreen() {
           />
         ) : (
           <>
-            {/* ===== VIDEO ===== */}
+            {/* LOCAL */}
             <video
               ref={localMainRef}
               className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] pointer-events-none ${
-                effectiveMain === "local" ? "z-10" : "opacity-0"
+                effectiveMain === "local" && hasLocalVideo
+                  ? "z-10 opacity-100"
+                  : "opacity-0"
               }`}
             />
 
+            {/* REMOTE */}
             <video
               ref={remoteMainRef}
+              muted
               className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
-                effectiveMain === "remote" ? "z-10" : "opacity-0"
+                effectiveMain === "remote" && hasRemoteVideo
+                  ? "z-10 opacity-100"
+                  : "opacity-0"
               }`}
             />
 
+            {/* LOCAL AVATAR */}
             {!hasLocalVideo && effectiveMain === "local" && (
-              <Avatar userId={activeCall?.peerUserId} />
+              <div className="absolute inset-0 z-20">
+                <Avatar userId={currentUserFallback()} />
+              </div>
             )}
 
+            {/* REMOTE AVATAR */}
             {!hasRemoteVideo && effectiveMain === "remote" && (
-              <Avatar userId={remoteUserId} />
+              <div className="absolute inset-0 z-20">
+                <Avatar userId={remoteUserId} />
+              </div>
             )}
           </>
         )}
@@ -261,27 +225,19 @@ export default function CallScreen() {
 
       {/* PiP */}
       {pipView && !isAudioOnly && (
-        <div
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onClick={() =>
-            handleTap(() => {
-              if (!movedRef.current) setMainView(pipView);
-            })
-          }
-          style={{ left: pos.x, top: pos.y }}
-          className={`absolute z-30 h-44 w-32 overflow-hidden rounded-xl border border-white/10 touch-none ${
-            snapping ? "transition-all duration-200 ease-out" : ""
-          }`}
-        >
+        <div className="absolute z-30 h-44 w-32 rounded-xl overflow-hidden border border-white/10">
           {pipView === "local" ? (
             <video
               ref={localPipRef}
+              muted
               className="w-full h-full object-cover scale-x-[-1]"
             />
           ) : (
-            <video ref={remotePipRef} className="w-full h-full object-cover" />
+            <video
+              ref={remotePipRef}
+              muted
+              className="w-full h-full object-cover"
+            />
           )}
         </div>
       )}
@@ -311,6 +267,8 @@ export default function CallScreen() {
   );
 }
 
+/* ===== UI ===== */
+
 function VoiceCallUI({
   name,
   status,
@@ -333,7 +291,6 @@ function VoiceCallUI({
       </div>
 
       <h2 className="text-xl font-semibold">{name || "User"}</h2>
-
       <p className="text-zinc-400 mt-2 text-sm">{status}</p>
     </div>
   );
@@ -361,4 +318,9 @@ function ControlButton({ children, onClick }: any) {
       {children}
     </button>
   );
+}
+
+/* ===== helper ===== */
+function currentUserFallback() {
+  return ""; // replace if you want your own avatar id
 }
