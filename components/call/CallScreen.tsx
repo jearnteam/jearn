@@ -26,6 +26,7 @@ export default function CallScreen() {
 
   const localMainRef = useRef<HTMLVideoElement | null>(null);
   const remoteMainRef = useRef<HTMLVideoElement | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const localPipRef = useRef<HTMLVideoElement | null>(null);
   const remotePipRef = useRef<HTMLVideoElement | null>(null);
 
@@ -42,9 +43,12 @@ export default function CallScreen() {
   const remoteUserId = participant?.[0] ?? "";
 
   /* ===== Track state ===== */
+  const videoTrack = localStream?.getVideoTracks()[0];
+
   const hasLocalVideo =
-    !!localStream?.getVideoTracks()[0] &&
-    localStream.getVideoTracks()[0].readyState === "live";
+    !!videoTrack &&
+    videoTrack.readyState === "live" &&
+    videoTrack.enabled !== false;
 
   const hasRemoteVideo = !!remoteStream
     ?.getVideoTracks()
@@ -56,6 +60,8 @@ export default function CallScreen() {
 
   const canShowLocal = !!localStream;
   const canShowRemote = !!remoteStream;
+
+  const isAudioOnly = !hasLocalVideo && !hasRemoteVideo;
 
   /* ===== Views ===== */
   const effectiveMain = useMemo(() => {
@@ -100,16 +106,19 @@ export default function CallScreen() {
 
   /* ===== STREAM ATTACH (CRITICAL FIX) ===== */
   useEffect(() => {
-    const attach = (el: HTMLVideoElement | null, stream: MediaStream | null, muted = false) => {
+    const attach = (
+      el: HTMLMediaElement | null,
+      stream: MediaStream | null,
+      muted = false
+    ) => {
       if (!el) return;
       if (el.srcObject !== stream) el.srcObject = stream;
       el.muted = muted;
-      el.playsInline = true;
       el.autoplay = true;
       el.play().catch(() => {});
     };
 
-    const detach = (el: HTMLVideoElement | null) => {
+    const detach = (el: HTMLMediaElement | null) => {
       if (!el) return;
       if (el.srcObject) el.srcObject = null;
     };
@@ -123,7 +132,7 @@ export default function CallScreen() {
       detach(localMainRef.current);
     }
 
-    /* REMOTE */
+    /* REMOTE VIDEO */
     if (effectiveMain === "remote") {
       attach(remoteMainRef.current, remoteStream, false);
       detach(remotePipRef.current);
@@ -131,6 +140,9 @@ export default function CallScreen() {
       attach(remotePipRef.current, remoteStream, false);
       detach(remoteMainRef.current);
     }
+
+    /* 🔥 ALWAYS ATTACH AUDIO */
+    attach(remoteAudioRef.current, remoteStream, false);
   }, [localStream, remoteStream, effectiveMain]);
 
   /* ===== PiP DRAG ===== */
@@ -159,8 +171,20 @@ export default function CallScreen() {
     if (dx > 6 || dy > 6) movedRef.current = true;
 
     setPos({
-      x: Math.max(SAFE, Math.min(window.innerWidth - PREVIEW_W - SAFE, e.clientX - offsetRef.current.x)),
-      y: Math.max(SAFE, Math.min(window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI, e.clientY - offsetRef.current.y)),
+      x: Math.max(
+        SAFE,
+        Math.min(
+          window.innerWidth - PREVIEW_W - SAFE,
+          e.clientX - offsetRef.current.x
+        )
+      ),
+      y: Math.max(
+        SAFE,
+        Math.min(
+          window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI,
+          e.clientY - offsetRef.current.y
+        )
+      ),
     });
   };
 
@@ -173,7 +197,10 @@ export default function CallScreen() {
     const snapLeft = centerX < window.innerWidth / 2;
 
     const newX = snapLeft ? SAFE : window.innerWidth - PREVIEW_W - SAFE;
-    const newY = Math.max(SAFE, Math.min(window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI, pos.y));
+    const newY = Math.max(
+      SAFE,
+      Math.min(window.innerHeight - PREVIEW_H - SAFE - BOTTOM_UI, pos.y)
+    );
 
     setSnapping(true);
     setPos({ x: newX, y: newY });
@@ -185,7 +212,6 @@ export default function CallScreen() {
 
   return (
     <div className="fixed inset-0 z-[200] bg-black text-white">
-
       {/* CLICK LAYER */}
       <div
         className="absolute inset-0 z-20"
@@ -197,31 +223,44 @@ export default function CallScreen() {
 
       {/* MAIN */}
       <div className="absolute inset-0">
-        <video
-          ref={localMainRef}
-          className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] pointer-events-none ${
-            effectiveMain === "local" ? "z-10" : "opacity-0"
-          }`}
-        />
+        <audio ref={remoteAudioRef} />
+        {/* ===== AUDIO ONLY ===== */}
+        {isAudioOnly ? (
+          <VoiceCallUI
+            name={activeCall?.peerUserName}
+            status={callStatus === "connecting" ? "Connecting..." : "In call"}
+            userId={remoteUserId || activeCall?.peerUserId}
+          />
+        ) : (
+          <>
+            {/* ===== VIDEO ===== */}
+            <video
+              ref={localMainRef}
+              className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] pointer-events-none ${
+                effectiveMain === "local" ? "z-10" : "opacity-0"
+              }`}
+            />
 
-        <video
-          ref={remoteMainRef}
-          className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
-            effectiveMain === "remote" ? "z-10" : "opacity-0"
-          }`}
-        />
+            <video
+              ref={remoteMainRef}
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none ${
+                effectiveMain === "remote" ? "z-10" : "opacity-0"
+              }`}
+            />
 
-        {!hasLocalVideo && effectiveMain === "local" && (
-          <Avatar userId={activeCall?.peerUserId} />
-        )}
+            {!hasLocalVideo && effectiveMain === "local" && (
+              <Avatar userId={activeCall?.peerUserId} />
+            )}
 
-        {!hasRemoteVideo && effectiveMain === "remote" && (
-          <Avatar userId={remoteUserId} />
+            {!hasRemoteVideo && effectiveMain === "remote" && (
+              <Avatar userId={remoteUserId} />
+            )}
+          </>
         )}
       </div>
 
       {/* PiP */}
-      {pipView && (
+      {pipView && !isAudioOnly && (
         <div
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -237,7 +276,10 @@ export default function CallScreen() {
           }`}
         >
           {pipView === "local" ? (
-            <video ref={localPipRef} className="w-full h-full object-cover scale-x-[-1]" />
+            <video
+              ref={localPipRef}
+              className="w-full h-full object-cover scale-x-[-1]"
+            />
           ) : (
             <video ref={remotePipRef} className="w-full h-full object-cover" />
           )}
@@ -269,11 +311,42 @@ export default function CallScreen() {
   );
 }
 
+function VoiceCallUI({
+  name,
+  status,
+  userId,
+}: {
+  name?: string;
+  status: string;
+  userId?: string;
+}) {
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+      <div className="relative mb-6">
+        <div className="absolute inset-0 rounded-full bg-green-400/20 animate-ping" />
+        <div className="relative z-10 w-28 h-28 rounded-full overflow-hidden bg-zinc-700">
+          <img
+            src={avatarUrl(userId || "")}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      </div>
+
+      <h2 className="text-xl font-semibold">{name || "User"}</h2>
+
+      <p className="text-zinc-400 mt-2 text-sm">{status}</p>
+    </div>
+  );
+}
+
 function Avatar({ userId }: { userId?: string }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black">
       <div className="h-20 w-20 rounded-full overflow-hidden bg-zinc-700 ring-2 ring-white/20">
-        <img src={avatarUrl(userId || "")} className="w-full h-full object-cover" />
+        <img
+          src={avatarUrl(userId || "")}
+          className="w-full h-full object-cover"
+        />
       </div>
     </div>
   );
