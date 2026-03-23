@@ -21,7 +21,7 @@ services:
 
     depends_on:
       - ai
-      - livekit
+      - libretranslate
 
 
   ai:
@@ -43,19 +43,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  livekit:
-    image: livekit/livekit-server:latest
-    container_name: jearn-livekit-dev
+  libretranslate:
+    image: libretranslate/libretranslate
+    container_name: jearn-libretranslate-prod
     restart: unless-stopped
 
-    command: --config /etc/livekit.yaml
-
-    volumes:
-      - ./livekit.yaml:/etc/livekit.yaml
-
     ports:
-      - "7880:7880"
-      - "7881:7881"
+      - "7778:5000"
+
+    environment:
+      - LT_LOAD_ONLY=en,ja
+      - LT_DISABLE_WEB_UI=true
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   default:

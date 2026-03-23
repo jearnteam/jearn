@@ -68,6 +68,9 @@ export function buildExtensions(finalPlaceholder: string) {
     MathExtension,
     Link.configure({
       autolink: false,
+      linkOnPaste: false,
+      HTMLAttributes: {},
+      validate: () => false,
     }),
 
     BulletList,

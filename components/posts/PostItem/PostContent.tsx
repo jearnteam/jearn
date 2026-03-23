@@ -7,6 +7,7 @@ import { usePostCollapse, COLLAPSED_HEIGHT } from "./usePostCollapse";
 import { PostTypes } from "@/types/post";
 import { hasMeaningfulContent } from "@/lib/processText";
 import { VirtuosoHandle } from "react-virtuoso";
+import { extractContent } from "@/lib/post/extractedContent";
 
 /* -------------------------------------------------
  * 🧠 Extract ONLY the first img / video
@@ -105,6 +106,111 @@ export default function PostContent({
   wrapperRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [poster, setPoster] = useState<string | undefined>(undefined);
+  const [translatedHTML, setTranslatedHTML] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
+  const [showTranslated, setShowTranslated] = useState(false);
+
+  /* ================================
+   * 🧠 Extract + Protect Code Blocks
+   * ================================ */
+  function extractWithPlaceholders(html: string) {
+    const container = document.createElement("div");
+    container.innerHTML = html;
+
+    const codeMap: string[] = [];
+
+    container.querySelectorAll("code").forEach((el, i) => {
+      const key = `__C${i + 10}__`; // short + safe
+      codeMap.push(el.outerHTML);
+
+      el.replaceWith(document.createTextNode(` ${key} `)); // spacing IMPORTANT
+    });
+
+    return {
+      text: container.innerHTML || "",
+      codeMap,
+    };
+  }
+
+  /* ================================
+   * 🔁 Restore Code Blocks
+   * ================================ */
+  function restorePlaceholders(text: string, codeMap: string[]) {
+    let result = text;
+
+    codeMap.forEach((code, i) => {
+      const key = `C${i + 10}`;
+      result = result.replaceAll(key, code);
+    });
+
+    return result;
+  }
+
+  /* ================================
+   * 🌐 Translate (single request)
+   * ================================ */
+  async function translateText(text: string) {
+    if (!text.trim()) return text;
+
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text,
+        target: "en",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.text) {
+      console.error("Translate failed:", data);
+      return text;
+    }
+
+    return data.text;
+  }
+
+  /* ================================
+   * 🚀 MAIN TRANSLATION PIPELINE
+   * ================================ */
+  async function translateHTML(html: string) {
+    // 1. Extract + protect code
+    const { text, codeMap } = extractWithPlaceholders(html);
+
+    // 2. Translate FULL sentence
+    const translated = await translateText(text);
+
+    // 3. Restore code blocks
+    const restored = restorePlaceholders(translated, codeMap);
+
+    return restored;
+  }
+
+  /* ================================
+   * 🎯 USE IN COMPONENT
+   * ================================ */
+  async function translateContent() {
+    if (translatedHTML) {
+      setShowTranslated(!showTranslated);
+      return;
+    }
+
+    try {
+      setTranslating(true);
+
+      const translated = await translateHTML(restHTML);
+
+      setTranslatedHTML(translated);
+      setShowTranslated(true);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   /* ---------------- VIDEO HANDLING ---------------- */
   useEffect(() => {
@@ -139,7 +245,6 @@ export default function PostContent({
   const { contentRef, expanded, setExpanded, needsCollapse } =
     usePostCollapse();
 
-  const isCollapsed = !disableCollapse && !expanded;
   const collapseWithSnap = () => {
     setExpanded(false);
 
@@ -207,8 +312,16 @@ export default function PostContent({
         <>
           {disableCollapse ? (
             /* 🔥 Full Display Mode (Modal) */
-            <div className="mt-2">
-              <MathRenderer html={restHTML} openLinksInNewTab />
+            <div className={expanded ? "pb-4" : ""}>
+              {/* Original */}
+              <MathRenderer html={restHTML} />
+
+              {/* Translation */}
+              {showTranslated && translatedHTML && (
+                <div className="mt-2 border-l-2 pl-3 text-sm opacity-80 whitespace-pre-wrap">
+                  {translatedHTML}
+                </div>
+              )}
             </div>
           ) : (
             /* 🔥 Feed Collapse Mode */
@@ -226,8 +339,29 @@ export default function PostContent({
                   overflow: "hidden",
                 }}
               >
+                {/*
+                <div className="mt-2 flex gap-2">
+                
+                  <button
+                    onClick={translateContent}
+                    className="text-xs text-gray-500 hover:underline"
+                  >
+                    {translating
+                      ? "Translating..."
+                      : showTranslated
+                      ? "Show Original"
+                      : "Translate"}
+                  </button>
+                </div>
+                  */}
                 <div className={expanded ? "pb-4" : ""}>
-                  <MathRenderer html={restHTML} />
+                  <MathRenderer
+                    html={
+                      showTranslated && translatedHTML
+                        ? translatedHTML
+                        : restHTML
+                    }
+                  />
                 </div>
 
                 {!expanded && needsCollapse && (

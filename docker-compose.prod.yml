@@ -24,6 +24,7 @@ services:
     depends_on:
       - ai
       - ws
+      - libretranslate
 
 
   ai:
@@ -51,6 +52,21 @@ services:
 
     env_file:
       - .env.production
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  libretranslate:
+    image: libretranslate/libretranslate
+    container_name: jearn-libretranslate-prod
+    restart: unless-stopped
+
+    ports:
+      - "7777:5000"
+
+    environment:
+      - LT_LOAD_ONLY=en,ja
+      - LT_DISABLE_WEB_UI=true
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
