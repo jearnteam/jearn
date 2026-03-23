@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import DOMPurify from "dompurify";
 import "katex/dist/katex.min.css";
 
 import { stripEditorUI } from "./dom/editor";
@@ -42,11 +43,23 @@ function MathRendererBase({
     loadTwitterWidgets(el);
   }, [html]);
 
+  const clean = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      "p", "b", "i", "strong", "em", "a", "code", "pre",
+      "span", "div", "br", "ul", "ol", "li",
+      "img", "blockquote"
+    ],
+    ALLOWED_ATTR: [
+      "href", "src", "class", "data-*"
+    ],
+    ALLOWED_URI_REGEXP: /^(https?|mailto|tel):/i,
+  });
+
   return (
     <div
       ref={ref}
       className="math-content break-words"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: clean }}
     />
   );
 }

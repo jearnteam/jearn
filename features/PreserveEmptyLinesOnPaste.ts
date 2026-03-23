@@ -32,9 +32,26 @@ export const PreserveEmptyLinesOnPaste = Extension.create({
             return false;
           }
 
-          // ❌ Let TipTap handle rich HTML paste (important for code blocks)
           if (html) {
-            return false;
+            event.preventDefault();
+
+            const cleanHtml = html
+              .replace(/<a[^>]*>/gi, "")
+              .replace(/<\/a>/gi, "");
+
+            const parser = new DOMParser();
+            const dom = parser.parseFromString(cleanHtml, "text/html");
+
+            const slice = view
+              .someProp("clipboardParser")
+              ?.parseSlice(dom.body);
+
+            if (!slice) return false;
+
+            const tr = view.state.tr.replaceSelection(slice);
+            view.dispatch(tr.scrollIntoView());
+
+            return true;
           }
 
           // ✅ Now we know this is plain-text paragraph paste
@@ -48,10 +65,7 @@ export const PreserveEmptyLinesOnPaste = Extension.create({
               nodes.push(schema.nodes.paragraph.create());
             } else {
               nodes.push(
-                schema.nodes.paragraph.create(
-                  null,
-                  schema.text(line)
-                )
+                schema.nodes.paragraph.create(null, schema.text(line))
               );
             }
           }

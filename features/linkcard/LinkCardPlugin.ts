@@ -4,12 +4,16 @@ import { isWhitelisted } from "./embedWhitelist";
 
 const key = new PluginKey("linkcard-plugin");
 
-const URL_RE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(\/\S*)?$/i;
+const URL_RE = /https?:\/\/[^\s]+/i;
 
-function extractUrl(text: string) {
-  const trimmed = text.trim();
-  const m = trimmed.match(URL_RE);
-  return m ? trimmed : null;
+function extractUrlWithPos(text: string) {
+  const match = text.match(URL_RE);
+  if (!match) return null;
+
+  return {
+    url: match[0],
+    index: match.index ?? 0,
+  };
 }
 
 function isJearnUrl(raw: string) {
@@ -28,117 +32,20 @@ export const LinkCardPlugin = Extension.create({
     return [
       new Plugin({
         key,
+
         props: {
-          handlePaste: (view, event) => {
-            const text = event.clipboardData?.getData("text/plain")?.trim();
-
-            if (!text) return false;
-
-            const url = extractUrl(text);
-            if (!url) return false;
-
-            const normalizedUrl = url.startsWith("http")
-              ? url
-              : `https://${url}`;
-
-            const { from, to } = view.state.selection;
-
-            event.preventDefault();
-
-            // 🔥 CASE 1: JEARN → popup mode
-            if (isJearnUrl(normalizedUrl)) {
-              const tr = view.state.tr
-                .insertText(normalizedUrl, from, to)
-                .setStoredMarks([])
-                .setMeta("jearnLinkDetected", {
-                  url: normalizedUrl,
-                  from,
-                  to: from + normalizedUrl.length,
-                });
-
-              view.dispatch(tr);
-              return true;
-            }
-
-            console.log("JEARN detected", normalizedUrl);
-
-            // 🔥 CASE 2: Whitelisted → embed
-            if (isWhitelisted(normalizedUrl)) {
-              const { state } = view;
-              const schema = state.schema;
-              const nodeType = schema.nodes.embedBlock;
-              if (!nodeType) return false;
-
-              const $from = state.selection.$from;
-              const paragraphStart = $from.before();
-              const paragraphEnd = $from.after();
-
-              let tr = state.tr.delete(paragraphStart, paragraphEnd);
-
-              const embedNode = nodeType.create({ url: normalizedUrl });
-              tr = tr.insert(paragraphStart, embedNode);
-
-              const paragraph = schema.nodes.paragraph.create();
-              tr = tr.insert(paragraphStart + embedNode.nodeSize, paragraph);
-
-              tr = tr.setSelection(
-                TextSelection.create(
-                  tr.doc,
-                  paragraphStart + embedNode.nodeSize + 1
-                )
-              );
-
-              view.dispatch(tr);
-              return true;
-            }
-
-            // 🔥 CASE 3: Fallback → linkCard
-            const { state } = view;
-            const schema = state.schema;
-            const linkCardType = schema.nodes.linkCard;
-
-            if (!linkCardType) return false;
-
-            const $from = state.selection.$from;
-            const paragraphStart = $from.before();
-            const paragraphEnd = $from.after();
-
-            let tr = state.tr.delete(paragraphStart, paragraphEnd);
-
-            const linkCardNode = linkCardType.create({
-              url: normalizedUrl,
-              loading: true,
-            });
-
-            tr = tr.insert(paragraphStart, linkCardNode);
-
-            const paragraph = schema.nodes.paragraph.create();
-            tr = tr.insert(paragraphStart + linkCardNode.nodeSize, paragraph);
-
-            tr = tr.setSelection(
-              TextSelection.create(
-                tr.doc,
-                paragraphStart + linkCardNode.nodeSize + 1
-              )
-            );
-
-            view.dispatch(tr);
-            return true;
-          },
           handleKeyDown: (view, event) => {
             if (event.key !== " ") return false;
 
             const { state } = view;
             const { from, to } = state.selection;
-
             if (from !== to) return false;
 
             const $from = state.selection.$from;
-
             if ($from.parent.type.name !== "paragraph") return false;
 
             const paragraphStart = $from.start();
-            const paragraphEnd = from; // 🔥 only up to cursor
+            const paragraphEnd = from;
 
             const rawText = state.doc.textBetween(
               paragraphStart,
@@ -146,89 +53,96 @@ export const LinkCardPlugin = Extension.create({
               " "
             );
 
-            const trimmed = rawText.trim();
-            const url = extractUrl(trimmed);
-            if (!url) return false;
+            const found = extractUrlWithPos(rawText);
+            if (!found) return false;
 
+            const { url, index } = found;
             const normalizedUrl = url.startsWith("http")
               ? url
               : `https://${url}`;
 
             event.preventDefault();
 
-            // 🔥 Delete only the URL range (not whole paragraph)
-            const tr = state.tr.delete(paragraphStart, paragraphEnd);
+            const urlStart = paragraphStart + index;
+            const urlEnd = urlStart + url.length;
 
-            // JEARN
+            let tr = state.tr.delete(urlStart, urlEnd);
+
+            // ===== JEARN (inline popup) =====
             if (isJearnUrl(normalizedUrl)) {
-              const { state } = view;
-              const { from, to } = state.selection;
-
-              let tr = state.tr.delete(from, to);
-
-              tr = tr.insertText(normalizedUrl, from);
+              tr = tr.insertText(normalizedUrl, urlStart);
 
               tr = tr.setMeta("jearnLinkDetected", {
                 url: normalizedUrl,
-                from,
-                to: from + normalizedUrl.length,
+                from: urlStart,
+                to: urlStart + normalizedUrl.length,
               });
 
               view.dispatch(tr);
               return true;
             }
 
-            // WHITELIST
+            // ===== WHITELIST (embed block) =====
             if (isWhitelisted(normalizedUrl)) {
               const schema = state.schema;
-              const nodeType = schema.nodes.embedBlock;
-              if (!nodeType) return false;
-              let tr = state.tr.delete(paragraphStart, paragraphEnd);
+              const embedType = schema.nodes.embedBlock;
+              if (!embedType) return false;
 
-              tr = tr.insertText(normalizedUrl, paragraphStart);
+              const embedNode = embedType.create({ url: normalizedUrl });
 
-              tr = tr.setMeta("jearnLinkDetected", {
-                url: normalizedUrl,
-                from: paragraphStart,
-                to: paragraphStart + normalizedUrl.length,
-              });
+              const paragraph = schema.nodes.paragraph.create();
+
+              tr = tr.insert(urlStart, embedNode);
+
+              const afterEmbed = tr.mapping.map(
+                urlStart + embedNode.nodeSize
+              );
+
+              tr = tr.insert(afterEmbed, paragraph);
+
+              tr = tr.setSelection(
+                TextSelection.create(tr.doc, afterEmbed + 1)
+              );
 
               view.dispatch(tr);
               return true;
             }
 
-            // FALLBACK linkCard
+            // ===== LINK CARD (block, new line) =====
             const schema = state.schema;
             const linkCardType = schema.nodes.linkCard;
             if (!linkCardType) return false;
-
-            // 🔥 delete entire paragraph for block insertion
-            const blockStart = $from.before();
-            const blockEnd = $from.after();
-
-            let blockTr = state.tr.delete(blockStart, blockEnd);
 
             const linkCardNode = linkCardType.create({
               url: normalizedUrl,
               loading: true,
             });
 
-            blockTr = blockTr.insert(blockStart, linkCardNode);
-
             const paragraph = schema.nodes.paragraph.create();
-            blockTr = blockTr.insert(
-              blockStart + linkCardNode.nodeSize,
-              paragraph
+
+            // insert line break (paragraph)
+            tr = tr.insert(urlStart, paragraph);
+
+            const afterParagraph = tr.mapping.map(
+              urlStart + paragraph.nodeSize
             );
 
-            blockTr = blockTr.setSelection(
-              TextSelection.create(
-                blockTr.doc,
-                blockStart + linkCardNode.nodeSize + 1
-              )
+            // insert card
+            tr = tr.insert(afterParagraph, linkCardNode);
+
+            const afterCard = tr.mapping.map(
+              afterParagraph + linkCardNode.nodeSize
             );
 
-            view.dispatch(blockTr);
+            // insert trailing paragraph
+            tr = tr.insert(afterCard, schema.nodes.paragraph.create());
+
+            // move cursor
+            tr = tr.setSelection(
+              TextSelection.create(tr.doc, afterCard + 1)
+            );
+
+            view.dispatch(tr);
             return true;
           },
         },
