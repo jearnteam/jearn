@@ -3,11 +3,12 @@
 import { useTranslation } from "react-i18next";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const LANGS = {
-  en: { label: "English", flag: "1f1fa-1f1f8" }, // 🇺🇸
-  ja: { label: "日本語", flag: "1f1ef-1f1f5" }, // 🇯🇵
-  my: { label: "မြန်မာ", flag: "1f1f2-1f1f2" }, // 🇲🇲
+  en: { label: "English", flag: "1f1fa-1f1f8" },
+  ja: { label: "日本語", flag: "1f1ef-1f1f5" },
+  my: { label: "မြန်မာ", flag: "1f1f2-1f1f2" },
 } as const;
 
 type SupportedLang = keyof typeof LANGS;
@@ -15,19 +16,29 @@ type SupportedLang = keyof typeof LANGS;
 export default function LangSwitcher() {
   const { i18n } = useTranslation();
   const { status } = useSession();
+  const router = useRouter();
+
   const [mounted, setMounted] = useState(false);
   const [open, setOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const currentLang = (i18n.language as SupportedLang) || "en";
+  const currentLang = (i18n.resolvedLanguage as SupportedLang) || "en";
 
   const changeLanguage = async (lang: SupportedLang) => {
-    i18n.changeLanguage(lang);
-    localStorage.setItem("lang", lang); //critical
+    if (!i18n?.changeLanguage) return;
+  
+    await i18n.changeLanguage(lang);
+  
+    localStorage.setItem("lang", lang);
+    localStorage.setItem("lang-manual", "1");
+  
     setOpen(false);
-
+  
+    // ⛔ REMOVE THIS (explained below)
+    // router.refresh();
+  
     if (status === "authenticated") {
       await fetch("/api/user/update-language", {
         method: "POST",
@@ -35,6 +46,11 @@ export default function LangSwitcher() {
         body: JSON.stringify({ language: lang }),
       });
     }
+  
+    // ✅ move timeout here
+    setTimeout(() => {
+      localStorage.removeItem("lang-manual");
+    }, 2000);
   };
 
   return (

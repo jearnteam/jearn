@@ -24,7 +24,10 @@ export default function UserMenu({ user }: { user: User }) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
-  const [showCategoryRequest, setShowCategoryRequest] = useState(false); // State added
+  const [showCategoryRequest, setShowCategoryRequest] = useState(false);
+
+  /* ✅ FIX: move hook to top */
+  const { data: session } = useSession();
 
   /* ---------------------------------------------
    * THEME
@@ -32,7 +35,6 @@ export default function UserMenu({ user }: { user: User }) {
   const { theme, setTheme, systemTheme } = useTheme();
   const currentTheme = theme === "system" ? systemTheme : theme;
 
-  /** Persist theme in DB (same as before) */
   const saveThemeToDB = async (nextTheme: "light" | "dark") => {
     try {
       await fetch("/api/user/update-theme", {
@@ -48,15 +50,13 @@ export default function UserMenu({ user }: { user: User }) {
   const toggleTheme = () => {
     const nextTheme = currentTheme === "dark" ? "light" : "dark";
 
-    // 🔵 start animated overlay
     window.dispatchEvent(
       new CustomEvent("theme-transition", { detail: { to: nextTheme } })
     );
 
-    // 🔁 flip theme during peak cover
     setTimeout(() => {
       setTheme(nextTheme);
-      saveThemeToDB(nextTheme); // ✅ persist
+      saveThemeToDB(nextTheme);
     }, 500);
   };
 
@@ -145,20 +145,20 @@ export default function UserMenu({ user }: { user: User }) {
               <LangSwitcher />
             </div>
 
-            {/* ✅ Category Request Button */}
+            {/* CATEGORY REQUEST */}
             <button
               onClick={() => {
                 setShowCategoryRequest(true);
                 setOpen(false);
               }}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
+              className="flex items-center rounded-md gap-2 px-3 py-2 text-sm text-left hover:bg-gray-100 dark:hover:bg-neutral-700"
             >
-              <FolderPlus size={18} />
+              <FolderPlus size={32} />
               <span>{t("userMenu.requestCategory")}</span>
             </button>
 
-            {/* ADMIN */}
-            {(useSession().data?.user.role === "admin" || user.isAdmin) && (
+            {/* ✅ ADMIN (SAFE) */}
+            {(session?.user?.role === "admin" || user.isAdmin) && (
               <button
                 onClick={() => {
                   setOpen(false);
@@ -183,9 +183,12 @@ export default function UserMenu({ user }: { user: User }) {
           </div>
         </div>
       </div>
-      {/* ✅ Modal */}
+
+      {/* MODAL */}
       {showCategoryRequest && (
-        <CategoryRequestModal onClose={() => setShowCategoryRequest(false)} />
+        <CategoryRequestModal
+          onClose={() => setShowCategoryRequest(false)}
+        />
       )}
     </>
   );

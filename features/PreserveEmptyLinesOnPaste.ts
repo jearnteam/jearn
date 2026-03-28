@@ -35,13 +35,22 @@ export const PreserveEmptyLinesOnPaste = Extension.create({
           if (html) {
             event.preventDefault();
 
-            const cleanHtml = html
-              .replace(/<a[^>]*>/gi, "")
-              .replace(/<\/a>/gi, "");
-
             const parser = new DOMParser();
-            const dom = parser.parseFromString(cleanHtml, "text/html");
+            const dom = parser.parseFromString(html, "text/html");
 
+            // 🔥 Remove ALL <a> elements but keep their text
+            dom.querySelectorAll("a").forEach((a) => {
+              const parent = a.parentNode;
+              if (!parent) return;
+
+              while (a.firstChild) {
+                parent.insertBefore(a.firstChild, a);
+              }
+
+              parent.removeChild(a);
+            });
+
+            // 🔥 Now parse cleaned DOM
             const slice = view
               .someProp("clipboardParser")
               ?.parseSlice(dom.body);
