@@ -10,6 +10,7 @@ import { ChatSocketProvider } from "@/features/chat/ChatSocketProvider";
 import { SSEProvider } from "@/features/sse/SSEProvider";
 import { CallProvider } from "@/features/call/CallProvider";
 import CallRoot from "@/components/call/CallRoot";
+import ImageViewer from "@/components/image/ImageViewer";
 
 export default function AppLayout({
   children,
@@ -64,6 +65,7 @@ export default function AppLayout({
             <Navbar />
             <AppNavigationBridge />
             <UploadProvider>
+            <ImageViewer />
               {children}
               {overlay}
               <CallRoot />
