@@ -1,4 +1,4 @@
-//@/api/user/update-language/route.ts
+//@/api/user/update-notifications/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authConfig } from "@/features/auth/auth";
@@ -8,22 +8,32 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authConfig);
 
   if (!session?.user) {
-    return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated" },
+      { status: 401 }
+    );
   }
 
-  const { language } = await req.json();
-  const supportedLanguages = ["en", "ja", "my"]; // English, Japanese, Burmese
+  const { enabled } = await req.json();
 
-  if (!supportedLanguages.includes(language)) {
-    return NextResponse.json({ ok: false, error: "Invalid language" }, { status: 400 });
+  if (typeof enabled !== "boolean") {
+    return NextResponse.json(
+      { ok: false, error: "Invalid value" },
+      { status: 400 }
+    );
   }
 
   const client = await getMongoClient();
   const db = client.db(process.env.MONGODB_DB || "jearn");
 
   await db.collection("users").updateOne(
-    { email: session.user.uid },
-    { $set: { language, updatedAt: new Date() } }
+    { email: session.user.uid }, // 👈 same as your language logic
+    {
+      $set: {
+        notificationsEnabled: enabled,
+        updatedAt: new Date(),
+      },
+    }
   );
 
   return NextResponse.json({ ok: true });

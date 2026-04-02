@@ -11,6 +11,7 @@ import { SSEProvider } from "@/features/sse/SSEProvider";
 import { CallProvider } from "@/features/call/CallProvider";
 import CallRoot from "@/components/call/CallRoot";
 import ImageViewer from "@/components/image/ImageViewer";
+import SWRegister from "@/components/sw/SWRegister";
 
 export default function AppLayout({
   children,
@@ -61,11 +62,12 @@ export default function AppLayout({
     <SSEProvider>
       <ChatSocketProvider currentUserId={me.uid} currentUserName={me.name}>
         <CallProvider>
+          <SWRegister />
           <NotificationProvider>
             <Navbar />
             <AppNavigationBridge />
             <UploadProvider>
-            <ImageViewer />
+              <ImageViewer />
               {children}
               {overlay}
               <CallRoot />

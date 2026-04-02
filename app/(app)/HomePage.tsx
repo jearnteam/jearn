@@ -28,6 +28,7 @@ import { VideoSettingsProvider } from "@/components/videos/VideoSettingsContext"
 import { usePostInteractions } from "@/features/posts/hooks/usePostInteractions";
 import AboutJearnPage from "@/components/about/AboutJearnPage";
 import { useChatSocket } from "@/features/chat/ChatSocketProvider";
+import { useSearchParams } from "next/navigation";
 
 /* ---------------------------------------------
  * VIEW TYPE
@@ -43,6 +44,7 @@ export default function HomePage() {
    * STATE
    * ------------------------------------------- */
   //current active page
+  const searchParams = useSearchParams();
   const [activeView, setActiveView] = useState<HomeView>("home");
   //mobile bottom navbar visibility when scrolling
   const [navbarVisible, setNavbarVisible] = useState(true);
@@ -122,15 +124,11 @@ export default function HomePage() {
     emitScroll(delta);
 
     if (activeView === "chat") {
-      // 🔥 Hide navbar ONLY when inside chat room
       if (activeRoomId) {
         setNavbarVisible(false);
       } else {
         setNavbarVisible(true);
       }
-
-      lastScrollTop.current = cur;
-      return;
     }
 
     // Videos page: mobile navbar always visible
@@ -269,6 +267,41 @@ export default function HomePage() {
       setDeletePostId(null);
     }
   }
+
+  /* ---------------------------------------------
+   * NOTI MANAGEMENT
+   * ------------------------------------------- */
+
+  useEffect(() => {
+    const view = searchParams.get("view") as HomeView | null;
+
+    if (view) {
+      setActiveView(view);
+
+      // 🔥 REMOVE query from history (critical fix)
+      window.history.replaceState({}, "", "/");
+    }
+  }, []);
+
+  useEffect(() => {
+    const prev = prevViewRef.current;
+
+    // 🔥 leaving notify page
+    if (
+      prev === "notify" &&
+      activeView !== "notify" &&
+      unreadCount > 0 // ✅ IMPORTANT
+    ) {
+      fetch("/api/notifications/read", {
+        method: "POST",
+      }).catch(() => {});
+
+      clearUnread(); // ✅ keep UI synced
+    }
+
+    prevViewRef.current = activeView;
+  }, [activeView, unreadCount]);
+
   /* ---------------------------------------------
    * DESKTOP DETECTION
    * ------------------------------------------- */
@@ -292,6 +325,13 @@ export default function HomePage() {
       const roomId = e.detail?.roomId;
       if (!roomId) return;
 
+      // 🔥 push history
+      window.history.pushState(
+        { type: "chat-room", roomId },
+        "",
+        `/?view=chat&roomId=${roomId}`
+      );
+
       setActiveView("chat");
       setActiveRoomId(roomId);
     }
@@ -301,11 +341,44 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (activeView === "chat") {
-      setNavbarVisible(!activeRoomId);
+    if (activeView === "chat" && activeRoomId) {
+      setNavbarVisible(false);
+    } else if (activeView === "chat") {
+      setNavbarVisible(true);
     }
   }, [activeView, activeRoomId]);
 
+  useEffect(() => {
+    const view = searchParams.get("view") as HomeView | null;
+    const roomId = searchParams.get("roomId");
+
+    if (view) setActiveView(view);
+
+    if (view === "chat" && roomId) {
+      setActiveRoomId(roomId);
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      // 🔥 if currently inside chat room
+      if (activeView === "chat" && activeRoomId) {
+        // instead of leaving page → go to chat list
+        setActiveRoomId(null);
+
+        // replace state so we don’t loop
+        window.history.replaceState({}, "", "/?view=chat");
+
+        return;
+      }
+    };
+
+    window.addEventListener("popstate", onPopState);
+
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [activeView, activeRoomId]);
   /* ---------------------------------------------
    * SCROLL RESTORATION
    * ------------------------------------------- */

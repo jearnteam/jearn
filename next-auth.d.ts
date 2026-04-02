@@ -1,4 +1,5 @@
 import NextAuth, { DefaultSession } from "next-auth";
+import { BarPositionPosition } from "recharts/types/util/ChartUtils";
 
 declare module "next-auth" {
   interface Session {
@@ -10,6 +11,7 @@ declare module "next-auth" {
       provider?: string | null;
       provider_id?: string | null;
       picture?: string | null;
+      notificationsEnabled?: boolean;
       role?: "user" | "admin";
     } & DefaultSession["user"];
   }

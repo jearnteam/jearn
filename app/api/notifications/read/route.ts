@@ -1,3 +1,4 @@
+// app/api/notifications/read/route.ts
 export const runtime = "nodejs";
 
 import { getMongoClient } from "@/lib/mongodb";
@@ -16,20 +17,45 @@ export async function POST() {
     const userId = session.user.uid;
 
     if (!ObjectId.isValid(userId)) {
-      console.error("Invalid ObjectId:", userId);
       return new Response("Invalid userId", { status: 400 });
     }
 
     const client = await getMongoClient();
     const db = client.db("jearn");
 
+    const userObjectId = new ObjectId(userId);
+
+    const user = await db.collection("users").findOne(
+      { _id: userObjectId },
+      { projection: { lastSeenNotificationsAt: 1 } }
+    );
+
+    const lastSeen = user?.lastSeenNotificationsAt ?? new Date(0);
+
+    const newCount = await db.collection("notifications").countDocuments({
+      userId: userObjectId,
+      createdAt: { $gt: lastSeen },
+    });
+
+    await db.collection("users").updateOne(
+      { _id: userObjectId },
+      { $set: { lastSeenNotificationsAt: new Date() } }
+    );
+
     await db.collection("notifications").updateMany(
-      { userId: new ObjectId(userId), read: false },
+      { userId: userObjectId, read: false },
       { $set: { read: true } }
     );
 
-    return Response.json({ ok: true });
+    // 💥 IMPORTANT FIX
+    await db.collection("notification_push_groups").deleteMany({
+      userId: userObjectId,
+    });
 
+    return Response.json({
+      ok: true,
+      new: newCount,
+    });
   } catch (err) {
     console.error("READ ERROR:", err);
     return new Response("Server error", { status: 500 });

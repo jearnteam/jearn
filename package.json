@@ -60,6 +60,7 @@
     "three": "^0.180.0",
     "tippy.js": "^6.3.7",
     "vis-network": "^10.0.2",
+    "web-push": "^3.6.7",
     "zustand": "^5.0.10"
   },
   "devDependencies": {

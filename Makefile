@@ -18,6 +18,9 @@ prod:
 
 prod-build:
 	docker compose -f docker-compose.prod.yml -p jearn-prod up -d --build
+#docker compose -f docker-compose.prod.yml -p jearn-prod down
+#docker compose -f docker-compose.prod.yml -p jearn-prod build --no-cache
+#docker compose -f docker-compose.prod.yml -p jearn-prod up -d
 
 prod-restart:
 	docker compose -f docker-compose.prod.yml -p jearn-prod restart

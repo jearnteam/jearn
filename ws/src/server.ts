@@ -38,6 +38,10 @@ const userSockets = new Map<string, Set<WSClient>>();
 
 const activeCalls = new Map<string, { participants: Set<string> }>();
 
+export function isUserOnline(userId: string) {
+  return onlineUsers.has(userId);
+}
+
 function sendToUser(userId: string, payload: any) {
   const sockets = userSockets.get(userId);
 

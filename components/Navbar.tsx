@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useSearchHistory } from "@/features/search/useSearchHistory";
 import { SearchItem } from "@/types/search";
+import EnableNotifications from "./sw/EnableNotifications";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
@@ -24,7 +25,7 @@ const MemoUserMenu = memo(UserMenu);
 export default function Navbar() {
   const pathname = usePathname();
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("ui:close-all"))
+    window.dispatchEvent(new CustomEvent("ui:close-all"));
   }, [pathname]);
   const isHome = pathname === "/";
   const { user, loading } = useCurrentUser();

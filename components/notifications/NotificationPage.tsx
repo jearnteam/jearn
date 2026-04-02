@@ -24,6 +24,7 @@ export type Notification = {
   createdAt: string;
   updatedAt?: string;
   read?: boolean;
+  uiRead?: boolean;
 };
 
 /* ---------------------------------------------
@@ -35,13 +36,7 @@ export default function NotificationPage() {
   const router = useRouter();
 
   const { items, fetchNotifications, loading } = useNotificationContext();
-
-  /* ---------------------------------------------
-   * FETCH ON OPEN
-   * ------------------------------------------- */
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
 
   /* ---------------------------------------------
    * OVERLAY NAVIGATION
@@ -61,7 +56,9 @@ export default function NotificationPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center py-20">
-        <p className="text-gray-500 text-sm">{t("notiPage.loading") ?? "Loading…"}</p>
+        <p className="text-gray-500 text-sm">
+          {t("notiPage.loading") ?? "Loading…"}
+        </p>
       </div>
     );
   }
@@ -88,6 +85,7 @@ export default function NotificationPage() {
           key={n._id}
           notification={n}
           onOpenPost={openPostOverlay}
+          isNew={newIds.has(n._id)}
         />
       ))}
     </div>
@@ -100,14 +98,19 @@ export default function NotificationPage() {
 function NotificationItem({
   notification,
   onOpenPost,
+  isNew,
 }: {
   notification: Notification;
   onOpenPost: (postId: string) => void;
+  isNew: boolean;
 }) {
   const mounted = useMounted();
   const { t } = useTranslation();
 
   const d = new Date(notification.updatedAt ?? notification.createdAt);
+  const [readOverrides, setReadOverrides] = useState<Set<string>>(new Set());
+  const isRead = notification.uiRead || readOverrides.has(notification._id);
+  const isHighlighted = isNew && !isRead;
 
   const date = mounted
     ? d.toLocaleDateString(undefined, {
@@ -125,7 +128,9 @@ function NotificationItem({
       case "post_like": {
         const count = notification.count ?? 1;
         return count > 1
-          ? `${notification.lastActorName} and ${count - 1} others ${t("notiPage.upvote_noti")}`
+          ? `${notification.lastActorName} and ${count - 1} others ${t(
+              "notiPage.upvote_noti"
+            )}`
           : `${notification.lastActorName} ${t("notiPage.upvote_noti")}`;
       }
       case "mention":
@@ -151,12 +156,38 @@ function NotificationItem({
 
   return (
     <div
-      onClick={() => notification.postId && onOpenPost(notification.postId)}
-      className="cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition
-                 border-gray-200 dark:border-neutral-800
-                 hover:bg-neutral-50 dark:hover:bg-neutral-900/60
-                 bg-white dark:bg-neutral-950"
+      onClick={async () => {
+        if (!notification.uiRead) {
+          setReadOverrides((prev) => new Set(prev).add(notification._id));
+
+          fetch("/api/notifications/read-one", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ id: notification._id }),
+          });
+        }
+
+        notification.postId && onOpenPost(notification.postId);
+      }}
+      className={`
+        relative
+        cursor-pointer flex gap-3 px-4 py-4 items-start border-b transition
+        border-gray-200 dark:border-neutral-800
+        hover:bg-neutral-50 dark:hover:bg-neutral-900/60
+        ${isRead ? "opacity-75" : "bg-white dark:bg-neutral-950"}
+      `}
     >
+      {isHighlighted && (
+        <span
+          className="
+          absolute top-3 right-3
+          w-2.5 h-2.5 rounded-full
+          bg-red-500
+        "
+        />
+      )}
       <img
         src={avatar}
         alt={notification.lastActorName}

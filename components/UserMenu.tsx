@@ -25,6 +25,7 @@ export default function UserMenu({ user }: { user: User }) {
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [showCategoryRequest, setShowCategoryRequest] = useState(false);
+  const [notifEnabled, setNotifEnabled] = useState(false);
 
   /* ✅ FIX: move hook to top */
   const { data: session } = useSession();
@@ -60,6 +61,20 @@ export default function UserMenu({ user }: { user: User }) {
     }, 500);
   };
 
+  const updateNotifications = async (enabled: boolean) => {
+    try {
+      await fetch("/api/user/update-notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ enabled }),
+      });
+    } catch (err) {
+      console.error("Failed to save notification setting", err);
+    }
+  };
+
   const handleLogout = () => router.push("/logout");
 
   /* ---------------------------------------------
@@ -74,8 +89,17 @@ export default function UserMenu({ user }: { user: User }) {
         setOpen(false);
       }
     };
-    document.addEventListener("mousedown", handler);
+
+    document.addEventListener("mousedown", handler); // ✅ FIX
     return () => document.removeEventListener("mousedown", handler);
+  }, []);
+  /* ---------------------------------------------
+   * Sync with browser notification permission
+   * ------------------------------------------- */
+  useEffect(() => {
+    if ("Notification" in window) {
+      setNotifEnabled(Notification.permission === "granted");
+    }
   }, []);
 
   return (
@@ -112,7 +136,10 @@ export default function UserMenu({ user }: { user: User }) {
           }
         `}
         >
-          <div className="p-2 flex flex-col gap-1">
+          <div
+            className="p-2 flex flex-col gap-1"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             {/* PROFILE */}
             <button
               onClick={() => {
@@ -138,6 +165,46 @@ export default function UserMenu({ user }: { user: User }) {
                 <Moon className="w-5 h-5 text-gray-800" />
               )}
               {t("userMenu.toggleTheme")}
+            </button>
+
+            {/* 🔔 NOTIFICATIONS */}
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+
+                if (!notifEnabled) {
+                  // 👉 show modal or separate button FIRST
+                  // then after permission granted:
+
+                  const permission = await Notification.requestPermission();
+
+                  if (permission === "granted") {
+                    setNotifEnabled(true);
+                    updateNotifications(true);
+                  }
+                } else {
+                  setNotifEnabled(false);
+                  updateNotifications(false);
+                }
+              }}
+              className="flex items-center justify-between w-full px-3 py-2 rounded-md hover:bg-gray-100 dark:hover:bg-neutral-700"
+            >
+              <span className="text-sm">
+                {t("notifications") || "Notifications"}
+              </span>
+
+              <div
+                className={`w-10 h-5 flex items-center rounded-full transition ${
+                  notifEnabled ? "bg-blue-600" : "bg-gray-400"
+                } pointer-events-none`}
+              >
+                <div
+                  className={`w-4 h-4 bg-white rounded-full shadow transform transition ${
+                    notifEnabled ? "translate-x-5" : "translate-x-1"
+                  } pointer-events-none`}
+                />
+              </div>
             </button>
 
             {/* LANGUAGE */}
@@ -186,9 +253,7 @@ export default function UserMenu({ user }: { user: User }) {
 
       {/* MODAL */}
       {showCategoryRequest && (
-        <CategoryRequestModal
-          onClose={() => setShowCategoryRequest(false)}
-        />
+        <CategoryRequestModal onClose={() => setShowCategoryRequest(false)} />
       )}
     </>
   );

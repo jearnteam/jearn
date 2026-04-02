@@ -69,6 +69,7 @@ export async function GET() {
           _id: { $toString: "$_id" },
           type: 1,
           read: 1,
+          uiRead: { $ifNull: ["$uiRead", false] },
           count: 1,
 
           postId: { $toString: "$postId" },

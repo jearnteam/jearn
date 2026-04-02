@@ -12,6 +12,7 @@ export type Notification = {
   createdAt: string;
   updatedAt?: string;
   read?: boolean;
+  uiRead?: boolean;
 };
 
 export function useNotifications() {
@@ -20,6 +21,28 @@ export function useNotifications() {
   const [loading, setLoading] = useState(false);
 
   const sseRef = useRef<EventSource | null>(null);
+
+  const getNotificationText = (n: Notification) => {
+    switch (n.type) {
+      case "comment":
+        return `${n.lastActorName} commented on your post`;
+      case "mention":
+        return `${n.lastActorName} mentioned you`;
+      case "follow":
+        return `${n.lastActorName} followed you`;
+      case "post_like":
+        return `${n.lastActorName} liked your post`;
+      default:
+        return "New activity";
+    }
+  };
+
+  const buildNotificationUrl = (n: Notification) => {
+    switch (n.type) {
+      default:
+        return `/?view=notify`;
+    }
+  };
 
   /* ---------------------------------------------
    * INITIAL FETCH
@@ -87,6 +110,12 @@ export function useNotifications() {
       }
     };
   }, [fetchNotifications, initSSE]);
+
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   /* ---------------------------------------------
    * CLEAR UNREAD

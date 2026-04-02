@@ -8,8 +8,8 @@ const adminEmails = (process.env.ADMIN_EMAILS || "")
   .split(",")
   .map((e) => e.trim())
   .filter(Boolean);
-  const clientPromise = await getMongoClient();
-  export const authConfig: AuthOptions = {
+const clientPromise = await getMongoClient();
+export const authConfig: AuthOptions = {
   adapter: MongoDBAdapter(clientPromise),
 
   providers: [
@@ -85,6 +85,7 @@ const adminEmails = (process.env.ADMIN_EMAILS || "")
           avatarUrl: user.image ?? null,
           provider: account.provider,
           provider_id: account.providerAccountId,
+          notificationsEnabled: false,
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -125,15 +126,25 @@ const adminEmails = (process.env.ADMIN_EMAILS || "")
      * SESSION ENRICHMENT (CLIENT ACCESS)
      * ---------------------------------------------------- */
     async session({ session, token }) {
-      // next-auth.d.ts で型拡張しているので、プロパティが存在することが保証される
-      if (session.user) {
-        session.user.uid = token.uid;
-        session.user.name = token.name;
-        session.user.provider = token.provider ?? null;
-        session.user.provider_id = token.provider_id ?? null;
+      if (session.user && token.email) {
+        const client = await clientPromise; // ✅ ADD
+        const db = client.db(process.env.MONGODB_DB); // ✅ ADD
 
-        // ✅ JWTからSessionへRoleをコピー
-        session.user.role = token.role;
+        const user = await db.collection("users").findOne({
+          email: token.email,
+        });
+        // next-auth.d.ts で型拡張しているので、プロパティが存在することが保証される
+        if (user) {
+          session.user.uid = token.uid;
+          session.user.name = token.name;
+          session.user.provider = token.provider ?? null;
+          session.user.provider_id = token.provider_id ?? null;
+
+          // ✅ JWTからSessionへRoleをコピー
+          session.user.notificationsEnabled =
+            user.notificationsEnabled ?? false;
+          session.user.role = token.role;
+        }
       }
 
       return session;
