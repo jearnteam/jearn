@@ -12,6 +12,7 @@ import { CallProvider } from "@/features/call/CallProvider";
 import CallRoot from "@/components/call/CallRoot";
 import ImageViewer from "@/components/image/ImageViewer";
 import SWRegister from "@/components/sw/SWRegister";
+import PwaInstallBanner from "@/components/PwaInstallBanner";
 
 export default function AppLayout({
   children,
@@ -65,6 +66,7 @@ export default function AppLayout({
           <SWRegister />
           <NotificationProvider>
             <Navbar />
+            <PwaInstallBanner />
             <AppNavigationBridge />
             <UploadProvider>
               <ImageViewer />

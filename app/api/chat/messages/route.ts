@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authConfig } from "@/features/auth/auth";
+import { emitChatNotification } from "@/lib/emitChatNotification";
 
 const PAGE_SIZE = 30;
 
@@ -83,9 +84,7 @@ export async function GET(req: Request) {
       text: m.text,
       createdAt: m.createdAt,
     })),
-    nextCursor: hasMore
-      ? pageDocs[pageDocs.length - 1]._id.toString()
-      : null,
+    nextCursor: hasMore ? pageDocs[pageDocs.length - 1]._id.toString() : null,
     isLastPage: !hasMore,
   });
 }
@@ -151,10 +150,26 @@ export async function POST(req: Request) {
 
   const result = await messagesCol.insertOne(doc);
 
-  await roomsCol.updateOne(
-    { _id: roomId },
-    { $set: { lastMessageAt: now } }
-  );
+  await roomsCol.updateOne({ _id: roomId }, { $set: { lastMessageAt: now } });
+
+  // ========================
+  // 🔔 CHAT PUSH
+  // ========================
+
+  // get all members except sender
+  const receiverIds = (room.members as ObjectId[])
+    .filter((id) => id.toString() !== myUid)
+    .map((id) => id.toString());
+
+  // send push to each
+  for (const receiverId of receiverIds) {
+    emitChatNotification({
+      userId: receiverId,
+      roomId: roomIdStr,
+      senderId: myUid,
+      message: doc.text,
+    }).catch(() => {});
+  }
 
   return NextResponse.json({
     id: result.insertedId.toString(),

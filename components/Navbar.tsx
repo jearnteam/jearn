@@ -13,7 +13,6 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useSearchHistory } from "@/features/search/useSearchHistory";
 import { SearchItem } from "@/types/search";
-import EnableNotifications from "./sw/EnableNotifications";
 
 const ThreeBall = dynamic(() => import("./3d_spinner/3d_spinner"), {
   ssr: false,
@@ -125,10 +124,10 @@ export default function Navbar() {
   };
 
   const goHome = () => {
-    closeSearch(); // close search overlay
-    document.activeElement instanceof HTMLElement &&
-      document.activeElement.blur(); // remove any focus
-    router.push("/");
+    closeSearch();
+    closeAllOverlays();
+
+    router.replace("/"); // ✅ FIX
   };
 
   useEffect(() => {
@@ -187,15 +186,9 @@ export default function Navbar() {
             closeAllOverlays();
 
             if (isHome) {
-              // already on home → refresh
-              setTimeout(() => {
-                window.location.reload();
-              }, 120);
+              window.location.reload();
             } else {
-              // navigate home
-              setTimeout(() => {
-                router.push("/");
-              }, 80);
+              router.replace("/");
             }
           }}
         >
@@ -206,7 +199,12 @@ export default function Navbar() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  router.back();
+
+                  if (window.history.length > 1) {
+                    window.history.back();
+                  } else {
+                    router.replace("/");
+                  }
                 }}
                 aria-label="Go back"
                 className="

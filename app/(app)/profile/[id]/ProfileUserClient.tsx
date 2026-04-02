@@ -188,7 +188,7 @@ export default function ProfileUserClient({
             <div className="flex flex-col items-center sm:items-start gap-4 flex-1">
               {/* Avatar + Name */}
               <div className="flex items-center gap-4">
-                <Avatar id={userId} size={72} className="border shrink-0" />
+                <Avatar id={userId} size={72} className="shrink-0" />
 
                 <div className="text-left">
                   <h1 className="text-xl font-bold break-words">{user.name}</h1>
